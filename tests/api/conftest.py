@@ -18,6 +18,8 @@ from blueberry_microid.infrastructure.config.settings import Settings
 from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
     Base,
+    DatasetItemModel,
+    DatasetSnapshotModel,
     HumanReviewModel,
     MicroImageModel,
     ModelVersionModel,
@@ -36,6 +38,8 @@ _SQLITE_TABLES = [
     AnalysisRunModel.__table__,
     HumanReviewModel.__table__,
     PredictionModel.__table__,
+    DatasetSnapshotModel.__table__,
+    DatasetItemModel.__table__,
 ]
 
 

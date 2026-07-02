@@ -44,6 +44,10 @@ class HumanReviewNotFoundError(NotFoundError):
     """Raised when a requested HumanReview or final review does not exist."""
 
 
+class DatasetSnapshotNotFoundError(NotFoundError):
+    """Raised when a requested DatasetSnapshot does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -62,6 +66,14 @@ class DuplicatePredictionError(ConflictError):
 
 class DuplicateFinalHumanReviewError(ConflictError):
     """Raised when more than one final HumanReview is attempted for a run."""
+
+
+class DuplicateDatasetSnapshotError(ConflictError):
+    """Raised when a dataset snapshot name/version already exists."""
+
+
+class DuplicateDatasetItemError(ConflictError):
+    """Raised when the same AnalysisRun is inserted twice in one DatasetSnapshot."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

@@ -88,6 +88,11 @@ class SqlAlchemyAnalysisRunRepository(AnalysisRunRepositoryPort):
         models = self._session.execute(statement).scalars().all()
         return [analysis_run_to_entity(model) for model in models]
 
+    def list_all(self) -> list[AnalysisRun]:
+        statement = select(AnalysisRunModel).order_by(AnalysisRunModel.created_at.asc(), AnalysisRunModel.id.asc())
+        models = self._session.execute(statement).scalars().all()
+        return [analysis_run_to_entity(model) for model in models]
+
     def _commit_or_flush(self) -> None:
         if self._auto_commit:
             self._session.commit()

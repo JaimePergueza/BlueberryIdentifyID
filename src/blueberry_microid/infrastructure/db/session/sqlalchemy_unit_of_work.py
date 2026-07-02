@@ -7,6 +7,12 @@ from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_repository import (
     SqlAlchemyAnalysisRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
+    SqlAlchemyDatasetItemRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapshot_repository import (
+    SqlAlchemyDatasetSnapshotRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
     SqlAlchemyHumanReviewRepository,
 )
@@ -41,6 +47,8 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
     def __enter__(self) -> "SqlAlchemyUnitOfWork":
         self.session = self._session_factory()
         self.analysis_run_repository = SqlAlchemyAnalysisRunRepository(self.session, auto_commit=False)
+        self.dataset_item_repository = SqlAlchemyDatasetItemRepository(self.session, auto_commit=False)
+        self.dataset_snapshot_repository = SqlAlchemyDatasetSnapshotRepository(self.session, auto_commit=False)
         self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)
         self.prediction_repository = SqlAlchemyPredictionRepository(self.session, auto_commit=False)
         return self

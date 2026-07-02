@@ -68,6 +68,14 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - No se debe eliminar ni sobrescribir la predicción original al aplicar una corrección humana: ambas coexisten (auditoría). `SubmitHumanReviewUseCase` nunca muta `Prediction`.
 - `HumanReview.is_final` marca cuál de las (potencialmente varias) revisiones de un `AnalysisRun` es la vigente; el resto son históricas. Como mucho una puede tener `is_final=True` por `AnalysisRun` — invariante aplicado a nivel de base de datos con un índice único parcial (`uq_human_reviews_one_final_per_run`), no solo en la entidad. `SubmitHumanReviewUseCase` despromueve cualquier revisión final anterior y añade la nueva final dentro de un único `UnitOfWork`; si la inserción falla, el rollback conserva la final anterior.
 
+## 5.1. Dataset curado (Fase 8)
+
+- `DatasetSnapshot` congela una versión de dataset para entrenamiento futuro; `DatasetItem` conserva referencias a `AnalysisRun`, `Sample`, `PetriImage`, `MicroImage`, `Prediction` y `HumanReview` final. No se copian imágenes ni se modifican datos originales.
+- Un item entrenable requiere una revisión humana final. `Prediction` por sí sola nunca es ground truth, aunque el motor mock haya producido una etiqueta.
+- Derivación permitida: `confirmed` usa `Prediction.predicted_label` porque el experto la aceptó; `corrected` usa `HumanReview.corrected_label`; `marked_inconclusive` solo entra si se solicita explícitamente; `rejected_invalid_sample` no entra como dato entrenable.
+- El manifest de dataset contiene rutas y metadata básica, nunca bytes de imagen, secretos, métricas de modelo, especies, géneros ni taxonomía.
+- Esta capa prepara datos trazables. No entrena modelos, no calcula accuracy/precision/recall/F1, no descarga datasets externos y no reemplaza `MockInferenceEngine`.
+
 ## 6. Estándares de código Python
 
 - Type hints obligatorios en toda función/método público. `mypy`-friendly (evitar `Any` salvo justificación).

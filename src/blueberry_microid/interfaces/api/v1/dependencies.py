@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from celery import Celery
 
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
+from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageStoragePort
 from blueberry_microid.application.ports.image_validator import ImageValidatorPort
@@ -29,6 +31,11 @@ from blueberry_microid.application.ports.prediction_repository import Prediction
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
+from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
+from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.get_dataset_snapshot import GetDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.list_dataset_items import ListDatasetItemsUseCase
+from blueberry_microid.application.use_cases.dataset.list_dataset_snapshots import ListDatasetSnapshotsUseCase
 from blueberry_microid.application.use_cases.inference.create_analysis_run import CreateAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_analysis_run import GetAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_prediction import GetPredictionForAnalysisRunUseCase
@@ -48,6 +55,12 @@ from blueberry_microid.application.use_cases.sample.get_sample import (
 from blueberry_microid.infrastructure.config.settings import Settings
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_repository import (
     SqlAlchemyAnalysisRunRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
+    SqlAlchemyDatasetItemRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapshot_repository import (
+    SqlAlchemyDatasetSnapshotRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
     SqlAlchemyHumanReviewRepository,
@@ -167,6 +180,14 @@ def get_human_review_repository(session: Session = Depends(get_db_session)) -> H
 
 def get_prediction_repository(session: Session = Depends(get_db_session)) -> PredictionRepositoryPort:
     return SqlAlchemyPredictionRepository(session)
+
+
+def get_dataset_snapshot_repository(session: Session = Depends(get_db_session)) -> DatasetSnapshotRepositoryPort:
+    return SqlAlchemyDatasetSnapshotRepository(session)
+
+
+def get_dataset_item_repository(session: Session = Depends(get_db_session)) -> DatasetItemRepositoryPort:
+    return SqlAlchemyDatasetItemRepository(session)
 
 
 # --- inference engine --------------------------------------------------------
@@ -299,3 +320,58 @@ def get_list_human_reviews_use_case(
     human_review_repository: HumanReviewRepositoryPort = Depends(get_human_review_repository),
 ) -> ListHumanReviewsUseCase:
     return ListHumanReviewsUseCase(analysis_run_repository, human_review_repository)
+
+
+def get_create_dataset_snapshot_use_case(
+    analysis_run_repository: AnalysisRunRepositoryPort = Depends(get_analysis_run_repository),
+    prediction_repository: PredictionRepositoryPort = Depends(get_prediction_repository),
+    human_review_repository: HumanReviewRepositoryPort = Depends(get_human_review_repository),
+    petri_image_repository: PetriImageRepositoryPort = Depends(get_petri_image_repository),
+    micro_image_repository: MicroImageRepositoryPort = Depends(get_micro_image_repository),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDatasetSnapshotUseCase:
+    return CreateDatasetSnapshotUseCase(
+        analysis_run_repository,
+        prediction_repository,
+        human_review_repository,
+        petri_image_repository,
+        micro_image_repository,
+        unit_of_work,
+    )
+
+
+def get_get_dataset_snapshot_use_case(
+    dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
+) -> GetDatasetSnapshotUseCase:
+    return GetDatasetSnapshotUseCase(dataset_snapshot_repository)
+
+
+def get_list_dataset_snapshots_use_case(
+    dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
+) -> ListDatasetSnapshotsUseCase:
+    return ListDatasetSnapshotsUseCase(dataset_snapshot_repository)
+
+
+def get_list_dataset_items_use_case(
+    dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
+    dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+) -> ListDatasetItemsUseCase:
+    return ListDatasetItemsUseCase(dataset_snapshot_repository, dataset_item_repository)
+
+
+def get_dataset_manifest_exporter(
+    dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
+    dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+    sample_repository: SampleRepositoryPort = Depends(get_sample_repository),
+    petri_image_repository: PetriImageRepositoryPort = Depends(get_petri_image_repository),
+    micro_image_repository: MicroImageRepositoryPort = Depends(get_micro_image_repository),
+    prediction_repository: PredictionRepositoryPort = Depends(get_prediction_repository),
+) -> DatasetManifestExporter:
+    return DatasetManifestExporter(
+        dataset_snapshot_repository,
+        dataset_item_repository,
+        sample_repository,
+        petri_image_repository,
+        micro_image_repository,
+        prediction_repository,
+    )

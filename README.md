@@ -14,35 +14,37 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 7)
+## MVP status (as of Fase 8)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
 creation, simulated (mock) inference with crash-safe/idempotent processing
-(synchronous or queued through Celery/Redis), and an auditable human-review flow (confirm/correct/mark
-inconclusive/reject) — all behind a versioned FastAPI, backed by SQLAlchemy
-models and Alembic migrations. 208 automated tests (196 SQLite/eager-based +
-12 PostgreSQL-only); the CI workflow is configured to run the fast suite on
-SQLite, apply migrations and PostgreSQL-only tests against a real PostgreSQL
-service, and run an operational Celery smoke against real PostgreSQL + Redis
-services on every push/PR to `main`.
+(synchronous or queued through Celery/Redis), an auditable human-review flow
+(confirm/correct/mark inconclusive/reject), and curated dataset snapshots for
+future training manifests — all behind a versioned FastAPI, backed by
+SQLAlchemy models and Alembic migrations. 222 automated tests
+(206 SQLite/eager-based + 16 PostgreSQL-only); the CI workflow runs the fast
+suite on SQLite, applies migrations and PostgreSQL-only tests against a real
+PostgreSQL service, and runs an operational Celery smoke against real
+PostgreSQL + Redis services on every push/PR to `main`.
 
-**What does not exist yet, on purpose:** a real or trained inference model (only
-`MockInferenceEngine`, a deterministic non-diagnostic simulation), any
-taxonomic species/genus identification, a frontend, and authentication.
+**What does not exist yet, on purpose:** a real or trained inference model
+(only `MockInferenceEngine`, a deterministic non-diagnostic simulation), any
+training run, performance metrics, taxonomic species/genus identification, a
+frontend, and authentication.
 
-**PostgreSQL validation status (Fase 6.5):** Estado B - workflow pushed,
-but the GitHub Actions run has not been observed from this environment.
-`origin` is configured as
-`https://github.com/JaimePergueza/BlueberryIdentifyID.git` and `main` was
-pushed successfully, but `gh` is not installed and the unauthenticated GitHub
-API request for Actions runs returned `404 Not Found` (for example, if the
-repository is private or requires authenticated API access). Do **not** treat
-PostgreSQL as validated in CI until a successful `postgres-migrations` run is
-confirmed. PostgreSQL was also **not** run in this local development
-environment, which has no Docker installed. To complete verification, open
-GitHub Actions and verify the `unit-and-api-tests` and
-`postgres-migrations` jobs; see `docs/development.md` § 15.
+**Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
+version and `DatasetItem` records traceable references to the original
+`AnalysisRun`, images, `Prediction`, and final `HumanReview`. A trainable item
+requires a final human review; `Prediction` alone is never ground truth.
+Manifests expose paths and metadata only, not image bytes, secrets, metrics, or
+taxonomy.
+
+**CI validation status:** GitHub Actions was observed green on 2026-07-02 for
+Fase 7.5 at commit `c4427c4df648ec0c9326d4b88e922435ffac60d6`, run
+`28618230579`: `unit-and-api-tests`, `postgres-migrations`, and
+`celery-smoke` all completed successfully. Local PostgreSQL/Redis smoke still
+requires Docker, which is not installed in this development environment.
 
 **Repository root folder name:** currently `IndetificadorMicro` (a
 misspelling); the recommended name is `BlueberryMicroID`. This has not been
@@ -105,7 +107,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
-- **PostgreSQL validation status:** Estado B as of Fase 6.5 - the GitHub Actions workflow was pushed to `origin`, but no run has been observed from this environment because `gh` is not installed and the unauthenticated Actions API request returned `404 Not Found`. PostgreSQL is therefore **not yet validated in CI**. To validate locally, start PostgreSQL and run `pytest -m postgres tests/integration/postgres` and `python scripts/check_postgres_migrations.py` - see `docs/development.md` § 5 and § 15.
+- **CI validation status:** as of Fase 7.5, GitHub Actions run `28618230579` passed `unit-and-api-tests`, `postgres-migrations`, and `celery-smoke` on commit `c4427c4df648ec0c9326d4b88e922435ffac60d6`. To validate locally, start PostgreSQL/Redis and run `pytest -m postgres tests/integration/postgres`, `python scripts/check_postgres_migrations.py`, and `python scripts/celery_smoke_test.py` - see `docs/development.md` § 5, § 15, and § 16.
 - **Continuous integration:** `.github/workflows/tests.yml` has three jobs on every push/PR to `main` - `unit-and-api-tests` (full suite on SQLite), `postgres-migrations` (real `postgres:16` service, Alembic migrations, PostgreSQL-only tests), and `celery-smoke` (real PostgreSQL + Redis services, real API process, real Celery worker, and `scripts/celery_smoke_test.py`). No deployment step, Docker image build, secrets, real AI, PyTorch, frontend, or taxonomy.
 
 ## API overview
@@ -119,6 +121,14 @@ Human review endpoints:
 - `POST /api/v1/analysis-runs/{analysis_run_id}/reviews` creates a review (`confirmed`, `corrected`, `marked_inconclusive`, or `rejected_invalid_sample`).
 - `GET /api/v1/analysis-runs/{analysis_run_id}/reviews` returns chronological review history.
 - `GET /api/v1/analysis-runs/{analysis_run_id}/reviews/final` returns the current final human review.
+
+Dataset endpoints:
+
+- `POST /api/v1/datasets/snapshots` creates a frozen curated dataset snapshot.
+- `GET /api/v1/datasets/snapshots` lists snapshots.
+- `GET /api/v1/datasets/snapshots/{dataset_snapshot_id}` returns snapshot metadata.
+- `GET /api/v1/datasets/snapshots/{dataset_snapshot_id}/items` lists traceable dataset items.
+- `GET /api/v1/datasets/snapshots/{dataset_snapshot_id}/manifest` returns a deterministic JSON manifest for future training pipelines.
 
 Async processing endpoints:
 

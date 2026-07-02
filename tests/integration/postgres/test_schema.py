@@ -26,6 +26,8 @@ _EXPECTED_TABLES = {
     "analysis_runs",
     "predictions",
     "human_reviews",
+    "dataset_snapshots",
+    "dataset_items",
 }
 
 

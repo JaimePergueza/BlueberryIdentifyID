@@ -23,6 +23,9 @@ from blueberry_microid.application.exceptions import (
     AnalysisRunNotReviewableError,
     ApplicationError,
     ConflictError,
+    DuplicateDatasetItemError,
+    DuplicateDatasetSnapshotError,
+    DatasetSnapshotNotFoundError,
     DuplicateFinalHumanReviewError,
     DuplicateModelVersionError,
     DuplicatePredictionError,
@@ -71,6 +74,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "analysis_run_not_found"
     if isinstance(exc, HumanReviewNotFoundError):
         return 404, "human_review_not_found"
+    if isinstance(exc, DatasetSnapshotNotFoundError):
+        return 404, "dataset_snapshot_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -84,6 +89,10 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_prediction"
     if isinstance(exc, DuplicateFinalHumanReviewError):
         return 409, "duplicate_final_human_review"
+    if isinstance(exc, DuplicateDatasetSnapshotError):
+        return 409, "duplicate_dataset_snapshot"
+    if isinstance(exc, DuplicateDatasetItemError):
+        return 409, "duplicate_dataset_item"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
     if isinstance(exc, ConflictError):

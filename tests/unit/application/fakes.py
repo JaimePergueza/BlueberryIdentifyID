@@ -18,6 +18,8 @@ from blueberry_microid.application.exceptions import (
     DuplicatePredictionError,
 )
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
+from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
 from blueberry_microid.application.ports.inference_engine import InferenceEnginePort, InferenceOutput
@@ -28,6 +30,8 @@ from blueberry_microid.application.ports.prediction_repository import Prediction
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
+from blueberry_microid.domain.entities.dataset_item import DatasetItem
+from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
@@ -124,6 +128,61 @@ class InMemoryAnalysisRunRepository(AnalysisRunRepositoryPort):
     def list_by_sample_id(self, sample_id: UUID) -> list[AnalysisRun]:
         return [run for run in self._by_id.values() if run.sample_id == sample_id]
 
+    def list_all(self) -> list[AnalysisRun]:
+        return sorted(self._by_id.values(), key=lambda run: (run.created_at, run.id))
+
+
+class InMemoryDatasetSnapshotRepository(DatasetSnapshotRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DatasetSnapshot] = {}
+
+    def add(self, dataset_snapshot: DatasetSnapshot) -> DatasetSnapshot:
+        self._by_id[dataset_snapshot.id] = dataset_snapshot
+        return dataset_snapshot
+
+    def get_by_id(self, dataset_snapshot_id: UUID) -> Optional[DatasetSnapshot]:
+        return self._by_id.get(dataset_snapshot_id)
+
+    def list_all(self) -> list[DatasetSnapshot]:
+        return sorted(self._by_id.values(), key=lambda snapshot: (snapshot.created_at, snapshot.id))
+
+
+class InMemoryDatasetItemRepository(DatasetItemRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DatasetItem] = {}
+
+    def add_many(self, dataset_items: list[DatasetItem]) -> list[DatasetItem]:
+        seen = {(item.dataset_snapshot_id, item.analysis_run_id) for item in self._by_id.values()}
+        for item in dataset_items:
+            key = (item.dataset_snapshot_id, item.analysis_run_id)
+            if key in seen:
+                raise ValueError("duplicate analysis_run in dataset snapshot")
+            seen.add(key)
+            self._by_id[item.id] = item
+        return dataset_items
+
+    def list_by_dataset_snapshot_id(self, dataset_snapshot_id: UUID) -> list[DatasetItem]:
+        return sorted(
+            [item for item in self._by_id.values() if item.dataset_snapshot_id == dataset_snapshot_id],
+            key=lambda item: (item.analysis_run_id, item.id),
+        )
+
+    def count_by_dataset_snapshot_id(self, dataset_snapshot_id: UUID) -> int:
+        return len(
+            [
+                item
+                for item in self._by_id.values()
+                if item.dataset_snapshot_id == dataset_snapshot_id and item.included
+            ]
+        )
+
+    def label_distribution_by_dataset_snapshot_id(self, dataset_snapshot_id: UUID) -> dict[str, int]:
+        distribution: dict[str, int] = {}
+        for item in self.list_by_dataset_snapshot_id(dataset_snapshot_id):
+            if item.included and item.ground_truth_label is not None:
+                distribution[item.ground_truth_label.value] = distribution.get(item.ground_truth_label.value, 0) + 1
+        return distribution
+
 
 class InMemoryPredictionRepository(PredictionRepositoryPort):
     def __init__(self) -> None:
@@ -210,10 +269,14 @@ class FakeUnitOfWork(UnitOfWorkPort):
         analysis_run_repository: AnalysisRunRepositoryPort,
         prediction_repository: PredictionRepositoryPort,
         human_review_repository: Optional[HumanReviewRepositoryPort] = None,
+        dataset_snapshot_repository: Optional[DatasetSnapshotRepositoryPort] = None,
+        dataset_item_repository: Optional[DatasetItemRepositoryPort] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
         self.human_review_repository = human_review_repository
+        self.dataset_snapshot_repository = dataset_snapshot_repository
+        self.dataset_item_repository = dataset_item_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
@@ -336,6 +399,9 @@ class UpdateFailingNTimesAnalysisRunRepository(AnalysisRunRepositoryPort):
 
     def list_by_sample_id(self, sample_id: UUID) -> list[AnalysisRun]:
         return self._delegate.list_by_sample_id(sample_id)
+
+    def list_all(self) -> list[AnalysisRun]:
+        return self._delegate.list_all()
 
 
 class InMemoryImageStorage(ImageStoragePort):

@@ -426,26 +426,26 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 7 this collects **208 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **196 passed, 12 skipped** (the 12 PostgreSQL-only tests
+As of Fase 8 this collects **222 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **206 passed, 16 skipped** (the 16 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 58 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, and `SubmitHumanReviewUseCase` final-review rollback) — no database, no filesystem. |
+| `tests/unit/application/` | 67 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, and curated dataset snapshot/manifest rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 66 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, and the human-review endpoints. |
-| `tests/integration/postgres/` | 12 | **PostgreSQL-only** (Fase 6): real migrations, JSONB, native ENUMs, partial unique index, CHECK constraints, UUID, and a full API smoke flow. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 67 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, and dataset snapshot manifest flow. |
+| `tests/integration/postgres/` | 16 | **PostgreSQL-only** (Fase 6/8): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 58 + 18 + 28 + 66 + 12 = **208**, matching `pytest --collect-only -q`.
+26 + 67 + 18 + 28 + 67 + 16 = **222**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
-188 in Fase 5, 200 in Fase 6, and 208 in Fase 7.)
+188 in Fase 5, 200 in Fase 6, 208 in Fase 7, and 222 in Fase 8.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -518,7 +518,7 @@ ARCHITECTURE.md § 20 for the design rationale.
 pytest -v
 ```
 
-As of Fase 7, on a machine without PostgreSQL this is **196 passed, 12 skipped** — the 12
+As of Fase 8, on a machine without PostgreSQL this is **206 passed, 16 skipped** — the 16
 PostgreSQL-only tests skip automatically. Nothing fails just because you have
 no database.
 
@@ -552,7 +552,7 @@ PostgreSQL. Each test then runs against a truncated-clean schema.
 
 ### What the PostgreSQL tests validate (that SQLite cannot)
 
-- All seven tables are created by the migrations.
+- All nine tables are created by the migrations.
 - `predictions.class_probabilities` is real `JSONB` (round-trips a dict, the
   `->>` operator works, and the server-side column type is `jsonb`).
 - Native `ENUM` columns store the enum **value** (`mock`, `pending`), not the
@@ -567,7 +567,7 @@ PostgreSQL. Each test then runs against a truncated-clean schema.
 
 ### CI
 
-`.github/workflows/tests.yml` now has two jobs:
+`.github/workflows/tests.yml` has three jobs:
 
 1. `unit-and-api-tests` — installs the project and runs the full suite. It
    does not set `DATABASE_URL`, so the PostgreSQL-only tests skip here.
@@ -576,6 +576,9 @@ PostgreSQL. Each test then runs against a truncated-clean schema.
    `DATABASE_URL`, runs `python scripts/check_postgres_migrations.py` (which
    applies the migrations and verifies they are reversible), then runs
    `pytest -m postgres tests/integration/postgres`.
+3. `celery-smoke` — starts PostgreSQL and Redis service containers, applies
+   Alembic migrations, starts a real API process and Celery worker, then runs
+   `scripts/celery_smoke_test.py`.
 
 No deployment, no Docker image build, and no secrets — the PostgreSQL
 credentials in the workflow are throwaway values for an ephemeral CI
@@ -690,3 +693,67 @@ worker and API process, then runs `scripts/celery_smoke_test.py`. It does
 not use secrets, deploy anything, build Docker images, run real AI, use
 PyTorch, or add taxonomy. The main source of truth remains `AnalysisRun` and
 `Prediction`; `/tasks/{task_id}` is only an auxiliary Celery status view.
+
+## 17. Curated dataset snapshots and manifests (Fase 8)
+
+Fase 8 adds a dataset curation layer for future training pipelines. It does
+not train models, calculate accuracy/precision/recall/F1, download external
+datasets, copy image files, add taxonomy, or replace `MockInferenceEngine`.
+
+Entities:
+
+- `DatasetSnapshot` is an immutable dataset version: name, version,
+  selection criteria, item count, label distribution, and notes.
+- `DatasetItem` is one traceable reference inside a snapshot. It points back
+  to the original `AnalysisRun`, `Sample`, `PetriImage`, `MicroImage`,
+  `Prediction`, and final `HumanReview`. Image bytes are not copied.
+
+Eligibility rules for trainable items:
+
+- The `AnalysisRun` must exist and must not be `pending` or `processing`.
+- A `Prediction` must exist, but it is not enough by itself.
+- A final `HumanReview` must exist.
+- The referenced Petri and micro images must exist.
+- `rejected_invalid_sample` is excluded from trainable items.
+- `marked_inconclusive` is excluded by default and included only when
+  `include_inconclusive=true`.
+- No species/genus/taxonomic label is created or exported.
+
+Ground truth derivation:
+
+- `confirmed`: ground truth is `Prediction.predicted_label`, because the
+  final human review accepted that broad visual label.
+- `corrected`: ground truth is `HumanReview.corrected_label`.
+- `marked_inconclusive`: ground truth is `inconclusive` only when explicitly
+  included.
+- `rejected_invalid_sample`: excluded from trainable items.
+
+Dataset endpoints:
+
+```bash
+POST /api/v1/datasets/snapshots
+GET  /api/v1/datasets/snapshots
+GET  /api/v1/datasets/snapshots/{dataset_snapshot_id}
+GET  /api/v1/datasets/snapshots/{dataset_snapshot_id}/items
+GET  /api/v1/datasets/snapshots/{dataset_snapshot_id}/manifest
+```
+
+Create example:
+
+```json
+{
+  "name": "curated-blueberry-v1",
+  "version": "0.1.0",
+  "description": "Reviewed AnalysisRuns only",
+  "created_by": "lab-team",
+  "include_inconclusive": false,
+  "include_rejected": false
+}
+```
+
+The manifest response is deterministic and includes snapshot metadata,
+`label_distribution`, and item rows with `analysis_run_id`, `sample_code`,
+Petri/micro image paths, broad `ground_truth_label`,
+`source_review_decision`, original `prediction_label`, `final_review_id`, and
+basic Petri/micro metadata. It does not include image binaries, secrets,
+model metrics, or taxonomy.

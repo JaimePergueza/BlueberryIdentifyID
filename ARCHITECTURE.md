@@ -504,3 +504,75 @@ Objetivo: comprobar que el flujo asíncrono funciona con cola real, no solo con 
 **Fuente de verdad.** `GET /tasks/{task_id}` solo prueba que el backend de resultados real recibe el resultado de Celery. La fuente durable sigue siendo `AnalysisRun` y `Prediction`; el smoke verifica ambos después del `SUCCESS`.
 
 **Riesgos pendientes antes de Fase 8.** (a) Si no se puede ejecutar Docker localmente, el smoke real queda validado por GitHub Actions, no por esta máquina. (b) El result backend de Celery sigue siendo auxiliar y puede tener retención limitada. (c) El worker real todavía procesa solo el mock determinista; una futura IA real requerirá otra fase de validación, no una extensión silenciosa de esta.
+
+## 24. Fase 8 — dataset curado, ground truth y exportación de manifest
+
+Objetivo: crear una capa formal para congelar datasets curados de
+`AnalysisRun` revisados por expertos, derivar una etiqueta de referencia y
+exportar un manifest reproducible para entrenamiento futuro. No se entrena
+ningún modelo, no se calcula ninguna métrica, no se descarga dataset externo,
+no se copia ninguna imagen, no se implementa IA real/PyTorch/frontend/auth, y
+no se agrega taxonomía microbiológica.
+
+**Diagnóstico de entidades existentes.** `Sample`, `PetriImage`,
+`MicroImage`, `AnalysisRun`, `Prediction` y `HumanReview.is_final` ya
+proporcionaban la trazabilidad necesaria: muestra de arándano, imagen de
+caja Petri, imagen microscópica, ejecución concreta, predicción mock
+preliminar y revisión humana final. Faltaba congelar una versión de dataset,
+guardar sus items trazables, derivar una etiqueta de referencia desde la
+revisión final y exportar un manifest determinista.
+
+**Nuevas entidades.** `DatasetSnapshot` representa una versión congelada con
+`name`, `version`, `selection_criteria`, `item_count`,
+`label_distribution`, `created_by` y `notes`. Es inmutable: no existe caso de
+uso de update. `DatasetItem` representa un item incluido o excluido dentro de
+un snapshot y conserva FKs a `AnalysisRun`, `Sample`, `PetriImage`,
+`MicroImage`, `Prediction` y `HumanReview` final. No copia imágenes ni borra
+datos originales.
+
+**Reglas de elegibilidad.** Un item entrenable requiere `AnalysisRun`
+existente, `Prediction` existente, `HumanReview` final existente, Petri y
+Micro existentes, y un estado distinto de `pending`/`processing`.
+`Prediction` sola nunca es ground truth. `rejected_invalid_sample` queda
+excluido del dataset entrenable. `marked_inconclusive` queda excluido por
+default y solo entra si `include_inconclusive=true`. No se generan etiquetas
+taxonómicas.
+
+**Derivación de ground truth.** Si la revisión final es `confirmed`, la
+etiqueta de referencia es `Prediction.predicted_label` porque el experto la
+aceptó. Si es `corrected`, la etiqueta es `HumanReview.corrected_label`. Si
+es `marked_inconclusive`, la etiqueta es `inconclusive` solo si se pidió
+incluir no concluyentes. Si es `rejected_invalid_sample`, el caso queda fuera
+del dataset entrenable. `Prediction` y `HumanReview` no se modifican.
+
+**Persistencia.** La migración `0003_dataset_snapshots.py` crea
+`dataset_snapshots` y `dataset_items`, con FKs a las tablas originales,
+`JSONB` para criterios/distribución en PostgreSQL, reutilización del enum
+`predicted_label` para `ground_truth_label`, y constraint único
+`dataset_snapshot_id + analysis_run_id` para impedir duplicados dentro del
+mismo snapshot. Las pruebas SQLite usan `PortableJSON`; las PostgreSQL
+validan migración, tablas, FKs, JSONB y constraint único.
+
+**Casos de uso y API.** `CreateDatasetSnapshotUseCase` selecciona candidatos,
+aplica reglas, deriva ground truth, calcula `item_count` y
+`label_distribution`, y guarda snapshot + items dentro de `UnitOfWork`.
+`GetDatasetSnapshotUseCase`, `ListDatasetSnapshotsUseCase` y
+`ListDatasetItemsUseCase` consultan DTOs. La API agrega:
+`POST /api/v1/datasets/snapshots`, `GET /api/v1/datasets/snapshots`,
+`GET /api/v1/datasets/snapshots/{id}`,
+`GET /api/v1/datasets/snapshots/{id}/items` y
+`GET /api/v1/datasets/snapshots/{id}/manifest`.
+
+**Manifest.** `DatasetManifestExporter` devuelve JSON determinista ordenado
+por `analysis_run_id`, con metadata del snapshot, distribución de etiquetas
+y items que incluyen rutas de imagen, metadata básica Petri/Micro,
+`ground_truth_label`, decisión de revisión fuente, etiqueta de predicción y
+`final_review_id`. No incluye contenido binario, secretos, métricas de
+modelo ni taxonomía.
+
+**Riesgos pendientes antes de Fase 9.** El dataset queda preparado para
+entrenamiento futuro, pero todavía falta definir protocolo externo de
+curación, control de calidad de revisores, política de versionado semántico
+de datasets, almacenamiento/descarga de manifests como artefactos, y
+validación de cualquier modelo real en una fase separada. El motor sigue
+siendo `MockInferenceEngine`.

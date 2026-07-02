@@ -49,3 +49,7 @@ class AnalysisRunRepositoryPort(ABC):
     @abstractmethod
     def list_by_sample_id(self, sample_id: UUID) -> list[AnalysisRun]:
         raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self) -> list[AnalysisRun]:
+        raise NotImplementedError

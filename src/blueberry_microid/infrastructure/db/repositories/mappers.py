@@ -6,6 +6,8 @@ application layer.
 """
 
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
+from blueberry_microid.domain.entities.dataset_item import DatasetItem
+from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
@@ -13,6 +15,8 @@ from blueberry_microid.domain.entities.petri_image import PetriImage
 from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
+from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
+from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
@@ -129,5 +133,38 @@ def human_review_to_entity(model: HumanReviewModel) -> HumanReview:
         corrected_label=model.corrected_label,
         comments=model.comments,
         is_final=model.is_final,
+        created_at=model.created_at,
+    )
+
+
+def dataset_snapshot_to_entity(model: DatasetSnapshotModel) -> DatasetSnapshot:
+    return DatasetSnapshot(
+        name=model.name,
+        version=model.version,
+        id=model.id,
+        description=model.description,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        selection_criteria=model.selection_criteria,
+        item_count=model.item_count,
+        label_distribution=model.label_distribution,
+        notes=model.notes,
+    )
+
+
+def dataset_item_to_entity(model: DatasetItemModel) -> DatasetItem:
+    return DatasetItem(
+        dataset_snapshot_id=model.dataset_snapshot_id,
+        analysis_run_id=model.analysis_run_id,
+        sample_id=model.sample_id,
+        petri_image_id=model.petri_image_id,
+        micro_image_id=model.micro_image_id,
+        prediction_id=model.prediction_id,
+        final_review_id=model.final_review_id,
+        source_review_decision=model.source_review_decision,
+        id=model.id,
+        ground_truth_label=model.ground_truth_label,
+        included=model.included,
+        exclusion_reason=model.exclusion_reason,
         created_at=model.created_at,
     )
