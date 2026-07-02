@@ -118,7 +118,7 @@ jobs:
       CELERY_TASK_ALWAYS_EAGER: "false"
       CELERY_TASK_EAGER_PROPAGATES: "true"
       API_BASE_URL: http://127.0.0.1:8000
-      STORAGE_ROOT: ${{ runner.temp }}/blueberry-storage
+      STORAGE_ROOT: /tmp/blueberry-storage
 
     steps:
       - uses: actions/checkout@v4
