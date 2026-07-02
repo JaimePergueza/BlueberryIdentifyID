@@ -23,13 +23,16 @@ from blueberry_microid.application.exceptions import (
     AnalysisRunNotReviewableError,
     ApplicationError,
     ConflictError,
+    DatasetReleaseNotFoundError,
+    DatasetSnapshotNotFoundError,
     DuplicateDatasetItemError,
     DuplicateDatasetSnapshotError,
-    DatasetSnapshotNotFoundError,
+    DuplicateDatasetSplitItemError,
     DuplicateFinalHumanReviewError,
     DuplicateModelVersionError,
     DuplicatePredictionError,
     DuplicateSampleCodeError,
+    EmptyDatasetSnapshotError,
     HumanReviewNotFoundError,
     ImageStorageCompensationError,
     ImageTooLargeError,
@@ -46,6 +49,7 @@ from blueberry_microid.domain.exceptions.errors import (
     CrossSampleAnalysisError,
     DomainError,
     InvalidAnalysisRunTransitionError,
+    InvalidSplitRatiosError,
     MissingCorrectedLabelError,
 )
 
@@ -76,6 +80,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "human_review_not_found"
     if isinstance(exc, DatasetSnapshotNotFoundError):
         return 404, "dataset_snapshot_not_found"
+    if isinstance(exc, DatasetReleaseNotFoundError):
+        return 404, "dataset_release_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -93,6 +99,10 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_dataset_snapshot"
     if isinstance(exc, DuplicateDatasetItemError):
         return 409, "duplicate_dataset_item"
+    if isinstance(exc, DuplicateDatasetSplitItemError):
+        return 409, "duplicate_dataset_split_item"
+    if isinstance(exc, EmptyDatasetSnapshotError):
+        return 409, "empty_dataset_snapshot"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
     if isinstance(exc, ConflictError):
@@ -109,6 +119,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 400, "image_sample_mismatch"
     if isinstance(exc, MissingCorrectedLabelError):
         return 422, "invalid_human_review"
+    if isinstance(exc, InvalidSplitRatiosError):
+        return 422, "invalid_split_ratios"
     # An AnalysisRun that is not `pending` (already processed, or currently
     # `processing`) cannot be processed again — this is the idempotency
     # guard from AnalysisRun.mark_processing(), surfaced as a conflict with

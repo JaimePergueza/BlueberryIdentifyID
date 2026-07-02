@@ -76,6 +76,18 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - El manifest de dataset contiene rutas y metadata básica, nunca bytes de imagen, secretos, métricas de modelo, especies, géneros ni taxonomía.
 - Esta capa prepara datos trazables. No entrena modelos, no calcula accuracy/precision/recall/F1, no descarga datasets externos y no reemplaza `MockInferenceEngine`.
 
+## 5.2. Dataset release y particiones train/validation/test (Fase 9)
+
+- `DatasetRelease` congela una partición reproducible (train/validation/test) de un `DatasetSnapshot` ya existente; `DatasetSplitItem` registra el split de cada `DatasetItem` dentro de esa release. Ninguno de los dos modifica ni copia el `DatasetSnapshot`/`DatasetItem` original — solo los leen.
+- **La partición es siempre a nivel de `Sample` (`sample_id`), nunca a nivel de `DatasetItem`/imagen individual.** Todo `DatasetItem` que comparta `sample_id` con otro debe terminar en el mismo split — esto es lo que previene la fuga de datos entre particiones. `DatasetSplitter` (`application/services/dataset_splitter.py`) es el único lugar autorizado para implementar esta regla; no dupliques la lógica de agrupación en un caso de uso o en un repositorio.
+- **Riesgo de fuga por `lot_code` documentado, no resuelto.** `Sample.lot_code` existe pero no se usa para particionar — dos `Sample`s del mismo lote pueden terminar en splits distintos. No "arregles" esto silenciosamente introduciendo partición por lote sin que el usuario lo pida explícitamente como una fase nueva; documentarlo ya es la decisión tomada (ver ARCHITECTURE.md §25).
+- **Determinismo obligatorio.** Dado el mismo `random_seed` y las mismas ratios, `DatasetSplitter` debe producir siempre la misma partición, sin importar el orden en que lleguen los `DatasetItem`s (nunca confiar en el orden de una consulta SQL). Los conteos de muestras por split (no el contenido) dependen solo de los ratios y el total de muestras, no del seed.
+- Los ratios (`train_ratio`/`validation_ratio`/`test_ratio`) deben sumar 1.0 y estar en `[0,1]`; validarlos con `validate_split_ratios()` (dominio, `domain/entities/dataset_release.py`), nunca reimplementar la suma/tolerancia en otro sitio. Ratios inválidos son `InvalidSplitRatiosError` → 422 `invalid_split_ratios`, no un 400 genérico.
+- Un dataset sin items incluidos (`included=True`) no puede generar una release: `EmptyDatasetSnapshotError` → 409. Un dataset pequeño (que deja algún split vacío) no debe fallar — debe generar la release igual y registrar un `WARNING` explícito vía `logging`, nunca fallar silenciosamente ni balancear artificialmente para evitar el split vacío.
+- No usar `scikit-learn` ni otra dependencia de ML para este split — es aritmética determinista simple (agrupar, ordenar, `random.Random(seed).shuffle`, cortar por ratio). Si en el futuro se justifica una librería, debe declararse en `pyproject.toml` y justificarse en ARCHITECTURE.md, igual que cualquier otra dependencia nueva.
+- El manifest de release (`DatasetReleaseManifestExporter`) sigue las mismas reglas que el manifest de snapshot: solo rutas y metadata, nunca binarios, secretos, métricas de modelo ni taxonomía. Añade `split` por item, nada más.
+- Esta capa sigue sin entrenar modelos, sin calcular métricas de rendimiento, sin descargar datasets externos y sin reemplazar `MockInferenceEngine`.
+
 ## 6. Estándares de código Python
 
 - Type hints obligatorios en toda función/método público. `mypy`-friendly (evitar `Any` salvo justificación).

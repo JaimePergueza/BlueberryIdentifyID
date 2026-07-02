@@ -19,7 +19,9 @@ from blueberry_microid.application.exceptions import (
 )
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
+from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
 from blueberry_microid.application.ports.inference_engine import InferenceEnginePort, InferenceOutput
@@ -31,7 +33,9 @@ from blueberry_microid.application.ports.sample_repository import SampleReposito
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
+from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
+from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
@@ -39,6 +43,7 @@ from blueberry_microid.domain.entities.petri_image import PetriImage
 from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.domain.enums.analysis_status import AnalysisStatus
+from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 
 
 class InMemorySampleRepository(SampleRepositoryPort):
@@ -184,6 +189,51 @@ class InMemoryDatasetItemRepository(DatasetItemRepositoryPort):
         return distribution
 
 
+class InMemoryDatasetReleaseRepository(DatasetReleaseRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DatasetRelease] = {}
+
+    def add(self, dataset_release: DatasetRelease) -> DatasetRelease:
+        self._by_id[dataset_release.id] = dataset_release
+        return dataset_release
+
+    def get_by_id(self, dataset_release_id: UUID) -> Optional[DatasetRelease]:
+        return self._by_id.get(dataset_release_id)
+
+    def list_by_dataset_snapshot_id(self, dataset_snapshot_id: UUID) -> list[DatasetRelease]:
+        return sorted(
+            [release for release in self._by_id.values() if release.dataset_snapshot_id == dataset_snapshot_id],
+            key=lambda release: (release.created_at, release.id),
+        )
+
+    def list_all(self) -> list[DatasetRelease]:
+        return sorted(self._by_id.values(), key=lambda release: (release.created_at, release.id))
+
+
+class InMemoryDatasetSplitItemRepository(DatasetSplitItemRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DatasetSplitItem] = {}
+
+    def add_many(self, dataset_split_items: list[DatasetSplitItem]) -> list[DatasetSplitItem]:
+        seen = {(item.dataset_release_id, item.dataset_item_id) for item in self._by_id.values()}
+        for item in dataset_split_items:
+            key = (item.dataset_release_id, item.dataset_item_id)
+            if key in seen:
+                raise ValueError("duplicate dataset_item in dataset release")
+            seen.add(key)
+            self._by_id[item.id] = item
+        return dataset_split_items
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[DatasetSplitItem]:
+        return sorted(
+            [item for item in self._by_id.values() if item.dataset_release_id == dataset_release_id],
+            key=lambda item: (item.dataset_item_id, item.id),
+        )
+
+    def list_by_split(self, dataset_release_id: UUID, split: DatasetSplit) -> list[DatasetSplitItem]:
+        return [item for item in self.list_by_dataset_release_id(dataset_release_id) if item.split == split]
+
+
 class InMemoryPredictionRepository(PredictionRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, Prediction] = {}
@@ -271,12 +321,16 @@ class FakeUnitOfWork(UnitOfWorkPort):
         human_review_repository: Optional[HumanReviewRepositoryPort] = None,
         dataset_snapshot_repository: Optional[DatasetSnapshotRepositoryPort] = None,
         dataset_item_repository: Optional[DatasetItemRepositoryPort] = None,
+        dataset_release_repository: Optional[DatasetReleaseRepositoryPort] = None,
+        dataset_split_item_repository: Optional[DatasetSplitItemRepositoryPort] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
         self.human_review_repository = human_review_repository
         self.dataset_snapshot_repository = dataset_snapshot_repository
         self.dataset_item_repository = dataset_item_repository
+        self.dataset_release_repository = dataset_release_repository
+        self.dataset_split_item_repository = dataset_split_item_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None

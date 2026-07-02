@@ -7,7 +7,9 @@ application layer.
 
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
+from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
+from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
@@ -16,7 +18,9 @@ from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
+from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
+from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
@@ -166,5 +170,40 @@ def dataset_item_to_entity(model: DatasetItemModel) -> DatasetItem:
         ground_truth_label=model.ground_truth_label,
         included=model.included,
         exclusion_reason=model.exclusion_reason,
+        created_at=model.created_at,
+    )
+
+
+def dataset_release_to_entity(model: DatasetReleaseModel) -> DatasetRelease:
+    return DatasetRelease(
+        dataset_snapshot_id=model.dataset_snapshot_id,
+        name=model.name,
+        version=model.version,
+        split_strategy=model.split_strategy,
+        random_seed=model.random_seed,
+        train_ratio=model.train_ratio,
+        validation_ratio=model.validation_ratio,
+        test_ratio=model.test_ratio,
+        id=model.id,
+        item_count=model.item_count,
+        train_count=model.train_count,
+        validation_count=model.validation_count,
+        test_count=model.test_count,
+        label_distribution=model.label_distribution,
+        split_distribution=model.split_distribution,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+    )
+
+
+def dataset_split_item_to_entity(model: DatasetSplitItemModel) -> DatasetSplitItem:
+    return DatasetSplitItem(
+        dataset_release_id=model.dataset_release_id,
+        dataset_item_id=model.dataset_item_id,
+        sample_id=model.sample_id,
+        split=model.split,
+        id=model.id,
+        ground_truth_label=model.ground_truth_label,
         created_at=model.created_at,
     )

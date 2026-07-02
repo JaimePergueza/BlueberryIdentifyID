@@ -35,3 +35,9 @@ class InvalidAnalysisRunTransitionError(DomainError):
     `needs_review`). This is the idempotency guard: an AnalysisRun can only
     ever be processed once; a retry requires creating a new AnalysisRun.
     """
+
+
+class InvalidSplitRatiosError(DomainError):
+    """Raised when a DatasetRelease's train/validation/test ratios are
+    outside [0, 1] or do not sum to 1.0 (within floating-point tolerance).
+    """

@@ -17,7 +17,9 @@ from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
     Base,
     DatasetItemModel,
+    DatasetReleaseModel,
     DatasetSnapshotModel,
+    DatasetSplitItemModel,
     HumanReviewModel,
     MicroImageModel,
     ModelVersionModel,
@@ -36,6 +38,8 @@ _SQLITE_TABLES = [
     PredictionModel.__table__,
     DatasetSnapshotModel.__table__,
     DatasetItemModel.__table__,
+    DatasetReleaseModel.__table__,
+    DatasetSplitItemModel.__table__,
 ]
 
 

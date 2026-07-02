@@ -6,7 +6,9 @@ configuration is used (e.g. by Base.metadata.create_all() or Alembic).
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.base import Base
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
+from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
+from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
@@ -18,7 +20,9 @@ __all__ = [
     "AnalysisRunModel",
     "Base",
     "DatasetItemModel",
+    "DatasetReleaseModel",
     "DatasetSnapshotModel",
+    "DatasetSplitItemModel",
     "HumanReviewModel",
     "MicroImageModel",
     "ModelVersionModel",

@@ -4,7 +4,9 @@ from typing import Optional
 
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
+from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 
@@ -28,7 +30,9 @@ class UnitOfWorkPort(ABC):
 
     analysis_run_repository: AnalysisRunRepositoryPort
     dataset_item_repository: DatasetItemRepositoryPort
+    dataset_release_repository: DatasetReleaseRepositoryPort
     dataset_snapshot_repository: DatasetSnapshotRepositoryPort
+    dataset_split_item_repository: DatasetSplitItemRepositoryPort
     human_review_repository: HumanReviewRepositoryPort
     prediction_repository: PredictionRepositoryPort
 

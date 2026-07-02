@@ -19,7 +19,9 @@ from celery import Celery
 
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
+from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageStoragePort
 from blueberry_microid.application.ports.image_validator import ImageValidatorPort
@@ -32,10 +34,16 @@ from blueberry_microid.application.ports.sample_repository import SampleReposito
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
+from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
+from blueberry_microid.application.services.dataset_splitter import DatasetSplitter
+from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_snapshot import GetDatasetSnapshotUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_items import ListDatasetItemsUseCase
+from blueberry_microid.application.use_cases.dataset.list_dataset_releases import ListDatasetReleasesUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_snapshots import ListDatasetSnapshotsUseCase
+from blueberry_microid.application.use_cases.dataset.list_dataset_split_items import ListDatasetSplitItemsUseCase
 from blueberry_microid.application.use_cases.inference.create_analysis_run import CreateAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_analysis_run import GetAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_prediction import GetPredictionForAnalysisRunUseCase
@@ -59,8 +67,14 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_re
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_release_repository import (
+    SqlAlchemyDatasetReleaseRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapshot_repository import (
     SqlAlchemyDatasetSnapshotRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_item_repository import (
+    SqlAlchemyDatasetSplitItemRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
     SqlAlchemyHumanReviewRepository,
@@ -188,6 +202,21 @@ def get_dataset_snapshot_repository(session: Session = Depends(get_db_session)) 
 
 def get_dataset_item_repository(session: Session = Depends(get_db_session)) -> DatasetItemRepositoryPort:
     return SqlAlchemyDatasetItemRepository(session)
+
+
+def get_dataset_release_repository(session: Session = Depends(get_db_session)) -> DatasetReleaseRepositoryPort:
+    return SqlAlchemyDatasetReleaseRepository(session)
+
+
+def get_dataset_split_item_repository(session: Session = Depends(get_db_session)) -> DatasetSplitItemRepositoryPort:
+    return SqlAlchemyDatasetSplitItemRepository(session)
+
+
+# --- dataset splitting service ------------------------------------------------
+
+
+def get_dataset_splitter() -> DatasetSplitter:
+    return DatasetSplitter()
 
 
 # --- inference engine --------------------------------------------------------
@@ -369,6 +398,59 @@ def get_dataset_manifest_exporter(
 ) -> DatasetManifestExporter:
     return DatasetManifestExporter(
         dataset_snapshot_repository,
+        dataset_item_repository,
+        sample_repository,
+        petri_image_repository,
+        micro_image_repository,
+        prediction_repository,
+    )
+
+
+def get_create_dataset_release_use_case(
+    dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
+    dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+    dataset_splitter: DatasetSplitter = Depends(get_dataset_splitter),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDatasetReleaseUseCase:
+    return CreateDatasetReleaseUseCase(
+        dataset_snapshot_repository,
+        dataset_item_repository,
+        dataset_splitter,
+        unit_of_work,
+    )
+
+
+def get_get_dataset_release_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+) -> GetDatasetReleaseUseCase:
+    return GetDatasetReleaseUseCase(dataset_release_repository)
+
+
+def get_list_dataset_releases_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+) -> ListDatasetReleasesUseCase:
+    return ListDatasetReleasesUseCase(dataset_release_repository)
+
+
+def get_list_dataset_split_items_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    dataset_split_item_repository: DatasetSplitItemRepositoryPort = Depends(get_dataset_split_item_repository),
+) -> ListDatasetSplitItemsUseCase:
+    return ListDatasetSplitItemsUseCase(dataset_release_repository, dataset_split_item_repository)
+
+
+def get_dataset_release_manifest_exporter(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    dataset_split_item_repository: DatasetSplitItemRepositoryPort = Depends(get_dataset_split_item_repository),
+    dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+    sample_repository: SampleRepositoryPort = Depends(get_sample_repository),
+    petri_image_repository: PetriImageRepositoryPort = Depends(get_petri_image_repository),
+    micro_image_repository: MicroImageRepositoryPort = Depends(get_micro_image_repository),
+    prediction_repository: PredictionRepositoryPort = Depends(get_prediction_repository),
+) -> DatasetReleaseManifestExporter:
+    return DatasetReleaseManifestExporter(
+        dataset_release_repository,
+        dataset_split_item_repository,
         dataset_item_repository,
         sample_repository,
         petri_image_repository,

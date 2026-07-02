@@ -426,26 +426,26 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 8 this collects **222 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **206 passed, 16 skipped** (the 16 PostgreSQL-only tests
+As of Fase 9 this collects **256 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **234 passed, 22 skipped** (the 22 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 67 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, and curated dataset snapshot/manifest rules) — no database, no filesystem. |
+| `tests/unit/application/` | 91 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, and `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism and leakage-prevention rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 67 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, and dataset snapshot manifest flow. |
-| `tests/integration/postgres/` | 16 | **PostgreSQL-only** (Fase 6/8): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 71 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, and dataset release/split/manifest flow. |
+| `tests/integration/postgres/` | 22 | **PostgreSQL-only** (Fase 6/8/9): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot and dataset release tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 67 + 18 + 28 + 67 + 16 = **222**, matching `pytest --collect-only -q`.
+26 + 91 + 18 + 28 + 71 + 22 = **256**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
-188 in Fase 5, 200 in Fase 6, 208 in Fase 7, and 222 in Fase 8.)
+188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, and 256 in Fase 9.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -757,3 +757,97 @@ Petri/micro image paths, broad `ground_truth_label`,
 `source_review_decision`, original `prediction_label`, `final_review_id`, and
 basic Petri/micro metadata. It does not include image binaries, secrets,
 model metrics, or taxonomy.
+
+## 18. Dataset releases and deterministic train/validation/test splits (Fase 9)
+
+Fase 9 adds a way to freeze a `DatasetSnapshot` into a reproducible
+train/validation/test partition for future training pipelines. It does not
+train a model, compute accuracy/precision/recall/F1, download an external
+dataset, copy image bytes, add taxonomy, or replace `MockInferenceEngine`.
+
+**`DatasetSnapshot` vs `DatasetRelease`:** a snapshot is *what* is curated
+(which `AnalysisRun`s qualify and their ground truth); a release is *how*
+that same, unmodified set of items is partitioned for a specific training
+run. The same snapshot can have many releases (different seeds, different
+ratios, different names/versions) without ever touching the snapshot or its
+items — `CreateDatasetReleaseUseCase` only reads them.
+
+Entities:
+
+- `DatasetRelease`: references a `DatasetSnapshot`, records
+  `split_strategy`, `random_seed`, the three ratios, item/train/validation/test
+  counts, an overall `label_distribution`, and a per-split
+  `split_distribution`.
+- `DatasetSplitItem`: one `DatasetItem`'s split assignment (`train`,
+  `validation`, or `test`) within a specific release, plus a denormalized
+  `sample_id` and `ground_truth_label` for direct auditing. A `DatasetItem`
+  can appear at most once per release (DB unique constraint on
+  `(dataset_release_id, dataset_item_id)`).
+
+**How splitting works (`DatasetSplitter`):** items are grouped by
+`sample_id` first; the list of unique sample ids is sorted by their string
+form (so incidental database/list ordering never affects the result), then
+shuffled with `random.Random(random_seed)`. The shuffled list is sliced into
+train/validation/test using `int(total_samples * ratio)` for train and
+validation, with test absorbing the remainder — so every sample is assigned
+exactly once even when the ratios don't divide evenly, and re-running with
+the same seed always reproduces the same partition. **All `DatasetItem`s
+that share a `sample_id` are assigned to the same split**, because the unit
+of partitioning is the Sample, never the individual item/image — this is
+what prevents one sample's Petri/microscopy evidence from leaking across
+train and evaluation.
+
+**Known, documented leakage risk this does *not* address:** `Sample.lot_code`
+(the batch a sample was collected from) is not considered by the splitter.
+Two different Samples from the same lot could still end up in different
+splits, and a model could in principle pick up on lot-level artifacts shared
+within a batch. This is a real, acknowledged limitation, not an oversight —
+see ARCHITECTURE.md § 25 for the full rationale on why sample-level
+splitting was implemented now and lot-level splitting was not.
+
+**Small/empty datasets:** requesting a release from a snapshot with zero
+`included` items returns `409 empty_dataset_snapshot`. A dataset too small
+to populate all three splits (e.g. 2 samples with the default 70/15/15
+ratios) does not fail — it still produces a valid release, but
+`DatasetSplitter` logs a `WARNING` when at least one split ends up empty, so
+this is visible in logs rather than silently accepted.
+
+**Ratios:** default to 70/15/15 (`train_ratio`/`validation_ratio`/`test_ratio`),
+configurable per release, and must sum to 1.0 (validated both in the
+splitter, before any work happens, and again in the `DatasetRelease` entity
+itself as a domain invariant). An invalid combination returns
+`422 invalid_split_ratios`.
+
+Dataset release endpoints:
+
+```bash
+POST /api/v1/datasets/releases
+GET  /api/v1/datasets/releases
+GET  /api/v1/datasets/releases/{dataset_release_id}
+GET  /api/v1/datasets/releases/{dataset_release_id}/items
+GET  /api/v1/datasets/releases/{dataset_release_id}/manifest
+```
+
+Create example:
+
+```json
+{
+  "dataset_snapshot_id": "11111111-1111-1111-1111-111111111111",
+  "name": "release-v1",
+  "version": "0.1.0",
+  "split_strategy": "random_by_sample",
+  "random_seed": 42,
+  "train_ratio": 0.70,
+  "validation_ratio": 0.15,
+  "test_ratio": 0.15,
+  "created_by": "lab-team"
+}
+```
+
+The release manifest is deterministic (sorted by split, then
+`analysis_run_id`) and includes release metadata (`ratios`, `counts`,
+`label_distribution`, `split_distribution`) plus item rows with `split`,
+`analysis_run_id`, `sample_code`, Petri/micro image paths,
+`ground_truth_label`, `source_review_decision`, `prediction_label`, and
+`final_review_id` — the same non-taxonomic, non-binary, metric-free shape as
+the Fase 8 snapshot manifest, with `split` added.

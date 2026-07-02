@@ -48,6 +48,10 @@ class DatasetSnapshotNotFoundError(NotFoundError):
     """Raised when a requested DatasetSnapshot does not exist."""
 
 
+class DatasetReleaseNotFoundError(NotFoundError):
+    """Raised when a requested DatasetRelease does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -74,6 +78,18 @@ class DuplicateDatasetSnapshotError(ConflictError):
 
 class DuplicateDatasetItemError(ConflictError):
     """Raised when the same AnalysisRun is inserted twice in one DatasetSnapshot."""
+
+
+class DuplicateDatasetSplitItemError(ConflictError):
+    """Raised when the same DatasetItem is inserted twice in one DatasetRelease."""
+
+
+class EmptyDatasetSnapshotError(ConflictError):
+    """Raised when a DatasetRelease is requested from a DatasetSnapshot that
+    has no `included` DatasetItems — there is nothing to split. Mapped to a
+    conflict (409), not a validation error: the snapshot reference itself is
+    valid, its current contents just cannot satisfy this request yet.
+    """
 
 
 class AnalysisRunNotReviewableError(ConflictError):
