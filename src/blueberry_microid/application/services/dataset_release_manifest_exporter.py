@@ -81,7 +81,10 @@ class DatasetReleaseManifestExporter:
                 {
                     "split": split_item.split.value,
                     "analysis_run_id": str(dataset_item.analysis_run_id),
+                    "sample_id": str(sample.id),
                     "sample_code": sample.sample_code,
+                    "lot_code": sample.lot_code,
+                    "origin": sample.origin,
                     "petri_image_path": petri_image.file_path,
                     "micro_image_path": micro_image.file_path,
                     "ground_truth_label": (
@@ -98,7 +101,10 @@ class DatasetReleaseManifestExporter:
             "dataset_snapshot_id": str(release.dataset_snapshot_id),
             "name": release.name,
             "version": release.version,
-            "split_strategy": release.split_strategy,
+            # Included so the manifest alone can be audited to confirm
+            # which leakage-prevention unit (Sample / lot / origin+lot) this
+            # release's splits actually respect.
+            "split_strategy": release.split_strategy.value,
             "random_seed": release.random_seed,
             "ratios": {
                 "train": release.train_ratio,

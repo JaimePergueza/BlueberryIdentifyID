@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
+from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 from blueberry_microid.domain.exceptions.errors import InvalidSplitRatiosError
 
 _RATIO_SUM_TOLERANCE = 1e-6
@@ -44,15 +45,16 @@ class DatasetRelease:
     Never copies image bytes and never mutates the DatasetSnapshot or its
     DatasetItems — it only records how each already-curated item was
     assigned to a split, deterministically, given `random_seed`. Partitioning
-    happens at the Sample level (see `DatasetSplitter`), never at the
-    individual DatasetItem/image level, to prevent leakage of a Sample's
-    evidence across splits.
+    happens at the group level defined by `split_strategy` (see
+    `SplitStrategy`/`DatasetSplitter`), never at the individual
+    DatasetItem/image level, to prevent leakage of a Sample's (or a lot's,
+    or an origin+lot's) evidence across splits.
     """
 
     dataset_snapshot_id: UUID
     name: str
     version: str
-    split_strategy: str
+    split_strategy: SplitStrategy
     random_seed: int
     train_ratio: float
     validation_ratio: float

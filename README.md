@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 9)
+## MVP status (as of Fase 10)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -22,9 +22,10 @@ creation, simulated (mock) inference with crash-safe/idempotent processing
 (synchronous or queued through Celery/Redis), an auditable human-review flow
 (confirm/correct/mark inconclusive/reject), curated dataset snapshots, and
 reproducible dataset releases with deterministic train/validation/test
-splits — all behind a versioned FastAPI, backed by SQLAlchemy models and
-Alembic migrations. 256 automated tests (234 SQLite/eager-based + 22
-PostgreSQL-only); the CI workflow runs the fast suite on SQLite, applies
+splits under three leakage-prevention strategies (`by_sample`, `by_lot`,
+`by_origin_lot`) — all behind a versioned FastAPI, backed by SQLAlchemy
+models and Alembic migrations. 289 automated tests (264 SQLite/eager-based +
+25 PostgreSQL-only); the CI workflow runs the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
 every push/PR to `main`.
@@ -42,20 +43,27 @@ Manifests expose paths and metadata only, not image bytes, secrets, metrics, or
 taxonomy.
 
 **Dataset releases and splits (Fase 9):** `DatasetRelease` freezes a
-reproducible train/validation/test partition of a `DatasetSnapshot`.
-Partitioning happens at the *Sample* level — every `DatasetItem` sharing a
-`sample_id` always lands in the same split — using a seeded, deterministic
-shuffle (`DatasetSplitter`), never sklearn or any new heavy dependency. A
-known, documented (not yet addressed) leakage risk: `Sample.lot_code` is not
-considered, so two Samples from the same lot could still land in different
-splits. See `docs/development.md` § 18 and ARCHITECTURE.md § 25.
+reproducible train/validation/test partition of a `DatasetSnapshot`, using a
+seeded, deterministic shuffle (`DatasetSplitter`), never sklearn or any new
+heavy dependency.
+
+**Advanced split strategies (Fase 10):** the default `by_sample` strategy
+only prevents a Sample's own evidence from leaking across splits. `by_lot`
+(groups by `Sample.lot_code`) and `by_origin_lot` (groups by
+`Sample.origin` + `lot_code`) are stricter options for when multiple Samples
+share a production lot and could let a model learn lot-specific conditions
+instead of a real pattern. Missing metadata never falls back silently to a
+weaker strategy — `by_lot`/`by_origin_lot` fail with
+`422 dataset_split_metadata_error` instead. None of the three strategies
+eliminates leakage risk completely (e.g. same-day/same-technician confounds
+are not modeled). See `docs/development.md` § 19 and ARCHITECTURE.md § 26.
 
 **CI validation status:** GitHub Actions was observed green on 2026-07-02 for
 Fase 7.5 at commit `c4427c4df648ec0c9326d4b88e922435ffac60d6`, run
 `28618230579`: `unit-and-api-tests`, `postgres-migrations`, and
-`celery-smoke` all completed successfully. Fases 8 and 9 have **not** been
-separately re-verified against a fresh Actions run in this session — only
-the local (SQLite) suite was run for them, and it stays green. Local
+`celery-smoke` all completed successfully. Fases 8, 9, and 10 have **not**
+been separately re-verified against a fresh Actions run in this session —
+only the local (SQLite) suite was run for them, and it stays green. Local
 PostgreSQL/Redis smoke still requires Docker, which is not installed in this
 development environment.
 

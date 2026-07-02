@@ -67,7 +67,7 @@ def _create_release(session, dataset_snapshot_id, **overrides) -> DatasetRelease
         dataset_snapshot_id=dataset_snapshot_id,
         name="pg-release",
         version="0.1.0",
-        split_strategy="random_by_sample",
+        split_strategy="by_sample",
         random_seed=42,
         train_ratio=0.70,
         validation_ratio=0.15,
@@ -190,7 +190,7 @@ def test_dataset_release_foreign_key_to_snapshot_is_enforced(pg_session):
         dataset_snapshot_id=uuid.uuid4(),
         name="pg-orphan-release",
         version="0.1.0",
-        split_strategy="random_by_sample",
+        split_strategy="by_sample",
         random_seed=1,
         train_ratio=0.7,
         validation_ratio=0.15,
@@ -200,3 +200,47 @@ def test_dataset_release_foreign_key_to_snapshot_is_enforced(pg_session):
 
     with pytest.raises(IntegrityError):
         pg_session.flush()
+
+
+def test_dataset_release_split_strategy_check_constraint_rejects_unknown_value(pg_session):
+    item = _create_dataset_item(pg_session, sample_code="S-PG-RELEASE-BADSTRATEGY")
+    release = DatasetReleaseModel(
+        dataset_snapshot_id=item.dataset_snapshot_id,
+        name="pg-bad-strategy-release",
+        version="0.1.0",
+        split_strategy="not_a_real_strategy",
+        random_seed=1,
+        train_ratio=0.7,
+        validation_ratio=0.15,
+        test_ratio=0.15,
+    )
+    pg_session.add(release)
+
+    with pytest.raises(IntegrityError):
+        pg_session.flush()
+
+
+def test_dataset_release_persists_with_by_lot_strategy(pg_session):
+    item = _create_dataset_item(pg_session, sample_code="S-PG-RELEASE-BYLOT")
+
+    release = _create_release(pg_session, item.dataset_snapshot_id, split_strategy="by_lot")
+    pg_session.refresh(release)
+
+    stored = pg_session.execute(
+        text("SELECT split_strategy FROM dataset_releases WHERE id = :id"),
+        {"id": release.id},
+    ).scalar_one()
+    assert stored == "by_lot"
+
+
+def test_dataset_release_persists_with_by_origin_lot_strategy(pg_session):
+    item = _create_dataset_item(pg_session, sample_code="S-PG-RELEASE-BYORIGINLOT")
+
+    release = _create_release(pg_session, item.dataset_snapshot_id, split_strategy="by_origin_lot")
+    pg_session.refresh(release)
+
+    stored = pg_session.execute(
+        text("SELECT split_strategy FROM dataset_releases WHERE id = :id"),
+        {"id": release.id},
+    ).scalar_one()
+    assert stored == "by_origin_lot"

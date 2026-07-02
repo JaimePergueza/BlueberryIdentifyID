@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,6 +20,12 @@ class DatasetReleaseModel(Base):
     """A reproducible train/validation/test partition of a DatasetSnapshot."""
 
     __tablename__ = "dataset_releases"
+    __table_args__ = (
+        CheckConstraint(
+            "split_strategy IN ('by_sample', 'by_lot', 'by_origin_lot')",
+            name="ck_dataset_releases_split_strategy",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataset_snapshot_id: Mapped[uuid.UUID] = mapped_column(

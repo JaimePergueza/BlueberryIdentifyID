@@ -25,6 +25,7 @@ from blueberry_microid.application.exceptions import (
     ConflictError,
     DatasetReleaseNotFoundError,
     DatasetSnapshotNotFoundError,
+    DatasetSplitMetadataError,
     DuplicateDatasetItemError,
     DuplicateDatasetSnapshotError,
     DuplicateDatasetSplitItemError,
@@ -121,6 +122,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 422, "invalid_human_review"
     if isinstance(exc, InvalidSplitRatiosError):
         return 422, "invalid_split_ratios"
+    if isinstance(exc, DatasetSplitMetadataError):
+        return 422, "dataset_split_metadata_error"
     # An AnalysisRun that is not `pending` (already processed, or currently
     # `processing`) cannot be processed again — this is the idempotency
     # guard from AnalysisRun.mark_processing(), surfaced as a conflict with

@@ -21,7 +21,7 @@ class SqlAlchemyDatasetReleaseRepository(DatasetReleaseRepositoryPort):
             dataset_snapshot_id=dataset_release.dataset_snapshot_id,
             name=dataset_release.name,
             version=dataset_release.version,
-            split_strategy=dataset_release.split_strategy,
+            split_strategy=dataset_release.split_strategy.value,
             random_seed=dataset_release.random_seed,
             train_ratio=dataset_release.train_ratio,
             validation_ratio=dataset_release.validation_ratio,

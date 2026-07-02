@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.review_decision import ReviewDecision
+from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 
 
 class DatasetSnapshotCreate(BaseModel):
@@ -58,7 +59,7 @@ class DatasetReleaseCreate(BaseModel):
     dataset_snapshot_id: UUID
     name: str
     version: str
-    split_strategy: str = "random_by_sample"
+    split_strategy: SplitStrategy = SplitStrategy.BY_SAMPLE
     random_seed: int = 42
     train_ratio: float = 0.70
     validation_ratio: float = 0.15
@@ -74,7 +75,7 @@ class DatasetReleaseRead(BaseModel):
     dataset_snapshot_id: UUID
     name: str
     version: str
-    split_strategy: str
+    split_strategy: SplitStrategy
     random_seed: int
     train_ratio: float
     validation_ratio: float

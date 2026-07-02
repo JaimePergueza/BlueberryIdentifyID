@@ -409,12 +409,14 @@ def get_dataset_manifest_exporter(
 def get_create_dataset_release_use_case(
     dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
     dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+    sample_repository: SampleRepositoryPort = Depends(get_sample_repository),
     dataset_splitter: DatasetSplitter = Depends(get_dataset_splitter),
     unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
 ) -> CreateDatasetReleaseUseCase:
     return CreateDatasetReleaseUseCase(
         dataset_snapshot_repository,
         dataset_item_repository,
+        sample_repository,
         dataset_splitter,
         unit_of_work,
     )

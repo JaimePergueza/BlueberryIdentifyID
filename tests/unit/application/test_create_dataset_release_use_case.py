@@ -56,7 +56,7 @@ def _make_context():
     snapshot_use_case = CreateDatasetSnapshotUseCase(
         analysis_repo, prediction_repo, review_repo, petri_repo, micro_repo, uow
     )
-    release_use_case = CreateDatasetReleaseUseCase(snapshot_repo, item_repo, DatasetSplitter(), uow)
+    release_use_case = CreateDatasetReleaseUseCase(snapshot_repo, item_repo, sample_repo, DatasetSplitter(), uow)
     return {
         "sample_repo": sample_repo,
         "petri_repo": petri_repo,

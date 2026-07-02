@@ -16,6 +16,7 @@ from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
 from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
+from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
@@ -179,7 +180,7 @@ def dataset_release_to_entity(model: DatasetReleaseModel) -> DatasetRelease:
         dataset_snapshot_id=model.dataset_snapshot_id,
         name=model.name,
         version=model.version,
-        split_strategy=model.split_strategy,
+        split_strategy=SplitStrategy(model.split_strategy),
         random_seed=model.random_seed,
         train_ratio=model.train_ratio,
         validation_ratio=model.validation_ratio,

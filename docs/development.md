@@ -426,26 +426,27 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 9 this collects **256 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **234 passed, 22 skipped** (the 22 PostgreSQL-only tests
+As of Fase 10 this collects **289 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **264 passed, 25 skipped** (the 25 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 91 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, and `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism and leakage-prevention rules) — no database, no filesystem. |
+| `tests/unit/application/` | 113 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, and `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, and `by_sample`/`by_lot`/`by_origin_lot` strategy rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 71 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, and dataset release/split/manifest flow. |
-| `tests/integration/postgres/` | 22 | **PostgreSQL-only** (Fase 6/8/9): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot and dataset release tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 79 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, and dataset release/split/manifest flow across all three split strategies. |
+| `tests/integration/postgres/` | 25 | **PostgreSQL-only** (Fase 6/8/9/10): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot and dataset release tables (incl. the `split_strategy` CHECK constraint), UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 91 + 18 + 28 + 71 + 22 = **256**, matching `pytest --collect-only -q`.
+26 + 113 + 18 + 28 + 79 + 25 = **289**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
-188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, and 256 in Fase 9.)
+188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
+and 289 in Fase 10.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -835,7 +836,7 @@ Create example:
   "dataset_snapshot_id": "11111111-1111-1111-1111-111111111111",
   "name": "release-v1",
   "version": "0.1.0",
-  "split_strategy": "random_by_sample",
+  "split_strategy": "by_sample",
   "random_seed": 42,
   "train_ratio": 0.70,
   "validation_ratio": 0.15,
@@ -845,9 +846,90 @@ Create example:
 ```
 
 The release manifest is deterministic (sorted by split, then
-`analysis_run_id`) and includes release metadata (`ratios`, `counts`,
-`label_distribution`, `split_distribution`) plus item rows with `split`,
-`analysis_run_id`, `sample_code`, Petri/micro image paths,
-`ground_truth_label`, `source_review_decision`, `prediction_label`, and
-`final_review_id` — the same non-taxonomic, non-binary, metric-free shape as
-the Fase 8 snapshot manifest, with `split` added.
+`analysis_run_id`) and includes release metadata (`split_strategy`,
+`ratios`, `counts`, `label_distribution`, `split_distribution`) plus item
+rows with `split`, `analysis_run_id`, `sample_id`, `sample_code`, `lot_code`,
+`origin`, Petri/micro image paths, `ground_truth_label`,
+`source_review_decision`, `prediction_label`, and `final_review_id` — the
+same non-taxonomic, non-binary, metric-free shape as the Fase 8 snapshot
+manifest, with `split`/`lot_code`/`origin` added so a release can be audited
+to confirm which leakage-prevention unit it actually respects. See § 19 for
+`by_lot`/`by_origin_lot` (Fase 10).
+
+## 19. Advanced split strategies: `by_sample`, `by_lot`, `by_origin_lot` (Fase 10)
+
+Fase 9's `by_sample` grouping prevents a Sample's own Petri/microscopy
+evidence from leaking across train/validation/test, but does **not**
+prevent leakage across Samples that share a `lot_code` — a model could
+still learn lot-specific conditions (culture medium batch, capture
+protocol, incubator, shared contamination) instead of a real
+microbiological pattern. Fase 10 adds two stricter grouping strategies. No
+model is trained in this phase, and none of this reduces leakage risk to
+zero — see the caveat at the end of this section.
+
+**The three strategies (`SplitStrategy`):**
+
+| Strategy | Groups by | Use when |
+|---|---|---|
+| `by_sample` (default) | `Sample.id` | The baseline for any release; no stricter grouping key is available or required. |
+| `by_lot` | `Sample.lot_code` | Multiple Samples share a production/collection lot and you want to rule out the model learning lot-specific artifacts. |
+| `by_origin_lot` | `(Sample.origin, Sample.lot_code)` | Samples from different origins can share the same `lot_code` value (e.g. two suppliers numbering lots independently) and you want origin and lot both to define the leakage-prevention unit — the strictest option. |
+
+Each is progressively stricter: `by_lot` is a superset of the guarantee
+`by_sample` gives (it also keeps every Sample's own evidence together, since
+grouping by lot only ever merges whole Samples, never splits one), and
+`by_origin_lot` is a superset of `by_lot`'s guarantee for the same reason.
+
+**Missing metadata never falls back silently.** Requesting `by_lot` when any
+relevant Sample has no `lot_code` (or `by_origin_lot` when any Sample is
+missing `origin` and/or `lot_code`) fails the whole release with
+`422 dataset_split_metadata_error`:
+
+```json
+{
+  "error": {
+    "code": "dataset_split_metadata_error",
+    "message": "sample '...' is missing lot_code, required by split_strategy='by_lot'"
+  }
+}
+```
+
+This is deliberate: silently degrading to `by_sample` (or silently excluding
+the incomplete Sample) would hide a real leakage risk instead of surfacing
+it. The fix is always to complete the Sample's metadata (`lot_code`/
+`origin`, settable at `POST /api/v1/samples`) and retry, not to relax the
+strategy.
+
+**Where the grouping actually happens.** `DatasetItem` was **not** widened
+with `lot_code`/`origin` — it still only carries `sample_id`, unchanged
+since Fase 8/9. `CreateDatasetReleaseUseCase` resolves each item's Sample
+metadata separately (via `SampleRepositoryPort`, only when
+`split_strategy != by_sample`, to avoid the extra lookups on the common
+path) and hands `DatasetSplitter` a `sample_id -> SampleSplitMetadata`
+lookup alongside the items. The splitter itself never imports the `Sample`
+entity — it only knows about this small, purpose-built metadata shape.
+
+**Backward compatibility.** Fase 9 only ever wrote the free-text value
+`"random_by_sample"` into `dataset_releases.split_strategy`. Migration
+`0005` normalizes any such existing row to `"by_sample"` (semantically
+identical — every Fase 9 release was already grouped by `sample_id`) before
+adding a `CHECK` constraint restricting the column to the three current
+values. `DatasetReleaseCreate`/`CreateDatasetReleaseRequest` both now
+default to `by_sample` instead of the old string.
+
+**Manifest and endpoints.** `GET /api/v1/datasets/releases/{id}/manifest`
+now includes `split_strategy` at the top level and `sample_id`, `lot_code`,
+`origin` per item — a release's manifest alone is now enough to audit which
+leakage-prevention unit it respects, without querying the database
+separately. No endpoint paths changed; `POST /api/v1/datasets/releases`
+accepts `split_strategy` (defaulting to `by_sample` when omitted, so
+existing callers are unaffected).
+
+**This reduces leakage risk — it does not eliminate it.** Even
+`by_origin_lot` cannot catch every possible confound (e.g. two different
+lots processed on the same day by the same technician, or a shared imaging
+setup change over time, are not modeled by any of these three strategies).
+Choosing a stricter strategy than the data can support is also
+counterproductive: it can start starving the smaller splits, which
+`DatasetSplitter` already flags with a `WARNING` log line when a partition
+ends up empty (see Fase 9).

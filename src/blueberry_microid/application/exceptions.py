@@ -92,6 +92,19 @@ class EmptyDatasetSnapshotError(ConflictError):
     """
 
 
+class DatasetSplitMetadataError(ApplicationError):
+    """Raised when a `by_lot`/`by_origin_lot` DatasetRelease is requested but
+    at least one DatasetItem's Sample is missing the `lot_code` (or
+    `origin`) that strategy requires to group by.
+
+    Deliberately fails the whole release rather than silently excluding the
+    item or falling back to `by_sample` — either would hide a real
+    data-leakage risk instead of surfacing it. Mapped to 422: the request
+    itself is well-formed, but the referenced data cannot satisfy the
+    requested split strategy.
+    """
+
+
 class AnalysisRunNotReviewableError(ConflictError):
     """Raised when an AnalysisRun is not in a state that permits review."""
 
