@@ -399,7 +399,8 @@ Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 
 SQLite-based tests do not replace validating migrations/constraints against
 real PostgreSQL — that is exactly what `tests/integration/postgres/` and the
-`postgres-migrations` CI job now do (§ 15).
+`postgres-migrations` CI job are designed to do once the workflow is pushed
+to GitHub and a successful run is observed (§ 15).
 
 ## 14. Project sanitation, Git, and CI (Fase 5.5)
 
@@ -441,7 +442,7 @@ business functionality. See ARCHITECTURE.md § 19 for the full rationale.
 
 Fase 6 closed the long-standing gap where the schema was only ever exercised
 against SQLite. There are now real PostgreSQL tests and a dedicated CI job
-that runs them against a live PostgreSQL service. No new business
+configured to run them against a live PostgreSQL service. No new business
 functionality was added — this is purely validation infrastructure. See
 ARCHITECTURE.md § 20 for the design rationale.
 
@@ -515,3 +516,34 @@ credentials in the workflow are throwaway values for an ephemeral CI
 database. Validating migrations against a *self-managed/production*
 PostgreSQL still uses the same `scripts/check_postgres_migrations.py` (§ 5)
 and remains an operational step outside CI.
+
+### CI verification status (Fase 6.5)
+
+Estado B: workflow created, execution pending.
+
+On 2026-07-02, the local repository was checked on branch `main` at commit
+`7535d6a` (`Add PostgreSQL validation workflow`). `git remote -v` returned no
+configured remotes, so no `git push origin main` was possible and no GitHub
+Actions run could be observed. PostgreSQL is therefore **not yet validated in
+CI**.
+
+Manual completion steps:
+
+```bash
+# 1. Create an empty GitHub repository manually.
+# 2. Add it as the origin remote.
+git remote add origin https://github.com/<owner>/<repo>.git
+
+# 3. Push the current main branch.
+git push -u origin main
+```
+
+Then open the repository in GitHub, go to **Actions**, select
+`.github/workflows/tests.yml`, and verify both jobs:
+
+1. `unit-and-api-tests`
+2. `postgres-migrations`
+
+Only after both jobs pass in a real GitHub Actions run may the project be
+described as PostgreSQL-validated in CI. If either job fails, record the run
+URL/id and the failing log excerpt here before moving to Fase 7.

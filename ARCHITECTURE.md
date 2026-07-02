@@ -432,13 +432,13 @@ Objetivo: esta fase no añade funcionalidad de negocio. Cierra deuda operativa a
 
 ## 20. Fase 6 — validación real de PostgreSQL, Alembic y CI con base de datos real (implementada)
 
-Objetivo: cerrar la brecha arrastrada desde la Fase 1 — el esquema solo se ejercitaba contra SQLite. Ahora existen tests que corren contra un PostgreSQL real y un job de CI dedicado que los ejecuta contra un contenedor de servicio PostgreSQL. No se añade funcionalidad de negocio: es puramente infraestructura de validación. Sin Celery, sin IA real, sin PyTorch, sin dataset, sin taxonomía, sin frontend.
+Objetivo: cerrar la brecha arrastrada desde la Fase 1 — el esquema solo se ejercitaba contra SQLite. Ahora existen tests que corren contra un PostgreSQL real y un job de CI dedicado configurado para ejecutarlos contra un contenedor de servicio PostgreSQL. No se añade funcionalidad de negocio: es puramente infraestructura de validación. Sin Celery, sin IA real, sin PyTorch, sin dataset, sin taxonomía, sin frontend.
 
 **Diagnóstico del CI anterior (Tarea 1).** El workflow de la Fase 5.5 tenía un único job (`test`) que instalaba el proyecto y corría `pytest -v` contra SQLite. Validaba: comportamiento de dominio/aplicación/API y las tablas que SQLite sí puede representar. **No** validaba: que las migraciones Alembic apliquen contra PostgreSQL, ni los tipos/constraints exclusivos de PostgreSQL (`JSONB`, `ENUM` nativos, índice único parcial, `CHECK`, `UUID`). Faltaba: un servicio PostgreSQL en CI, un `DATABASE_URL` apuntándolo, y tests que se ejecuten contra él.
 
 **CI con dos jobs (`.github/workflows/tests.yml`).** (1) `unit-and-api-tests`: instala y corre `pytest -v` sin `DATABASE_URL`, por lo que los tests exclusivos de PostgreSQL se saltan automáticamente. (2) `postgres-migrations`: levanta un `services: postgres:16` (`blueberry`/`blueberry`, base `blueberry_microid_test`, puerto 5432 con healthcheck `pg_isready`), define `DATABASE_URL=postgresql+psycopg://...`, ejecuta `python scripts/check_postgres_migrations.py` (aplica las migraciones y verifica reversibilidad), y luego `pytest -v -m postgres tests/integration/postgres`. Sin deploy, sin build de imagen Docker, sin secrets — las credenciales del workflow son valores desechables de una base efímera de CI, no secretos reales.
 
-**Marcador `postgres` y gating por entorno.** Se registró el marcador `postgres` en `pyproject.toml`. Los tests bajo `tests/integration/postgres/` llevan `pytestmark = pytest.mark.postgres` y dependen de fixtures que hacen `pytest.skip` salvo que la **variable de entorno** `DATABASE_URL` esté puesta y empiece por `postgresql`. El gate lee `os.environ` directamente, **no** `Settings` (cuyo default ya es una URL PostgreSQL aunque no haya nada configurado) — así la condición es "¿alguien proporcionó explícitamente una base PostgreSQL?", no "¿el default parece PostgreSQL?". Consecuencia: en local sin PostgreSQL, `pytest -v` reporta 188 passed, 12 skipped (nunca falla por no tener base); en el job de CI corren de verdad. En ningún caso se usa SQLite como sustituto de estos tests.
+**Marcador `postgres` y gating por entorno.** Se registró el marcador `postgres` en `pyproject.toml`. Los tests bajo `tests/integration/postgres/` llevan `pytestmark = pytest.mark.postgres` y dependen de fixtures que hacen `pytest.skip` salvo que la **variable de entorno** `DATABASE_URL` esté puesta y empiece por `postgresql`. El gate lee `os.environ` directamente, **no** `Settings` (cuyo default ya es una URL PostgreSQL aunque no haya nada configurado) — así la condición es "¿alguien proporcionó explícitamente una base PostgreSQL?", no "¿el default parece PostgreSQL?". Consecuencia: en local sin PostgreSQL, `pytest -v` reporta 188 passed, 12 skipped (nunca falla por no tener base); cuando el job de CI se ejecute en GitHub Actions, corren de verdad. En ningún caso se usa SQLite como sustituto de estos tests.
 
 **Fixtures (`tests/integration/postgres/conftest.py`).** `migrated_engine` (scope de sesión) fija `os.environ["DATABASE_URL"]` y aplica las **migraciones Alembic reales** vía la API de Alembic (`command.downgrade(base)` → `command.upgrade(head)`) — es decir, un run verde prueba que las migraciones son válidas en PostgreSQL, no solo que `create_all` funcionaría. `pg_session` (scope de función) entrega una sesión y hace `TRUNCATE ... RESTART IDENTITY CASCADE` de las siete tablas tras cada test (con `rollback()` previo, para que un test que disparó un error de constraint —dejando su transacción abortada— no rompa el truncado).
 
@@ -448,6 +448,25 @@ Objetivo: cerrar la brecha arrastrada desde la Fase 1 — el esquema solo se eje
 
 **`alembic/env.py` revisado (Tarea 7), sin cambios.** Ya lee `DATABASE_URL` de entorno y sobrescribe `sqlalchemy.url`; no tiene default a SQLite; usa una ruta relativa calculada (`parents[1]/src`), no absoluta; no requiere un `.env` real; no imprime secretos. Correcto tal cual para CI y local.
 
-**Estado real de PostgreSQL en este entorno.** Igual que en la Fase 5.5: esta máquina/sesión no tiene Docker (`docker: command not found`), así que los 12 tests PostgreSQL **no** se ejecutaron localmente — se reportan como `skipped` en local y su validación real ocurre en GitHub Actions. No se finge que pasaron localmente.
+**Estado real de PostgreSQL en este entorno.** Igual que en la Fase 5.5: esta máquina/sesión no tiene Docker (`docker: command not found`), así que los 12 tests PostgreSQL **no** se ejecutaron localmente — se reportan como `skipped` en local. Su validación real debe ocurrir en GitHub Actions, pero en Fase 6.5 todavía no se observó ningún run porque el repositorio local no tiene remoto GitHub configurado. No se finge que pasaron localmente ni en CI.
 
-**Riesgos pendientes antes de Fase 7.** (a) La validación PostgreSQL depende de que el job de CI corra en GitHub Actions; en este entorno local sigue sin Docker, así que no hay confirmación local. (b) El job de CI usa `postgres:16` con credenciales de prueba; una futura fase que despliegue necesitará validar también contra la versión/configuración exacta de PostgreSQL de producción. (c) Sigue sin haber Celery, IA real ni frontend — fuera de alcance por diseño hasta que se aprueben.
+**Riesgos pendientes antes de Fase 7.** (a) La validación PostgreSQL depende de que el job de CI corra en GitHub Actions; en este entorno local sigue sin Docker y en Fase 6.5 no hay remoto GitHub, así que no hay confirmación local ni de CI. (b) El job de CI usa `postgres:16` con credenciales de prueba; una futura fase que despliegue necesitará validar también contra la versión/configuración exacta de PostgreSQL de producción. (c) Sigue sin haber Celery, IA real ni frontend — fuera de alcance por diseño hasta que se aprueben.
+
+## 21. Fase 6.5 — verificación real del workflow CI PostgreSQL (Estado B)
+
+Objetivo: confirmar si el workflow de GitHub Actions realmente se ejecuta y pasa. No se implementó funcionalidad nueva: sin Celery, sin IA real, sin PyTorch, sin entrenamiento, sin datasets, sin frontend, sin autenticación y sin taxonomía microbiológica.
+
+**Estado Git observado el 2026-07-02.** Rama actual: `main`. Último commit antes de documentar esta fase: `7535d6a Add PostgreSQL validation workflow`. `git status --short` no mostró archivos modificados al inicio de la verificación (solo warnings del sandbox por `safe.directory`/ignore global inaccesible). `git log --oneline -5` mostró `7535d6a` seguido de `b098eb6 Initial BlueberryMicroID MVP backend`.
+
+**Remoto GitHub.** `git remote -v` no devolvió ningún remoto configurado. Por eso no se ejecutó `git push origin main`: no existe `origin`, no hay URL de GitHub que confirmar y no se debe inventar un remoto ni crear un repositorio externo sin autorización explícita.
+
+**Estado del workflow.** Estado B: `.github/workflows/tests.yml` existe y define los jobs `unit-and-api-tests` y `postgres-migrations`, pero no se observó ningún run real de GitHub Actions. PostgreSQL **no** queda validado en CI hasta que un run real termine exitosamente.
+
+**Pasos manuales para completar la verificación.**
+
+```bash
+git remote add origin https://github.com/<owner>/<repo>.git
+git push -u origin main
+```
+
+Después, abrir el repositorio en GitHub, entrar a **Actions**, seleccionar `.github/workflows/tests.yml`, y confirmar que pasen ambos jobs: `unit-and-api-tests` y `postgres-migrations`. Si falla alguno, registrar aquí el run id o URL y el resumen del error antes de avanzar a Fase 7. Si pasan ambos, actualizar esta sección a Estado A con fecha, hash y run id/URL.

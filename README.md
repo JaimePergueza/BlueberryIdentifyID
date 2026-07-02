@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 6)
+## MVP status (as of Fase 6.5)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -22,23 +22,25 @@ creation, simulated (mock) inference with crash-safe/idempotent processing,
 and an auditable human-review flow (confirm/correct/mark
 inconclusive/reject) — all behind a versioned FastAPI, backed by SQLAlchemy
 models and Alembic migrations. 200 automated tests (188 SQLite-based +
-12 PostgreSQL-only); CI runs the fast suite on SQLite **and**, in a separate
-job, applies the migrations to a real PostgreSQL service and runs the
-PostgreSQL-only tests against it, on every push/PR to `main`.
+12 PostgreSQL-only); the CI workflow is configured to run the fast suite on
+SQLite **and**, in a separate job, apply the migrations to a real PostgreSQL
+service and run the PostgreSQL-only tests against it on every push/PR to
+`main`.
 
 **What does not exist yet, on purpose:** Celery/async task processing (the
 API is fully synchronous), a real or trained inference model (only
 `MockInferenceEngine`, a deterministic non-diagnostic simulation), any
 taxonomic species/genus identification, a frontend, and authentication.
 
-**PostgreSQL validation status:** the schema and migrations are now validated
-against a real PostgreSQL **in GitHub Actions** (the `postgres-migrations`
-job). They were **not** run against PostgreSQL in this local development
-environment, which has no Docker installed — so the authoritative validation
-is CI, not a local run. To validate locally, start PostgreSQL and run
-`pytest -m postgres tests/integration/postgres` plus
-`python scripts/check_postgres_migrations.py` — see `docs/development.md`
-§ 5 and § 15.
+**PostgreSQL validation status (Fase 6.5):** Estado B - workflow created,
+but execution is still pending. This repository currently has no configured
+GitHub remote, so no push was performed and no GitHub Actions run has been
+observed. Do **not** treat PostgreSQL as validated in CI until a successful
+`postgres-migrations` run is confirmed. PostgreSQL was also **not** run in
+this local development environment, which has no Docker installed. To
+complete verification, create/configure a GitHub remote, push `main`, then
+verify the `unit-and-api-tests` and `postgres-migrations` jobs in Actions;
+see `docs/development.md` § 15.
 
 **Repository root folder name:** currently `IndetificadorMicro` (a
 misspelling); the recommended name is `BlueberryMicroID`. This has not been
@@ -83,7 +85,7 @@ export DATABASE_URL=postgresql+psycopg://blueberry:blueberry@localhost:5432/blue
 pytest -v -m postgres tests/integration/postgres
 ```
 
-See [docs/development.md](docs/development.md) for full details, including the exact current test count, how the fast suite uses SQLite, and how the PostgreSQL-only tests and the `postgres-migrations` CI job validate the real schema (§ 15).
+See [docs/development.md](docs/development.md) for full details, including the exact current test count, how the fast suite uses SQLite, and how the PostgreSQL-only tests and the `postgres-migrations` CI job are intended to validate the real schema once the workflow is pushed and observed (§ 15).
 
 ## Operational notes
 
@@ -93,8 +95,8 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
-- **PostgreSQL validation status:** validated against a real PostgreSQL in CI (the `postgres-migrations` job), not in this local development environment (no Docker installed here). To validate locally, start PostgreSQL and run `pytest -m postgres tests/integration/postgres` and `python scripts/check_postgres_migrations.py` — see `docs/development.md` § 5 and § 15.
-- **Continuous integration:** `.github/workflows/tests.yml` has two jobs on every push/PR to `main` — `unit-and-api-tests` (full suite on SQLite) and `postgres-migrations` (spins up a real `postgres:16` service, applies the Alembic migrations, and runs the PostgreSQL-only tests). No deployment step and no secrets.
+- **PostgreSQL validation status:** Estado B as of Fase 6.5 - the GitHub Actions workflow exists, but no run has been observed because no GitHub remote is configured. PostgreSQL is therefore **not yet validated in CI**. To validate locally, start PostgreSQL and run `pytest -m postgres tests/integration/postgres` and `python scripts/check_postgres_migrations.py` - see `docs/development.md` § 5 and § 15.
+- **Continuous integration:** `.github/workflows/tests.yml` has two jobs on every push/PR to `main` - `unit-and-api-tests` (full suite on SQLite) and `postgres-migrations` (spins up a real `postgres:16` service, applies the Alembic migrations, and runs the PostgreSQL-only tests). No deployment step and no secrets. Execution is pending until the repository is pushed to GitHub.
 
 ## API overview
 
