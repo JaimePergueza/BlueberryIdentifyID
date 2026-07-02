@@ -448,9 +448,9 @@ Objetivo: cerrar la brecha arrastrada desde la Fase 1 — el esquema solo se eje
 
 **`alembic/env.py` revisado (Tarea 7), sin cambios.** Ya lee `DATABASE_URL` de entorno y sobrescribe `sqlalchemy.url`; no tiene default a SQLite; usa una ruta relativa calculada (`parents[1]/src`), no absoluta; no requiere un `.env` real; no imprime secretos. Correcto tal cual para CI y local.
 
-**Estado real de PostgreSQL en este entorno.** Igual que en la Fase 5.5: esta máquina/sesión no tiene Docker (`docker: command not found`), así que los 12 tests PostgreSQL **no** se ejecutaron localmente — se reportan como `skipped` en local. Su validación real debe ocurrir en GitHub Actions, pero en Fase 6.5 todavía no se observó ningún run porque el repositorio local no tiene remoto GitHub configurado. No se finge que pasaron localmente ni en CI.
+**Estado real de PostgreSQL en este entorno.** Igual que en la Fase 5.5: esta máquina/sesión no tiene Docker (`docker: command not found`), así que los 12 tests PostgreSQL **no** se ejecutaron localmente — se reportan como `skipped` en local. Su validación real debe ocurrir en GitHub Actions, pero en Fase 6.5 todavía no se observó ningún run desde esta máquina: `main` sí fue subido a GitHub, pero no hay `gh` instalado y el API público de Actions respondió `404 Not Found`. No se finge que pasaron localmente ni en CI.
 
-**Riesgos pendientes antes de Fase 7.** (a) La validación PostgreSQL depende de que el job de CI corra en GitHub Actions; en este entorno local sigue sin Docker y en Fase 6.5 no hay remoto GitHub, así que no hay confirmación local ni de CI. (b) El job de CI usa `postgres:16` con credenciales de prueba; una futura fase que despliegue necesitará validar también contra la versión/configuración exacta de PostgreSQL de producción. (c) Sigue sin haber Celery, IA real ni frontend — fuera de alcance por diseño hasta que se aprueben.
+**Riesgos pendientes antes de Fase 7.** (a) La validación PostgreSQL depende de que el job de CI corra en GitHub Actions; en este entorno local sigue sin Docker y en Fase 6.5 el workflow fue subido, pero no se pudo observar el resultado desde esta máquina, así que no hay confirmación local ni de CI. (b) El job de CI usa `postgres:16` con credenciales de prueba; una futura fase que despliegue necesitará validar también contra la versión/configuración exacta de PostgreSQL de producción. (c) Sigue sin haber Celery, IA real ni frontend — fuera de alcance por diseño hasta que se aprueben.
 
 ## 21. Fase 6.5 — verificación real del workflow CI PostgreSQL (Estado B)
 
@@ -458,15 +458,8 @@ Objetivo: confirmar si el workflow de GitHub Actions realmente se ejecuta y pasa
 
 **Estado Git observado el 2026-07-02.** Rama actual: `main`. Último commit antes de documentar esta fase: `7535d6a Add PostgreSQL validation workflow`. `git status --short` no mostró archivos modificados al inicio de la verificación (solo warnings del sandbox por `safe.directory`/ignore global inaccesible). `git log --oneline -5` mostró `7535d6a` seguido de `b098eb6 Initial BlueberryMicroID MVP backend`.
 
-**Remoto GitHub.** `git remote -v` no devolvió ningún remoto configurado. Por eso no se ejecutó `git push origin main`: no existe `origin`, no hay URL de GitHub que confirmar y no se debe inventar un remoto ni crear un repositorio externo sin autorización explícita.
+**Remoto GitHub y push.** Al inicio `git remote -v` no devolvió ningún remoto configurado. Tras autorización explícita del usuario, se agregó `origin` con `https://github.com/JaimePergueza/BlueberryIdentifyID.git` y `git push origin main` terminó correctamente: `main -> main`.
 
-**Estado del workflow.** Estado B: `.github/workflows/tests.yml` existe y define los jobs `unit-and-api-tests` y `postgres-migrations`, pero no se observó ningún run real de GitHub Actions. PostgreSQL **no** queda validado en CI hasta que un run real termine exitosamente.
+**Estado del workflow.** Estado B: `.github/workflows/tests.yml` existe y define los jobs `unit-and-api-tests` y `postgres-migrations`, y la rama `main` fue subida al remoto. Aun así no se observó ningún run real de GitHub Actions desde este entorno: `gh --version` falla porque GitHub CLI no está instalado, y una consulta no autenticada a `https://api.github.com/repos/JaimePergueza/BlueberryIdentifyID/actions/runs?per_page=5` devolvió `404 Not Found`. PostgreSQL **no** queda validado en CI hasta que un run real termine exitosamente.
 
-**Pasos manuales para completar la verificación.**
-
-```bash
-git remote add origin https://github.com/<owner>/<repo>.git
-git push -u origin main
-```
-
-Después, abrir el repositorio en GitHub, entrar a **Actions**, seleccionar `.github/workflows/tests.yml`, y confirmar que pasen ambos jobs: `unit-and-api-tests` y `postgres-migrations`. Si falla alguno, registrar aquí el run id o URL y el resumen del error antes de avanzar a Fase 7. Si pasan ambos, actualizar esta sección a Estado A con fecha, hash y run id/URL.
+**Pasos manuales para completar la verificación.** Abrir el repositorio en GitHub, entrar a **Actions**, seleccionar `.github/workflows/tests.yml`, y confirmar que pasen ambos jobs: `unit-and-api-tests` y `postgres-migrations`. Si falla alguno, registrar aquí el run id o URL y el resumen del error antes de avanzar a Fase 7. Si pasan ambos, actualizar esta sección a Estado A con fecha, hash y run id/URL.

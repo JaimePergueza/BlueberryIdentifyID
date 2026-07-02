@@ -519,26 +519,20 @@ and remains an operational step outside CI.
 
 ### CI verification status (Fase 6.5)
 
-Estado B: workflow created, execution pending.
+Estado B: workflow pushed, verification pending.
 
 On 2026-07-02, the local repository was checked on branch `main` at commit
-`7535d6a` (`Add PostgreSQL validation workflow`). `git remote -v` returned no
-configured remotes, so no `git push origin main` was possible and no GitHub
-Actions run could be observed. PostgreSQL is therefore **not yet validated in
-CI**.
+`7535d6a` (`Add PostgreSQL validation workflow`) before this documentation
+update. After user approval, `origin` was configured as
+`https://github.com/JaimePergueza/BlueberryIdentifyID.git` and `main` was
+pushed successfully. However, no GitHub Actions run could be observed from
+this environment: `gh --version` failed because GitHub CLI is not installed,
+and an unauthenticated request to the GitHub Actions API returned `404 Not
+Found`. PostgreSQL is therefore **not yet validated in CI**.
 
-Manual completion steps:
+Manual verification steps:
 
-```bash
-# 1. Create an empty GitHub repository manually.
-# 2. Add it as the origin remote.
-git remote add origin https://github.com/<owner>/<repo>.git
-
-# 3. Push the current main branch.
-git push -u origin main
-```
-
-Then open the repository in GitHub, go to **Actions**, select
+Open the repository in GitHub, go to **Actions**, select
 `.github/workflows/tests.yml`, and verify both jobs:
 
 1. `unit-and-api-tests`

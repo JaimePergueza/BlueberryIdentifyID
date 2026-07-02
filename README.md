@@ -32,15 +32,18 @@ API is fully synchronous), a real or trained inference model (only
 `MockInferenceEngine`, a deterministic non-diagnostic simulation), any
 taxonomic species/genus identification, a frontend, and authentication.
 
-**PostgreSQL validation status (Fase 6.5):** Estado B - workflow created,
-but execution is still pending. This repository currently has no configured
-GitHub remote, so no push was performed and no GitHub Actions run has been
-observed. Do **not** treat PostgreSQL as validated in CI until a successful
-`postgres-migrations` run is confirmed. PostgreSQL was also **not** run in
-this local development environment, which has no Docker installed. To
-complete verification, create/configure a GitHub remote, push `main`, then
-verify the `unit-and-api-tests` and `postgres-migrations` jobs in Actions;
-see `docs/development.md` § 15.
+**PostgreSQL validation status (Fase 6.5):** Estado B - workflow pushed,
+but the GitHub Actions run has not been observed from this environment.
+`origin` is configured as
+`https://github.com/JaimePergueza/BlueberryIdentifyID.git` and `main` was
+pushed successfully, but `gh` is not installed and the unauthenticated GitHub
+API request for Actions runs returned `404 Not Found` (for example, if the
+repository is private or requires authenticated API access). Do **not** treat
+PostgreSQL as validated in CI until a successful `postgres-migrations` run is
+confirmed. PostgreSQL was also **not** run in this local development
+environment, which has no Docker installed. To complete verification, open
+GitHub Actions and verify the `unit-and-api-tests` and
+`postgres-migrations` jobs; see `docs/development.md` § 15.
 
 **Repository root folder name:** currently `IndetificadorMicro` (a
 misspelling); the recommended name is `BlueberryMicroID`. This has not been
@@ -95,8 +98,8 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
-- **PostgreSQL validation status:** Estado B as of Fase 6.5 - the GitHub Actions workflow exists, but no run has been observed because no GitHub remote is configured. PostgreSQL is therefore **not yet validated in CI**. To validate locally, start PostgreSQL and run `pytest -m postgres tests/integration/postgres` and `python scripts/check_postgres_migrations.py` - see `docs/development.md` § 5 and § 15.
-- **Continuous integration:** `.github/workflows/tests.yml` has two jobs on every push/PR to `main` - `unit-and-api-tests` (full suite on SQLite) and `postgres-migrations` (spins up a real `postgres:16` service, applies the Alembic migrations, and runs the PostgreSQL-only tests). No deployment step and no secrets. Execution is pending until the repository is pushed to GitHub.
+- **PostgreSQL validation status:** Estado B as of Fase 6.5 - the GitHub Actions workflow was pushed to `origin`, but no run has been observed from this environment because `gh` is not installed and the unauthenticated Actions API request returned `404 Not Found`. PostgreSQL is therefore **not yet validated in CI**. To validate locally, start PostgreSQL and run `pytest -m postgres tests/integration/postgres` and `python scripts/check_postgres_migrations.py` - see `docs/development.md` § 5 and § 15.
+- **Continuous integration:** `.github/workflows/tests.yml` has two jobs on every push/PR to `main` - `unit-and-api-tests` (full suite on SQLite) and `postgres-migrations` (spins up a real `postgres:16` service, applies the Alembic migrations, and runs the PostgreSQL-only tests). No deployment step and no secrets. The workflow must still be verified in GitHub Actions.
 
 ## API overview
 
