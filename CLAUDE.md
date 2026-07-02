@@ -1,0 +1,117 @@
+# CLAUDE.md — Reglas de desarrollo para BlueberryMicroID
+
+Este archivo define cómo debe comportarse cualquier sesión de desarrollo (humana o asistida por IA) sobre este repositorio. Es de lectura obligatoria antes de escribir código.
+
+## 1. Qué es este proyecto (y qué NO es)
+
+**BlueberryMicroID** es una **plataforma de apoyo al reconocimiento preliminar** de microorganismos asociados a **arándanos** (blueberry), mediante visión artificial multimodal que combina dos fuentes de imagen por muestra:
+
+1. **Imagen de caja Petri** (referida en el código como "imagen macro" solo por su escala relativa a la microscópica): fotografía de la caja Petri donde se observa el crecimiento/colonia obtenida en laboratorio.
+2. **Imagen microscópica**: fotografía obtenida por microscopio a partir de la muestra tomada de esa misma caja Petri.
+
+**No es** un sistema de diagnóstico microbiológico definitivo. **No es** un identificador taxonómico (especie/género) validado clínicamente. **No** reemplaza el criterio de un experto en microbiología. Cualquier código, texto de UI, documentación o commit que sugiera lo contrario debe corregirse antes de fusionarse.
+
+Reglas de alcance explícitas y no negociables:
+
+- **La imagen "macro" es siempre y únicamente una fotografía de la caja Petri con el crecimiento del microorganismo.** Nunca es una fotografía del fruto (arándano) en sí, ni de su superficie, color o estado externo.
+- **El sistema NO analiza la apariencia externa del arándano** (no hay clasificación de calidad de fruta, madurez, daño físico, etc. en este proyecto). Cualquier funcionalidad de ese tipo está fuera de alcance salvo que el usuario lo solicite explícitamente como un proyecto distinto.
+- El producto inicial y único soportado es **arándano (blueberry)**. No generalizar a "cualquier fruta" sin instrucción explícita.
+- La inferencia multimodal se basa exclusivamente en **imagen de caja Petri + imagen microscópica** de una misma muestra. Ninguna otra fuente de imagen es válida en el MVP.
+- No confundir estos conceptos en nombres de variables, endpoints, tablas ni documentación.
+
+## 2. Arquitectura obligatoria
+
+El proyecto sigue Clean Architecture con 5 capas, ubicadas en `src/blueberry_microid/`:
+
+| Capa | Carpeta | Puede importar de |
+|---|---|---|
+| domain | `domain/` | nada (capa más interna, sin dependencias externas) |
+| application | `application/` | `domain/` únicamente |
+| ml | `ml/` | `domain/` (entidades/value objects), nunca al revés |
+| infrastructure | `infrastructure/` | `domain/`, `application/` (implementa sus puertos) |
+| interfaces/api | `interfaces/` | `application/` (casos de uso), nunca directo a `infrastructure/` o `ml/` salvo vía inyección de dependencias |
+
+Reglas duras:
+
+- `domain/` no importa SQLAlchemy, FastAPI, PyTorch, OpenCV ni ninguna librería de infraestructura o ML. Son entidades y reglas de negocio puras (dataclasses/Pydantic simples, enums, excepciones de dominio).
+- `application/` define **puertos** (interfaces abstractas, ej. `SampleRepository`, `InferenceEngine`, `ImageStorage`) en `application/ports/` y los **casos de uso** que los consumen. Nunca conoce implementaciones concretas.
+- `infrastructure/` implementa esos puertos (repositorios SQLAlchemy, storage en disco/S3, config; Celery queda reservado para una fase futura).
+- `ml/` implementa el puerto `InferenceEngine` (u otros puertos de ML) pero vive separado de `infrastructure/` porque tiene un ciclo de vida distinto (modelos, pesos, versionado).
+- `interfaces/api/` solo orquesta: recibe HTTP, valida con Pydantic, llama a un caso de uso de `application/`, devuelve respuesta. Cero lógica de negocio aquí.
+- Nunca mezclar en un mismo archivo: endpoint + lógica de negocio + acceso a datos + inferencia. Si un archivo empieza a hacer más de una de estas cosas, se separa.
+- `interfaces/api/v1/dependencies.py` es el **único** módulo permitido para construir repositorios SQLAlchemy, `LocalImageStorage` o `PillowImageValidator` e inyectarlos en un caso de uso. Los routers importan de ahí funciones `get_*_use_case`, nunca una clase de infraestructura directamente.
+
+## 3. Separación macro / micro (no negociable)
+
+El sistema es multimodal por diseño. En todo el código, nombres, tablas y endpoints:
+
+- Usar `petri_image` / `PetriImage` para la imagen de caja Petri (imagen macro). En `ml/` la rama correspondiente se llama `petri_branch/`, **nunca** `macro_branch/` — ese nombre induce a pensar erróneamente en una foto del fruto.
+- Usar `micro_image` / `MicroImage` (o `microscopy_image`) para la imagen microscópica. En `ml/` la rama correspondiente es `micro_branch/`.
+- Nunca un tipo/entidad genérico llamado `Image` sin calificar de cuál de las dos se trata, salvo en una interfaz común muy explícita (ej. `SampleImage` abstracto del que heredan ambas).
+- Toda muestra (`Sample`) debe poder rastrear su relación 1—N con `PetriImage` y `MicroImage`. No se permite un resultado de inferencia sin trazabilidad a las imágenes de origen ni sin saber exactamente qué `PetriImage` y qué `MicroImage` se usaron (ver `AnalysisRun`).
+- **Transiciones de estado de `AnalysisRun` viven en la entidad, no en el caso de uso ni en el repositorio.** `mark_processing()`/`mark_completed()`/`mark_needs_review()`/`mark_failed(msg)` validan su propio origen permitido (`pending`→`processing`→estado final) y lanzan `InvalidAnalysisRunTransitionError` si no corresponde — esto es lo que hace imposible reprocesar un `AnalysisRun` ya terminado desde cualquier punto de entrada. Nunca dupliques esa validación de estado en un caso de uso; solo llama al método de la entidad y deja que lance si corresponde.
+- **La transición `pending → processing` real (con garantía de concurrencia) no la hace `mark_processing()`.** Desde la Fase 4.5, `ProcessAnalysisRunUseCase` usa `AnalysisRunRepositoryPort.claim_for_processing(analysis_run_id)` — una única sentencia `UPDATE ... WHERE status = 'pending'` verificada por `rowcount` — porque un chequeo en memoria (`mark_processing()`) no puede impedir que dos llamadas concurrentes, cada una con su propia copia del `AnalysisRun`, pasen la validación al mismo tiempo. `mark_processing()` se conserva en la entidad como documentación/prueba de la regla de negocio en aislamiento, pero **ningún caso de uso nuevo debe depender de ella para garantizar exclusividad** — esa garantía solo puede darla una operación atómica de base de datos. Ver ARCHITECTURE.md §17.
+
+## 4. Reglas sobre IA y modelos
+
+- Desde la Fase 4 existe `InferenceEnginePort` (`application/ports/inference_engine.py`) y una única implementación, `MockInferenceEngine` (`ml/inference_engine/mock_inference_engine.py`): determinista (hash de `analysis_run.id`, sin aleatoriedad), **no lee ni decodifica bytes de imagen** (no abre `file_path`, no usa Pillow/OpenCV/Cellpose/PyTorch), y sus `confidence_score` nunca superan ~0.75. Cualquier motor nuevo (real o de terceros) debe implementar el mismo puerto, sin tocar `application/` ni `interfaces/` — el único punto que elige el motor es `interfaces/api/v1/dependencies.py::get_inference_engine()`.
+- Todo resultado de inferencia debe registrar: modelo usado, versión del modelo (`ModelVersion` vía `AnalysisRun.model_version_id`), timestamp, nivel de confianza (si aplica). Nunca omitir esta trazabilidad "para simplificar".
+- **Prohibido inventar métricas.** No escribir accuracy, precision, recall, F1 ni ninguna métrica de modelo que no provenga de una evaluación real documentada. Si no existe evaluación, el campo correspondiente debe quedar `null`/ausente, no un número de relleno.
+- **Prohibido inventar taxonomía.** No generar nombres de especie/género de hongos o bacterias como si el sistema los hubiera identificado, y no afirmar identificación taxonómica exacta sin dataset, protocolo y validación de expertos. Las clases del MVP (`no_evident_growth`, `suspicious_growth`, `probable_fungal_growth`, `probable_bacterial_growth`, `inconclusive`) son categorías visuales amplias, no diagnósticos ni taxones. `MockInferenceEngine` nunca debe extenderse con nombres de especie/género, ni siquiera como "ejemplo" o "placeholder".
+- Todo modelo debe ser versionado explícitamente (campo `model_version` o tabla `ModelVersion`). No se sobrescribe un modelo "en caliente" sin nueva versión.
+- **Un procesamiento fallido en `/process` no devuelve 200 OK.** `ProcessAnalysisRunUseCase` envuelve en un único `try/except` todo lo que ocurre después de `claim_for_processing()` (la llamada al motor, la construcción de `Prediction`, la transacción final) y, ante cualquier excepción, primero marca el `AnalysisRun` como `failed` con `error_message` controlado en su propia transacción. Si la recuperación tiene éxito, levanta `AnalysisProcessingError` (→ 500 `analysis_processing_failed`, mensaje seguro, detalle técnico solo en logs). Si ocurre `DuplicatePredictionError`, también marca `failed` y relanza 409 `duplicate_prediction`, sin crear una segunda `Prediction`. **`processing` nunca debe quedar como estado permanente**: si hasta el intento de marcar `failed` fallara (el único escenario que de verdad no se puede autorreparar), se registra en `CRITICAL` con el error original preservado y se lanza `AnalysisRunFinalizationError` (→ 500 controlado, sin traza cruda al cliente) — ver ARCHITECTURE.md §17.
+
+## 5. Revisión humana
+
+- Desde la Fase 5, una predicción procesada puede recibir revisiones humanas por API: confirmar, corregir a una de las cinco etiquetas visuales permitidas, marcar como no concluyente o rechazar la muestra como inválida. No existe estado `pending_review` separado para `Prediction`: el estado operativo vive en `AnalysisRun` (`completed` o `needs_review`) y la auditoría vive en `HumanReview`.
+- El resultado final que se considera "de referencia" para curación de dataset o reentrenamientos futuros es la revisión humana final, no la predicción cruda del modelo. Esto no implica que ya exista dataset, entrenamiento ni métricas.
+- No se debe eliminar ni sobrescribir la predicción original al aplicar una corrección humana: ambas coexisten (auditoría). `SubmitHumanReviewUseCase` nunca muta `Prediction`.
+- `HumanReview.is_final` marca cuál de las (potencialmente varias) revisiones de un `AnalysisRun` es la vigente; el resto son históricas. Como mucho una puede tener `is_final=True` por `AnalysisRun` — invariante aplicado a nivel de base de datos con un índice único parcial (`uq_human_reviews_one_final_per_run`), no solo en la entidad. `SubmitHumanReviewUseCase` despromueve cualquier revisión final anterior y añade la nueva final dentro de un único `UnitOfWork`; si la inserción falla, el rollback conserva la final anterior.
+
+## 6. Estándares de código Python
+
+- Type hints obligatorios en toda función/método público. `mypy`-friendly (evitar `Any` salvo justificación).
+- `domain/` y `application/` usan `dataclasses` estándar (entidades, DTOs, requests) — nunca Pydantic, para no acoplar esas capas a una librería de validación web. Pydantic se reserva para `interfaces/api/v1/schemas/` (frontera HTTP).
+- Nombres explícitos en inglés para código (`sample`, `petri_image`, `micro_image`, `analysis_run`, `human_review`); comentarios y docs pueden estar en español si el equipo lo prefiere, pero mantener consistencia dentro de un mismo archivo.
+- Sin código muerto, sin TODOs sin ticket asociado, sin `print()` (usar logging estructurado).
+- Tests con Pytest para cada caso de uso de `application/` (con dobles de prueba en memoria, sin base de datos), pruebas de integración con SQLite para los repositorios en `infrastructure/db/repositories/`, y pruebas de API con `TestClient` en `tests/api/` (SQLite compartida vía `StaticPool` + storage temporal). Los tests de `ml/` deben validar el contrato del puerto, no la "precisión" del stub. `pytest` (sin argumentos) ya apunta a `tests/` vía `testpaths` en `pyproject.toml`.
+
+## 7. Manejo de errores y validación
+
+- Dos familias de excepciones, no una: `domain.exceptions` protege invariantes de entidades (ej. `sample_code` vacío); `application.exceptions` cubre fallos de orquestación que solo existen una vez que hay un repositorio o recurso externo de por medio (`SampleNotFoundError`, `DuplicateSampleCodeError`, `InvalidImageError`, etc.). Los casos de uso lanzan/dejan propagar ambas según corresponda.
+- Desde la Fase 3, `interfaces/api/error_handlers.py` traduce ambas familias a `{"error": {"code": ..., "message": ...}}` con el status HTTP correspondiente (ver la tabla completa en ARCHITECTURE.md §14 y las adiciones de Fases 4–5: `InvalidAnalysisRunTransitionError`→409, `DuplicatePredictionError`→409, `PredictionNotFoundError`→404, `AnalysisProcessingError`→500, `AnalysisRunFinalizationError`→500, errores de revisión humana 404/409/422 según corresponda). Los errores de validación básica de Pydantic/FastAPI (campo faltante, enum inválido) siguen usando el formato por defecto de FastAPI (`{"detail": [...]}`) — solo las excepciones de dominio/aplicación usan el formato propio.
+- **Gotcha de Starlette a recordar:** registrar un handler para la clase `Exception` a secas lo instala como fallback de `ServerErrorMiddleware`, que responde **y vuelve a lanzar** la excepción (para que `TestClient` la siga mostrando en desarrollo). Si solo registras ahí, tus excepciones propias se propagan como excepción Python en vez de devolver JSON. Hay que registrar también para las superclases concretas que sí quieres que respondan sin relanzar (`ApplicationError`, `DomainError`), y dejar `Exception` únicamente como red de seguridad para bugs no anticipados. En tests de API usar `TestClient(app, raise_server_exceptions=False)`.
+- Todo endpoint valida entrada (Pydantic) y maneja errores de forma explícita (excepciones → códigos HTTP en la capa API, nunca al revés). La API nunca duplica una regla de negocio ya aplicada en `application/`: solo traduce entrada/salida e invoca el caso de uso.
+- Rutas con un segmento literal y un path param en el mismo prefijo (ej. `/samples/by-code/{sample_code}` vs `/samples/{sample_id}`) deben registrarse con el segmento literal primero — FastAPI resuelve por orden de registro, y si el path param fuera primero, capturaría el segmento literal como su propio valor.
+- Toda imagen cargada (Petri o micro) pasa por `ImageValidatorPort` antes de guardarse o persistirse: tamaño > 0, MIME permitido (`image/jpeg`, `image/png`, `image/tiff`), extensión permitida (`.jpg`, `.jpeg`, `.png`, `.tif`, `.tiff`), decodificable por Pillow sin corrupción, **y** (desde la Fase 3.5) el formato real detectado por Pillow debe coincidir tanto con el MIME declarado como con la extensión — `UploadFile.content_type` y el nombre de archivo son datos que el cliente declara, no una prueba. Si algo de esto falla, se rechaza con `InvalidImageError`; no se intenta "arreglar" la imagen de forma silenciosa.
+- **Nunca confiar en un `file_size_bytes` declarado por el llamador.** Todo caso de uso que reciba bytes de imagen debe calcular `len(content)` y usar ese valor como fuente de verdad; si el llamador declaró un tamaño distinto, se rechaza con `InvalidImageError` antes de tocar storage o base de datos (ver `ImageIntakeService`).
+- **Límite de subida siempre desde `Settings`, nunca hardcodeado.** `MAX_UPLOAD_SIZE_MB` (default 20) se inyecta en `ImageIntakeService` vía `dependencies.py`; si `len(content)` lo excede, se lanza `ImageTooLargeError` (→ 413) antes de validar formato o tocar storage. Es una excepción distinta de `InvalidImageError` (400) porque el archivo puede ser perfectamente válido, solo que grande.
+- `ImageStoragePort` nunca confía en el nombre de archivo original para construir la ruta final (riesgo de colisión/path traversal): el nombre final siempre es un UUID nuevo, conservando solo la extensión si es una de las permitidas.
+- **Nunca dejar un archivo huérfano.** Si `ImageStoragePort.save()` tiene éxito pero la persistencia en base de datos falla después, el caso de uso debe llamar a `ImageStoragePort.delete()` (vía `ImageIntakeService.cleanup()`) antes de relanzar el error original. Si el borrado compensatorio también falla, envolver ambos errores en `ImageStorageCompensationError` encadenada (`raise ... from original_error`) — nunca ocultar el error original.
+- Cada repositorio SQLAlchemy gestiona su propia transacción (`commit` por llamada) — **salvo** dentro de un `UnitOfWorkPort`, donde los repositorios expuestos por `uow` usan `auto_commit=False` (hacen `flush()`, no `commit()`) para que todas sus escrituras se confirmen juntas con un único `uow.commit()`. Desde la Fase 4, `ProcessAnalysisRunUseCase` agrupa la creación de `Prediction` junto con el cambio de estado final del `AnalysisRun`; desde la Fase 5, `SubmitHumanReviewUseCase` agrupa la despromoción de reviews finales previas y la inserción de la nueva final. Usa este mismo patrón (extender `UnitOfWorkPort` con los repositorios que necesites como atributos, no importar SQLAlchemy en el caso de uso) si un caso de uso futuro necesita escribir más de un agregado de forma atómica.
+- **Idempotencia y anti-doble-procesamiento vía reclamo atómico (Fase 4.5).** Cualquier caso de uso que transicione un recurso de un estado inicial a "en proceso" antes de un trabajo potencialmente lento/fallible debe usar una actualización condicional a nivel de base de datos (`UPDATE ... WHERE <condición del estado inicial>`, verificando `rowcount`) en vez de "leer en Python, validar en la entidad, escribir" — ese patrón de lectura-modificación-escritura no impide que dos llamadas concurrentes pasen la validación en memoria al mismo tiempo. Ver `AnalysisRunRepositoryPort.claim_for_processing()` como referencia y ARCHITECTURE.md §17 para el razonamiento completo (por qué la Opción B — actualización condicional — se prefirió sobre el bloqueo pesimista `SELECT ... FOR UPDATE`, que no se comporta igual bajo SQLite).
+- Nunca hardcodear rutas absolutas ni credenciales. Toda configuración (`DATABASE_URL`, rutas de storage, `MAX_UPLOAD_SIZE_MB`, `LOG_LEVEL`/`LOG_FORMAT`, etc.) se lee vía `infrastructure/config/settings.py` (`pydantic-settings`), nunca directamente de `os.environ` disperso por el código.
+- **Todo request tiene un `request_id`** (de `X-Request-ID` si el cliente lo envía, generado si no), guardado en `request.state.request_id` por `RequestLoggingMiddleware` y estampado en la respuesta (éxito o error) como header `X-Request-ID`. Todo error 5xx se loguea en servidor con traza completa (`exc_info`); el cliente nunca ve esos detalles, solo un `code` y un mensaje genérico. No usar `print()`: usar `logging` (ver `infrastructure/logging/`), nunca un servicio externo.
+
+## 8. Qué evitar en esta etapa
+
+- No añadir frontend ni dashboard.
+- No entrenar ni integrar modelos reales de PyTorch, ni añadir OpenCV/Cellpose al motor de inferencia. `MockInferenceEngine` es, y debe seguir siendo hasta que se apruebe explícitamente lo contrario, la única implementación de `InferenceEnginePort` — determinista, sin leer contenido real de imagen.
+- No implementar Celery ni encolar nada hacia él, aunque Redis ya esté en `docker-compose.yml` (reservado, sin consumidor). `POST /analysis-runs/{id}/process` sigue siendo síncrono.
+- No añadir autenticación (ni básica ni compleja) hasta que se apruebe explícitamente esa fase.
+- No añadir CORS a la API salvo que el usuario lo pida explícitamente como preparación documentada para un frontend futuro — no se agrega "por si acaso".
+- No introducir pgvector/búsqueda vectorial hasta que exista una necesidad concreta del MVP.
+- No crear abstracciones especulativas ("por si en el futuro soportamos otra fruta") sin que el usuario lo pida explícitamente.
+- No añadir dependencias nuevas al stack sin reflejarlas en `pyproject.toml` y justificarlas en `ARCHITECTURE.md`.
+- No hacer que un caso de uso en `application/` importe SQLAlchemy, Pillow, FastAPI o cualquier detalle de infraestructura directamente — siempre a través de un puerto inyectado en el constructor. `Depends(...)` no debe aparecer fuera de `interfaces/`.
+- No afirmar que una migración de Alembic "fue validada" si solo se ejecutó en modo offline (`--sql`) o contra SQLite. Solo cuenta como validada si `alembic upgrade head` (o `scripts/check_postgres_migrations.py`, que hace exactamente eso más una verificación de reversibilidad) corrió contra una instancia real de PostgreSQL y reportó éxito. Si no fue posible (p. ej. sin Docker disponible), decirlo explícitamente — incluyendo si el script de verificación fue ejecutado y falló por falta de conexión, que es distinto de "no se intentó".
+- No instalar/actualizar dependencias del proyecto directamente en un entorno Python global compartido con otras herramientas sin verificar antes si hay conflictos de versiones (ver ARCHITECTURE.md §14, incidente con `starlette`/`sse-starlette`). Preferir un entorno virtual dedicado (`python -m venv .venv`) cuando sea posible.
+- No renombrar la carpeta raíz del repositorio (`D:\IndetificadorMicro` → `D:\BlueberryMicroID`) desde dentro de una sesión de Claude Code que la tenga como directorio de trabajo — es una operación insegura para el harness. El renombrado es un paso manual documentado en `docs/development.md` (Prerequisites) y ARCHITECTURE.md §19; el paquete Python (`blueberry_microid`) ya está correctamente nombrado y no depende de esta carpeta.
+- No añadir un servicio PostgreSQL al workflow de CI (`.github/workflows/tests.yml`) "para completar la validación" sin que el usuario lo pida explícitamente — el CI actual es deliberadamente mínimo (SQLite únicamente) y la validación contra PostgreSQL real sigue siendo un paso manual y aparte (ver §8 más arriba sobre no afirmar migraciones validadas sin PostgreSQL real).
+
+## 9. Antes de cada sesión de desarrollo
+
+1. Releer este archivo y `ARCHITECTURE.md`.
+2. Verificar en qué fase del MVP se está trabajando (ver `docs/`).
+3. Desde la Fase 5.5, el repositorio tiene control de versiones real (`git init` ejecutado, rama por defecto `main`). Ejecutar `git status --short` antes de empezar a modificar código para no confundir cambios propios con trabajo en curso preexistente sin commitear.
+4. No avanzar de fase sin validación del usuario si la tarea implica una decisión arquitectónica nueva.

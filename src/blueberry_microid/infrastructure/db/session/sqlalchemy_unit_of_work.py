@@ -1,0 +1,70 @@
+from types import TracebackType
+from typing import Optional
+
+from sqlalchemy.orm import Session, sessionmaker
+
+from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_repository import (
+    SqlAlchemyAnalysisRunRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
+    SqlAlchemyHumanReviewRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_prediction_repository import (
+    SqlAlchemyPredictionRepository,
+)
+
+
+class SqlAlchemyUnitOfWork(UnitOfWorkPort):
+    """Wraps one SQLAlchemy Session as a single commit/rollback boundary.
+
+    Usage::
+
+        uow = SqlAlchemyUnitOfWork(session_factory)
+        with uow:
+            uow.prediction_repository.add(prediction)
+            uow.analysis_run_repository.update(analysis_run)
+            uow.commit()
+        # falling out of the `with` block without an explicit commit(), or
+        # raising inside it, rolls back everything.
+
+    `analysis_run_repository`/`prediction_repository` are constructed with
+    `auto_commit=False` — they only `flush()` on writes, so their changes
+    become visible to this transaction (constraint violations still raise
+    immediately) without being made durable until `commit()` is called here.
+    """
+
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+        self.session: Optional[Session] = None
+
+    def __enter__(self) -> "SqlAlchemyUnitOfWork":
+        self.session = self._session_factory()
+        self.analysis_run_repository = SqlAlchemyAnalysisRunRepository(self.session, auto_commit=False)
+        self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)
+        self.prediction_repository = SqlAlchemyPredictionRepository(self.session, auto_commit=False)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
+        assert self.session is not None
+        try:
+            # Roll back anything not already committed, whether or not an
+            # exception occurred. If the caller already called commit()
+            # explicitly inside the `with` block, this is a no-op.
+            self.rollback()
+        finally:
+            self.session.close()
+            self.session = None
+
+    def commit(self) -> None:
+        assert self.session is not None
+        self.session.commit()
+
+    def rollback(self) -> None:
+        assert self.session is not None
+        self.session.rollback()
