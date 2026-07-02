@@ -55,3 +55,12 @@ class AnalysisRunProcessRead(BaseModel):
     analysis_run: AnalysisRunRead
     prediction: Optional[PredictionRead]
     disclaimer: str
+
+
+class AnalysisRunAsyncProcessRead(BaseModel):
+    """Response of `POST /analysis-runs/{id}/process-async`."""
+
+    analysis_run_id: UUID
+    task_id: str
+    status: str
+    message: str

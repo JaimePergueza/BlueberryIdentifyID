@@ -56,7 +56,7 @@ BlueberryMicroID/
 │   │   │   ├── repositories/     # Sqlalchemy*Repository (Fase 2, +Prediction en Fase 4) + mappers.py (ORM -> entidad)
 │   │   │   └── session/          # create_db_engine, create_session_factory, SqlAlchemyUnitOfWork (repos internos desde Fase 4)
 │   │   ├── storage/               # LocalImageStorage + PillowImageValidator (Fase 2; validación estricta desde Fase 3.5)
-│   │   ├── tasks/                  # Celery tasks (fase futura, todavía vacío/sin consumidor)
+│   │   ├── tasks/                  # Celery app + task de procesamiento mock asíncrono (Fase 7)
 │   │   ├── config/                 # Settings (pydantic-settings): DATABASE_URL, MAX_UPLOAD_SIZE_MB, LOG_LEVEL/LOG_FORMAT...
 │   │   └── logging/                 # configure_logging, RequestLoggingMiddleware, formatters (Fase 3.5)
 │   │
@@ -88,7 +88,7 @@ BlueberryMicroID/
 ├── scripts/
 │   ├── check_postgres_migrations.py  # Valida Alembic contra Postgres real; falla fuerte y claro si no hay conexión (Fase 3.5)
 │   └── api_smoke_test.py               # Camino feliz end-to-end contra un servidor real, sin datasets externos (Fase 3.5)
-├── docker-compose.yml       # PostgreSQL + Redis (Redis reservado, sin uso todavía)
+├── docker-compose.yml       # PostgreSQL + Redis (broker/backend Celery local desde Fase 7)
 ├── docs/
 │   └── development.md        # venv, instalación, Docker, migraciones, logging, límites, smoke test, tests
 ├── pyproject.toml            # Dependencias formales del proyecto (Fase 3)
@@ -125,7 +125,7 @@ Un `AnalysisRun` **nunca** se ejecuta implícitamente sobre "todas las imágenes
 6. SubmitHumanReview       → experto confirma/corrige/marca no concluyente/rechaza muestra inválida
 ```
 
-**Los pasos 1–6 ya están expuestos por HTTP** (Fase 3 para 1–4, Fase 4 para 5, Fase 5 para 6 — ver § 14, § 16 y § 18). El paso 5 corre hoy de forma **síncrona** dentro del propio request HTTP (`POST /analysis-runs/{id}/process`), sin preprocesamiento real de imágenes ni fusión de features — el motor es una simulación determinista (ver § 16). Celery y la ejecución asíncrona quedan para cuando exista un motor real cuyo costo de cómputo lo justifique. La revisión humana no sobrescribe la `Prediction`: agrega registros `HumanReview` auditables y marca una revisión final vigente.
+**Los pasos 1–6 ya están expuestos por HTTP** (Fase 3 para 1–4, Fase 4 para 5, Fase 5 para 6, Fase 7 para cola asíncrona — ver § 14, § 16, § 18 y § 22). El paso 5 puede correr de forma **síncrona** dentro del propio request HTTP (`POST /analysis-runs/{id}/process`) o de forma asíncrona con Celery (`POST /analysis-runs/{id}/process-async`), sin preprocesamiento real de imágenes ni fusión de features — el motor sigue siendo una simulación determinista (ver § 16). La revisión humana no sobrescribe la `Prediction`: agrega registros `HumanReview` auditables y marca una revisión final vigente.
 
 ## 6. Puertos (`application/ports/`) — implementados por fases
 
@@ -141,11 +141,14 @@ Un `AnalysisRun` **nunca** se ejecuta implícitamente sobre "todas las imágenes
 - SQLAlchemy como ORM, Alembic para migraciones versionadas (nunca modificar el esquema directamente en producción). La cadena de conexión se lee de `DATABASE_URL` vía `infrastructure/config/settings.py`, nunca hardcodeada.
 - `pgvector` queda contemplado en el diseño (columna de embeddings a futuro en `PetriImage`/`MicroImage` o en una tabla de features) pero **no se activa en el MVP** hasta que exista un caso de uso real de búsqueda por similitud.
 
-## 8. Procesamiento asíncrono (futuro)
+## 8. Procesamiento asíncrono (Fase 7)
 
-- Redis está provisionado por `docker-compose.yml`, pero ningún código lo consume todavía.
-- Celery, tareas como `run_inference_task(...)`, preprocesamiento pesado o reentrenamiento quedan fuera del alcance actual.
-- La API no encola jobs: `POST /api/v1/analysis-runs/{id}/process` sigue siendo síncrono.
+- Redis está provisionado por `docker-compose.yml` y se usa como broker/result backend de Celery en desarrollo local.
+- `src/blueberry_microid/infrastructure/tasks/celery_app.py` crea `celery_app` desde `Settings`, con JSON como único formato aceptado (`accept_content=["json"]`) y cola `analysis`.
+- `src/blueberry_microid/infrastructure/tasks/analysis_tasks.py` define `process_analysis_run_task(analysis_run_id: str)`, convierte a `UUID`, construye repositorios SQLAlchemy reales, `SqlAlchemyUnitOfWork` y `MockInferenceEngine`, y llama al mismo `ProcessAnalysisRunUseCase` del endpoint síncrono.
+- `POST /api/v1/analysis-runs/{id}/process-async` encola la task y devuelve `202 Accepted`; no ejecuta inferencia dentro del request.
+- `GET /api/v1/tasks/{task_id}` expone estado auxiliar de Celery sin traceback. La fuente durable de verdad sigue siendo `AnalysisRun` y `Prediction`.
+- No hay preprocesamiento pesado, reentrenamiento, PyTorch ni IA real.
 
 ## 9. Observabilidad (implementado en Fase 3.5 — ver § 15)
 
@@ -168,7 +171,7 @@ Un `AnalysisRun` **nunca** se ejecuta implícitamente sobre "todas las imágenes
 - Ninguna métrica de desempeño (accuracy, precisión, etc.) se muestra sin evaluación real documentada.
 - La imagen "macro" es siempre y únicamente de la caja Petri, nunca del fruto (arándano). El sistema no analiza la apariencia externa del arándano.
 - El único producto soportado en esta etapa es arándano (blueberry).
-- `POST /api/v1/analysis-runs` únicamente registra una solicitud de análisis en estado `pending` — no ejecuta nada. Desde la Fase 4, `POST /api/v1/analysis-runs/{id}/process` sí ejecuta un motor de inferencia y crea una `Prediction`, pero ese motor es **exclusivamente `MockInferenceEngine`**: una simulación determinista que nunca abre ni analiza el contenido real de las imágenes, no usa PyTorch/OpenCV/Cellpose, y no tiene validez diagnóstica — ver § 16. Sigue sin encolarse nada a Celery (el procesamiento es síncrono, dentro del propio request HTTP).
+- `POST /api/v1/analysis-runs` únicamente registra una solicitud de análisis en estado `pending` — no ejecuta nada. Desde la Fase 4, `POST /api/v1/analysis-runs/{id}/process` sí ejecuta un motor de inferencia y crea una `Prediction`; desde la Fase 7, `POST /api/v1/analysis-runs/{id}/process-async` encola esa misma operación en Celery. En ambos casos el motor es **exclusivamente `MockInferenceEngine`**: una simulación determinista que nunca abre ni analiza el contenido real de las imágenes, no usa PyTorch/OpenCV/Cellpose, y no tiene validez diagnóstica — ver § 16 y § 22.
 
 ## 12. Fase 2 — capa de aplicación, persistencia y almacenamiento (implementada)
 
@@ -438,7 +441,7 @@ Objetivo: cerrar la brecha arrastrada desde la Fase 1 — el esquema solo se eje
 
 **CI con dos jobs (`.github/workflows/tests.yml`).** (1) `unit-and-api-tests`: instala y corre `pytest -v` sin `DATABASE_URL`, por lo que los tests exclusivos de PostgreSQL se saltan automáticamente. (2) `postgres-migrations`: levanta un `services: postgres:16` (`blueberry`/`blueberry`, base `blueberry_microid_test`, puerto 5432 con healthcheck `pg_isready`), define `DATABASE_URL=postgresql+psycopg://...`, ejecuta `python scripts/check_postgres_migrations.py` (aplica las migraciones y verifica reversibilidad), y luego `pytest -v -m postgres tests/integration/postgres`. Sin deploy, sin build de imagen Docker, sin secrets — las credenciales del workflow son valores desechables de una base efímera de CI, no secretos reales.
 
-**Marcador `postgres` y gating por entorno.** Se registró el marcador `postgres` en `pyproject.toml`. Los tests bajo `tests/integration/postgres/` llevan `pytestmark = pytest.mark.postgres` y dependen de fixtures que hacen `pytest.skip` salvo que la **variable de entorno** `DATABASE_URL` esté puesta y empiece por `postgresql`. El gate lee `os.environ` directamente, **no** `Settings` (cuyo default ya es una URL PostgreSQL aunque no haya nada configurado) — así la condición es "¿alguien proporcionó explícitamente una base PostgreSQL?", no "¿el default parece PostgreSQL?". Consecuencia: en local sin PostgreSQL, `pytest -v` reporta 188 passed, 12 skipped (nunca falla por no tener base); cuando el job de CI se ejecute en GitHub Actions, corren de verdad. En ningún caso se usa SQLite como sustituto de estos tests.
+**Marcador `postgres` y gating por entorno.** Se registró el marcador `postgres` en `pyproject.toml`. Los tests bajo `tests/integration/postgres/` llevan `pytestmark = pytest.mark.postgres` y dependen de fixtures que hacen `pytest.skip` salvo que la **variable de entorno** `DATABASE_URL` esté puesta y empiece por `postgresql`. El gate lee `os.environ` directamente, **no** `Settings` (cuyo default ya es una URL PostgreSQL aunque no haya nada configurado) — así la condición es "¿alguien proporcionó explícitamente una base PostgreSQL?", no "¿el default parece PostgreSQL?". Consecuencia: en local sin PostgreSQL, los PostgreSQL-only tests se saltan (en Fase 7, `pytest -v` reporta 196 passed, 12 skipped); cuando el job de CI se ejecute en GitHub Actions, corren de verdad. En ningún caso se usa SQLite como sustituto de estos tests.
 
 **Fixtures (`tests/integration/postgres/conftest.py`).** `migrated_engine` (scope de sesión) fija `os.environ["DATABASE_URL"]` y aplica las **migraciones Alembic reales** vía la API de Alembic (`command.downgrade(base)` → `command.upgrade(head)`) — es decir, un run verde prueba que las migraciones son válidas en PostgreSQL, no solo que `create_all` funcionaría. `pg_session` (scope de función) entrega una sesión y hace `TRUNCATE ... RESTART IDENTITY CASCADE` de las siete tablas tras cada test (con `rollback()` previo, para que un test que disparó un error de constraint —dejando su transacción abortada— no rompa el truncado).
 
@@ -463,3 +466,27 @@ Objetivo: confirmar si el workflow de GitHub Actions realmente se ejecuta y pasa
 **Estado del workflow.** Estado B: `.github/workflows/tests.yml` existe y define los jobs `unit-and-api-tests` y `postgres-migrations`, y la rama `main` fue subida al remoto. Aun así no se observó ningún run real de GitHub Actions desde este entorno: `gh --version` falla porque GitHub CLI no está instalado, y una consulta no autenticada a `https://api.github.com/repos/JaimePergueza/BlueberryIdentifyID/actions/runs?per_page=5` devolvió `404 Not Found`. PostgreSQL **no** queda validado en CI hasta que un run real termine exitosamente.
 
 **Pasos manuales para completar la verificación.** Abrir el repositorio en GitHub, entrar a **Actions**, seleccionar `.github/workflows/tests.yml`, y confirmar que pasen ambos jobs: `unit-and-api-tests` y `postgres-migrations`. Si falla alguno, registrar aquí el run id o URL y el resumen del error antes de avanzar a Fase 7. Si pasan ambos, actualizar esta sección a Estado A con fecha, hash y run id/URL.
+
+## 22. Fase 7 — procesamiento asíncrono con Celery + Redis usando el motor mock
+
+Objetivo: ejecutar el análisis mock fuera del request HTTP sin cambiar las reglas de negocio ni introducir IA real. Esta fase agrega Celery como transporte de ejecución asíncrona, no un segundo motor de procesamiento. Sin IA real, sin PyTorch, sin entrenamiento, sin datasets, sin métricas inventadas, sin frontend, sin autenticación y sin taxonomía microbiológica.
+
+**Diagnóstico del flujo síncrono reutilizado.** `ProcessAnalysisRunUseCase` ya concentra las reglas importantes: valida referencias, reclama `pending -> processing` con `AnalysisRunRepositoryPort.claim_for_processing()`, llama al `InferenceEnginePort`, crea `Prediction`, finaliza el `AnalysisRun`, y recupera fallos dejando el run en `failed`. Celery no duplica nada de eso: `process_analysis_run_task()` construye la infraestructura real y llama al mismo caso de uso.
+
+**Configuración Celery/Redis.** `Settings` ahora incluye `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `CELERY_TASK_ALWAYS_EAGER`, `CELERY_TASK_EAGER_PROPAGATES`, `CELERY_TASK_TIME_LIMIT` y `CELERY_TASK_SOFT_TIME_LIMIT`. Los defaults locales son Redis en `localhost:6379` DB 0/1; no hay credenciales reales ni secretos. `pyproject.toml` declara solo `celery` y `redis` como dependencias nuevas.
+
+**Celery app.** `infrastructure/tasks/celery_app.py` expone `celery_app`, lee `Settings`, usa cola `analysis`, serializa tareas/resultados como JSON, acepta solo JSON (no pickle), usa UTC y activa `task_track_started`. Los imports de tasks son explícitos.
+
+**Task de procesamiento.** `infrastructure/tasks/analysis_tasks.py::process_analysis_run_task(analysis_run_id: str)` convierte el id a `UUID`, construye engine/session/repositories/`SqlAlchemyUnitOfWork` sin FastAPI, usa `MockInferenceEngine`, llama `ProcessAnalysisRunUseCase`, loguea inicio/éxito/fallo con `analysis_run_id`, y devuelve una estructura con `analysis_run_id`, `status`, `prediction_id` y `mock=true`. Si el caso de uso falla de forma controlada tras marcar el run como `failed`, la task refleja ese estado. Si ocurre un error inesperado, se relanza para que Celery marque la task como failed.
+
+**Endpoint async.** `POST /api/v1/analysis-runs/{analysis_run_id}/process-async` valida que el `AnalysisRun` exista y esté `pending`, encola la task y responde `202 Accepted` con `task_id`, `"status": "queued"` y un mensaje. No ejecuta inferencia, no crea `Prediction`, no llama directamente a `MockInferenceEngine` y conserva `X-Request-ID`.
+
+**Sin estado persistido `queued`.** No se agregó migración ni nuevo estado. `"queued"` es el estado operativo de la task en la respuesta HTTP; el `AnalysisRun` permanece `pending` hasta que el worker gana el claim y lo mueve a `processing`. Esto evita una migración prematura. Riesgo aceptado: dos requests pueden encolar dos tasks antes del claim; no crean doble `Prediction` porque `claim_for_processing()` sigue siendo la protección real.
+
+**Consulta de task.** `GET /api/v1/tasks/{task_id}` devuelve `task_id`, `state` y un `result` seguro. En `FAILURE` no expone traceback. Este endpoint es auxiliar: Celery puede olvidar resultados según backend/configuración; la fuente durable es `GET /analysis-runs/{id}` y `GET /analysis-runs/{id}/prediction`.
+
+**Endpoint síncrono preservado.** `POST /api/v1/analysis-runs/{id}/process` sigue existiendo para desarrollo y pruebas. El flujo recomendado para operación es `/process-async`; una fase futura podrá deprecarlo, protegerlo o reservarlo a tooling interno.
+
+**Pruebas.** Se agregan tests unitarios para settings Celery, configuración JSON/no-pickle y task; tests API con task fake para demostrar que `/process-async` solo encola; y tests eager con SQLite de archivo para ejecutar la task real sin Redis, verificar `202`, estado final, `Prediction`, revisión humana posterior y duplicados sin segunda `Prediction`.
+
+**Riesgos pendientes antes de Fase 8.** (a) Falta smoke real con un worker Celery separado y Redis real en esta máquina si Docker sigue no disponible. (b) El endpoint `/tasks/{task_id}` depende de la retención del result backend y no debe usarse como fuente de verdad. (c) Sigue pendiente observar un run verde de GitHub Actions desde esta sesión, según Fase 6.5. (d) No existe IA real ni procesamiento pesado todavía; Celery solo mueve el mock fuera del request.

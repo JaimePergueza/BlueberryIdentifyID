@@ -37,6 +37,12 @@ class Settings(BaseSettings):
         default=20.0,
         description="Maximum accepted size, in megabytes, for a single Petri/micro image upload.",
     )
+    celery_broker_url: str = Field(default="redis://localhost:6379/0")
+    celery_result_backend: str = Field(default="redis://localhost:6379/1")
+    celery_task_always_eager: bool = Field(default=False)
+    celery_task_eager_propagates: bool = Field(default=True)
+    celery_task_time_limit: int | None = Field(default=300)
+    celery_task_soft_time_limit: int | None = Field(default=240)
 
     @property
     def petri_image_path(self) -> Path:

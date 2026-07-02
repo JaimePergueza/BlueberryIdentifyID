@@ -16,9 +16,8 @@ services:
       timeout: 5s
       retries: 10
 
-  # Not used by any code yet — reserved for the future Celery-based
-  # asynchronous inference pipeline (Fase 4+). Included now so the compose
-  # topology doesn't need to change when that phase starts.
+  # Used by Celery as broker/result backend for asynchronous mock processing
+  # in local development. Tests use Celery eager mode and do not require Redis.
   redis:
     image: redis:7-alpine
     container_name: blueberry_microid_redis

@@ -94,6 +94,11 @@ See `.env.example` for the full list. Settings are loaded by
 | `MAX_UPLOAD_SIZE_MB` | `20` | Upload size ceiling for Petri/micro image endpoints (see § 8). |
 | `LOG_LEVEL` | `INFO` | Standard library logging level for the root logger. |
 | `LOG_FORMAT` | `console` | `console` (human-readable) or `json` (one JSON object per line). |
+| `CELERY_BROKER_URL` | `redis://localhost:6379/0` | Broker for asynchronous mock processing tasks. |
+| `CELERY_RESULT_BACKEND` | `redis://localhost:6379/1` | Auxiliary Celery result backend; not the source of truth for analysis state. |
+| `CELERY_TASK_ALWAYS_EAGER` | `false` | Test/development switch to run Celery tasks inline without Redis/worker. |
+| `CELERY_TASK_EAGER_PROPAGATES` | `true` | In eager mode, propagate task exceptions to tests. |
+| `CELERY_TASK_TIME_LIMIT` / `CELERY_TASK_SOFT_TIME_LIMIT` | `300` / `240` | Optional safety limits for task runtime. |
 
 ## 4. Start/stop backing services (PostgreSQL, Redis)
 
@@ -104,8 +109,9 @@ docker compose down        # stop and remove the containers
 docker compose down -v     # also wipe the postgres data volume
 ```
 
-Redis is provisioned now but not used by any code yet — it is reserved for
-the future Celery-based asynchronous inference pipeline.
+Redis is used by Celery as the broker/result backend for asynchronous mock
+processing in local development. Tests use Celery eager mode and do not need
+a real Redis process.
 
 ## 5. Run database migrations
 
@@ -173,13 +179,28 @@ Then visit `http://127.0.0.1:8000/health` (should return
 for interactive Swagger docs.
 
 `POST /api/v1/analysis-runs/{id}/process` runs the **simulated** inference
-pipeline synchronously (no Celery, nothing queued): it always uses
+pipeline synchronously: it always uses
 `MockInferenceEngine`, a deterministic simulation that never opens or
 analyzes the actual image bytes, never identifies a species/genus, and
 carries no diagnostic validity — see § 11 below. A given `AnalysisRun` can
 only be processed once; a second call returns `409 Conflict`. If processing
 fails after the run has been claimed, the run is persisted as `failed` and
 the client receives a safe error response, not `200 OK`.
+
+For operation-like local testing, run a Celery worker in a separate terminal:
+
+```bash
+docker compose up -d redis
+celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --loglevel=info -Q analysis
+```
+
+Then queue processing instead of running it inside the request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>/process-async
+curl http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>
+curl http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>/prediction
+```
 
 ## 7. Run the operational smoke test
 
@@ -243,13 +264,15 @@ deploying.
 ## 10. Simulated inference engine and Prediction lifecycle
 
 - `POST /api/v1/analysis-runs/{id}/process` is the only way a `Prediction`
-  gets created. It moves the `AnalysisRun` through `pending` → `processing`
-  → `completed` or `needs_review` (or `failed`, with `error_message`, if the
-  processing step fails). A failed processing attempt returns a controlled
-  HTTP error (`500 analysis_processing_failed`, or `409 duplicate_prediction`
-  for an existing Prediction), not `200 OK`. Reprocessing an
-  already-processed `AnalysisRun` returns `409 Conflict`; create a new
-  `AnalysisRun` instead.
+  gets created synchronously. `POST /api/v1/analysis-runs/{id}/process-async`
+  queues the same use case through Celery and returns `202 Accepted`; the
+  worker then moves the `AnalysisRun` through `pending` → `processing` →
+  `completed` or `needs_review` (or `failed`, with `error_message`, if the
+  processing step fails). A failed synchronous processing attempt returns a
+  controlled HTTP error (`500 analysis_processing_failed`, or `409
+  duplicate_prediction` for an existing Prediction), not `200 OK`.
+  Reprocessing an already-processed `AnalysisRun` returns `409 Conflict`;
+  create a new `AnalysisRun` instead.
 - The only `InferenceEnginePort` implementation today is
   `MockInferenceEngine` (`ml/inference_engine/`): a **deterministic
   simulation** based on a hash of `analysis_run.id`, not randomness. It
@@ -311,10 +334,22 @@ the full technical rationale.
   marks the `AnalysisRun` as `failed` with a controlled `error_message`, then
   raises `409 duplicate_prediction`. It never creates a second `Prediction`
   and never leaves the run in `processing`.
-- **Still no Celery, no real AI/ML, no PyTorch, no dataset, no frontend, no
-  authentication, no taxonomy.** None of the above changes the scope
-  restrictions from earlier phases — this is entirely about the robustness
-  and HTTP semantics of the existing synchronous, simulated pipeline.
+- **Async queueing does not duplicate processing rules.** The Celery task
+  calls `ProcessAnalysisRunUseCase` with SQLAlchemy repositories,
+  `SqlAlchemyUnitOfWork`, and `MockInferenceEngine`. The `/process-async`
+  endpoint only verifies the run exists and is still `pending`, then queues
+  the task. It does not claim the row, create a Prediction, or call the
+  inference engine.
+- **No new `queued` state yet.** The HTTP response says `"status":
+  "queued"` to describe the task operation, but the persisted `AnalysisRun`
+  stays `pending` until the worker wins the atomic claim and moves it to
+  `processing`. This avoids a premature migration. A race can enqueue two
+  tasks before either worker claims the run; this is acceptable because only
+  one task can win `claim_for_processing()`, so duplicates cannot create a
+  second `Prediction`.
+- **Still no real AI/ML, no PyTorch, no dataset, no frontend, no
+  authentication, no taxonomy.** Celery changes where the mock processing
+  runs, not what it does.
 
 ## 12. Human review flow (Fase 5)
 
@@ -360,26 +395,26 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 6 this collects **200 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **188 passed, 12 skipped** (the 12 PostgreSQL-only tests
+As of Fase 7 this collects **208 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **196 passed, 12 skipped** (the 12 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
 | `tests/unit/application/` | 58 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, and `SubmitHumanReviewUseCase` final-review rollback) — no database, no filesystem. |
-| `tests/unit/infrastructure/` | 14 | `Settings` + `PillowImageValidator`, in isolation. |
+| `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 62 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status and the human-review endpoints. |
+| `tests/api/` | 66 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, and the human-review endpoints. |
 | `tests/integration/postgres/` | 12 | **PostgreSQL-only** (Fase 6): real migrations, JSONB, native ENUMs, partial unique index, CHECK constraints, UUID, and a full API smoke flow. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 58 + 14 + 28 + 62 + 12 = **200**, matching `pytest --collect-only -q`.
+26 + 58 + 18 + 28 + 66 + 12 = **208**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
-188 in Fase 5, and 200 in Fase 6.)
+188 in Fase 5, 200 in Fase 6, and 208 in Fase 7.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -452,7 +487,7 @@ ARCHITECTURE.md § 20 for the design rationale.
 pytest -v
 ```
 
-On a machine without PostgreSQL this is **188 passed, 12 skipped** — the 12
+As of Fase 7, on a machine without PostgreSQL this is **196 passed, 12 skipped** — the 12
 PostgreSQL-only tests skip automatically. Nothing fails just because you have
 no database.
 
@@ -541,3 +576,60 @@ Open the repository in GitHub, go to **Actions**, select
 Only after both jobs pass in a real GitHub Actions run may the project be
 described as PostgreSQL-validated in CI. If either job fails, record the run
 URL/id and the failing log excerpt here before moving to Fase 7.
+
+## 16. Asynchronous mock processing with Celery (Fase 7)
+
+Fase 7 adds Celery/Redis as an execution boundary for the existing mock
+processing path. It does **not** add real AI, PyTorch, training, datasets,
+metrics, frontend, authentication, taxonomy, or species/genus
+identification.
+
+Local operation:
+
+```bash
+docker compose up -d redis
+celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --loglevel=info -Q analysis
+uvicorn blueberry_microid.interfaces.api.app:create_app --factory --reload
+```
+
+Queue processing:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>/process-async
+```
+
+The response is `202 Accepted`:
+
+```json
+{
+  "analysis_run_id": "...",
+  "task_id": "...",
+  "status": "queued",
+  "message": "Analysis processing has been queued"
+}
+```
+
+Task state can be checked with `GET /api/v1/tasks/<task_id>`, but that is
+only auxiliary. The durable source of truth is:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>
+curl http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>/prediction
+```
+
+Testing does not require Redis. Tests configure Celery eager mode and use
+SQLite/file-backed storage as needed:
+
+```bash
+CELERY_TASK_ALWAYS_EAGER=true CELERY_TASK_EAGER_PROPAGATES=true pytest -v
+```
+
+The synchronous endpoint remains available:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>/process
+```
+
+It is useful for development and tests. For operation-style flows,
+`/process-async` is preferred; a later phase may deprecate or protect the
+synchronous route.

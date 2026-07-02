@@ -7,28 +7,27 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 **What this system does not do (yet, or ever without further validation):**
 
-- It does **not** run real inference, and never trains or loads a real/trained model. `POST /analysis-runs/{id}/process` only ever runs `MockInferenceEngine` — a deterministic simulation that never opens or analyzes the actual image bytes, exists purely to validate the technical pipeline (`AnalysisRun` → `Prediction` → state transition), and carries no diagnostic validity. Its response always says so explicitly (`disclaimer` field).
+- It does **not** run real inference, and never trains or loads a real/trained model. `POST /analysis-runs/{id}/process` and the Celery worker behind `POST /analysis-runs/{id}/process-async` only ever run `MockInferenceEngine` — a deterministic simulation that never opens or analyzes the actual image bytes, exists purely to validate the technical pipeline (`AnalysisRun` → `Prediction` → state transition), and carries no diagnostic validity. The synchronous response always says so explicitly (`disclaimer` field).
 - It does **not** identify microorganism species or genus. No taxonomic classification exists in this codebase — only five broad, preliminary visual categories.
 - It does **not** invent datasets or performance metrics.
-- It has no frontend, no Celery/async task processing (processing is synchronous), and no authentication yet.
+- It has no frontend and no authentication yet. Celery/Redis is used only to run the existing mock processing path asynchronously; it does not add real AI.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 6.5)
+## MVP status (as of Fase 7)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
-creation, simulated (mock) inference with crash-safe/idempotent processing,
-and an auditable human-review flow (confirm/correct/mark
+creation, simulated (mock) inference with crash-safe/idempotent processing
+(synchronous or queued through Celery/Redis), and an auditable human-review flow (confirm/correct/mark
 inconclusive/reject) — all behind a versioned FastAPI, backed by SQLAlchemy
-models and Alembic migrations. 200 automated tests (188 SQLite-based +
+models and Alembic migrations. 208 automated tests (196 SQLite/eager-based +
 12 PostgreSQL-only); the CI workflow is configured to run the fast suite on
 SQLite **and**, in a separate job, apply the migrations to a real PostgreSQL
 service and run the PostgreSQL-only tests against it on every push/PR to
 `main`.
 
-**What does not exist yet, on purpose:** Celery/async task processing (the
-API is fully synchronous), a real or trained inference model (only
+**What does not exist yet, on purpose:** a real or trained inference model (only
 `MockInferenceEngine`, a deterministic non-diagnostic simulation), any
 taxonomic species/genus identification, a frontend, and authentication.
 
@@ -66,7 +65,7 @@ pip install -e ".[dev]"
 # 3. Configure environment variables
 cp .env.example .env
 
-# 4. Start PostgreSQL (and Redis, reserved for a future phase) via Docker Compose
+# 4. Start PostgreSQL and Redis via Docker Compose
 docker compose up -d
 
 # 5. Run database migrations
@@ -77,13 +76,16 @@ python scripts/check_postgres_migrations.py
 # 6. Run the API
 uvicorn blueberry_microid.interfaces.api.app:create_app --factory --reload
 
-# 7. Smoke-test the running API (separate terminal)
+# 7. Run a Celery worker for async mock processing (separate terminal)
+celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --loglevel=info -Q analysis
+
+# 8. Smoke-test the running API (separate terminal)
 python scripts/api_smoke_test.py
 
-# 8. Run the test suite (fast; PostgreSQL-only tests auto-skip)
+# 9. Run the test suite (fast; PostgreSQL-only tests auto-skip)
 pytest -v
 
-# 9. Run the PostgreSQL-only tests against the database from step 4
+# 10. Run the PostgreSQL-only tests against the database from step 4
 export DATABASE_URL=postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid
 pytest -v -m postgres tests/integration/postgres
 ```
@@ -93,6 +95,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 ## Operational notes
 
 - **Simulated inference only:** the only `InferenceEnginePort` implementation is `MockInferenceEngine` — deterministic (hashes `analysis_run.id`, no randomness), never reads image content, never names a species/genus, and keeps `confidence_score` moderate (≤ 0.75) by design. See `docs/development.md` § 10.
+- **Async mock processing:** `POST /api/v1/analysis-runs/{id}/process-async` enqueues the same mock processing use case in Celery and returns `202 Accepted`. The worker creates the `Prediction`; the source of truth is still `GET /api/v1/analysis-runs/{id}` and `GET /api/v1/analysis-runs/{id}/prediction`, not the Celery result backend.
 - **Idempotent, crash-safe processing:** `POST /analysis-runs/{id}/process` claims the `pending -> processing` transition with a single atomic conditional database update, so two simultaneous calls for the same AnalysisRun can never both proceed — one gets `409 Conflict`, whichever loses the race, and no state is left ambiguous. `processing` is never a permanent state: any processing failure after the claim is caught, logged server-side, persisted as `failed` with a controlled `error_message`, and returned as a safe HTTP error rather than `200 OK`; a duplicate `Prediction` returns `409 Conflict` and also leaves the run `failed`, without creating a second prediction. See `docs/development.md` § 11.
 - **Human review audit flow:** after an `AnalysisRun` has a `Prediction`, an expert can submit reviews under `/api/v1/analysis-runs/{id}/reviews`. A new final review demotes any previous final review in the same transaction, while the original `Prediction` stays immutable for traceability. See `docs/development.md` § 12.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
@@ -112,6 +115,11 @@ Human review endpoints:
 - `POST /api/v1/analysis-runs/{analysis_run_id}/reviews` creates a review (`confirmed`, `corrected`, `marked_inconclusive`, or `rejected_invalid_sample`).
 - `GET /api/v1/analysis-runs/{analysis_run_id}/reviews` returns chronological review history.
 - `GET /api/v1/analysis-runs/{analysis_run_id}/reviews/final` returns the current final human review.
+
+Async processing endpoints:
+
+- `POST /api/v1/analysis-runs/{analysis_run_id}/process-async` queues mock processing and returns `202`.
+- `GET /api/v1/tasks/{task_id}` returns auxiliary Celery task state; use the AnalysisRun endpoints as the durable source of truth.
 
 ## Project layout
 

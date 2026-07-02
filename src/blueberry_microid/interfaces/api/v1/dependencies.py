@@ -15,6 +15,7 @@ from typing import Iterator
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
+from celery import Celery
 
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
@@ -67,6 +68,8 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_sample_reposito
 from blueberry_microid.infrastructure.db.session.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from blueberry_microid.infrastructure.storage.local_image_storage import LocalImageStorage
 from blueberry_microid.infrastructure.storage.pillow_image_validator import PillowImageValidator
+from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
+from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
 
 # --- settings & database session -----------------------------------------
@@ -103,6 +106,14 @@ def get_session_factory(request: Request) -> sessionmaker[Session]:
 
 def get_unit_of_work(session_factory: sessionmaker[Session] = Depends(get_session_factory)) -> UnitOfWorkPort:
     return SqlAlchemyUnitOfWork(session_factory)
+
+
+def get_celery_app(request: Request) -> Celery:
+    return getattr(request.app.state, "celery_app", celery_app)
+
+
+def get_process_analysis_run_task():
+    return process_analysis_run_task
 
 
 # --- infrastructure: storage & validation ---------------------------------

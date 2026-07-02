@@ -13,6 +13,7 @@ from blueberry_microid.infrastructure.db.session.engine import create_db_engine
 from blueberry_microid.infrastructure.db.session.session_factory import create_session_factory
 from blueberry_microid.infrastructure.logging.config import configure_logging
 from blueberry_microid.infrastructure.logging.middleware import RequestLoggingMiddleware
+from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.interfaces.api.error_handlers import register_exception_handlers
 from blueberry_microid.interfaces.api.v1.routers import (
     analysis_runs,
@@ -21,6 +22,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     model_versions,
     petri_images,
     samples,
+    tasks,
 )
 
 API_V1_PREFIX = "/api/v1"
@@ -62,6 +64,7 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    app.state.celery_app = celery_app
 
     # Assigns/reads request_id and logs one structured line per request; see
     # infrastructure/logging/middleware.py.
@@ -73,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(micro_images.router, prefix=API_V1_PREFIX)
     app.include_router(analysis_runs.router, prefix=API_V1_PREFIX)
     app.include_router(human_reviews.router, prefix=API_V1_PREFIX)
+    app.include_router(tasks.router, prefix=API_V1_PREFIX)
 
     register_exception_handlers(app)
 
