@@ -94,6 +94,7 @@ See `.env.example` for the full list. Settings are loaded by
 | `MAX_UPLOAD_SIZE_MB` | `20` | Upload size ceiling for Petri/micro image endpoints (see § 8). |
 | `LOG_LEVEL` | `INFO` | Standard library logging level for the root logger. |
 | `LOG_FORMAT` | `console` | `console` (human-readable) or `json` (one JSON object per line). |
+| `API_BASE_URL` | `http://127.0.0.1:8000` | Base URL used by operational smoke scripts. |
 | `CELERY_BROKER_URL` | `redis://localhost:6379/0` | Broker for asynchronous mock processing tasks. |
 | `CELERY_RESULT_BACKEND` | `redis://localhost:6379/1` | Auxiliary Celery result backend; not the source of truth for analysis state. |
 | `CELERY_TASK_ALWAYS_EAGER` | `false` | Test/development switch to run Celery tasks inline without Redis/worker. |
@@ -221,6 +222,36 @@ generated in memory with Pillow — no external files or datasets are used.
 It prints one line per step and exits with status 1 on the first failure,
 so it's suitable for a CI health-check step or a manual sanity check after
 deploying.
+
+For the real Redis + Celery async path, start PostgreSQL, Redis, the API, and
+a worker, then run the Celery smoke:
+
+```bash
+# terminal 1
+docker compose up -d postgres redis
+export DATABASE_URL=postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid
+alembic upgrade head
+
+# terminal 2
+uvicorn blueberry_microid.interfaces.api.app:create_app --factory --reload
+
+# terminal 3
+celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --loglevel=info -Q analysis
+
+# terminal 4
+python scripts/celery_smoke_test.py
+```
+
+Stop local services when done:
+
+```bash
+docker compose down
+```
+
+`scripts/celery_smoke_test.py` calls `/process-async`, polls
+`/api/v1/tasks/{task_id}` until `SUCCESS`, then verifies the durable
+`AnalysisRun`, `Prediction`, and final `HumanReview`. It still uses only
+generated Pillow images and `MockInferenceEngine`.
 
 ## 8. Upload limits and image validation
 
@@ -633,3 +664,29 @@ curl -X POST http://127.0.0.1:8000/api/v1/analysis-runs/<analysis_run_id>/proces
 It is useful for development and tests. For operation-style flows,
 `/process-async` is preferred; a later phase may deprecate or protect the
 synchronous route.
+
+### Real Redis + worker smoke (Fase 7.5)
+
+Fase 7.5 adds an operational smoke script and CI job to prove the async path
+works with a real Redis broker/result backend and a real Celery worker, not
+only eager mode.
+
+Manual flow:
+
+```bash
+cp .env.example .env
+docker compose up -d postgres redis
+export DATABASE_URL=postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid
+alembic upgrade head
+uvicorn blueberry_microid.interfaces.api.app:create_app --factory --reload
+celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --loglevel=info -Q analysis
+python scripts/celery_smoke_test.py
+docker compose down
+```
+
+In GitHub Actions, the `celery-smoke` job starts ephemeral PostgreSQL and
+Redis service containers, applies Alembic migrations, starts a real Celery
+worker and API process, then runs `scripts/celery_smoke_test.py`. It does
+not use secrets, deploy anything, build Docker images, run real AI, use
+PyTorch, or add taxonomy. The main source of truth remains `AnalysisRun` and
+`Prediction`; `/tasks/{task_id}` is only an auxiliary Celery status view.

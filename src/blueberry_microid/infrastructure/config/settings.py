@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     micro_image_dir: str = Field(default="micro_images")
     log_level: str = Field(default="INFO")
     log_format: str = Field(default="console", description="'json' or 'console'.")
+    api_base_url: str = Field(default="http://127.0.0.1:8000")
     max_upload_size_mb: float = Field(
         default=20.0,
         description="Maximum accepted size, in megabytes, for a single Petri/micro image upload.",

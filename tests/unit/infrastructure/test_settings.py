@@ -16,6 +16,7 @@ def _clean_env(monkeypatch):
         "PETRI_IMAGE_DIR",
         "MICRO_IMAGE_DIR",
         "LOG_LEVEL",
+        "API_BASE_URL",
         "CELERY_BROKER_URL",
         "CELERY_RESULT_BACKEND",
         "CELERY_TASK_ALWAYS_EAGER",
@@ -31,6 +32,7 @@ def test_settings_have_safe_local_defaults():
     assert settings.log_level == "INFO"
     assert settings.petri_image_dir == "petri_images"
     assert settings.micro_image_dir == "micro_images"
+    assert settings.api_base_url == "http://127.0.0.1:8000"
     assert settings.celery_broker_url == "redis://localhost:6379/0"
     assert settings.celery_result_backend == "redis://localhost:6379/1"
     assert settings.celery_task_always_eager is False
@@ -50,6 +52,7 @@ def test_settings_default_storage_paths_are_separated():
 def test_settings_read_from_environment_variables(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("API_BASE_URL", "http://api.testserver:9000")
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/testdb")
     monkeypatch.setenv("CELERY_BROKER_URL", "redis://redis:6379/3")
     monkeypatch.setenv("CELERY_RESULT_BACKEND", "redis://redis:6379/4")
@@ -59,6 +62,7 @@ def test_settings_read_from_environment_variables(monkeypatch):
 
     assert settings.environment == "test"
     assert settings.log_level == "DEBUG"
+    assert settings.api_base_url == "http://api.testserver:9000"
     assert settings.database_url == "postgresql+psycopg://u:p@db:5432/testdb"
     assert settings.celery_broker_url == "redis://redis:6379/3"
     assert settings.celery_result_backend == "redis://redis:6379/4"

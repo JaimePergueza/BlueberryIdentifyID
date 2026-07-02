@@ -1,6 +1,6 @@
 name: Tests
 
-# Two jobs:
+# Three jobs:
 #   1. unit-and-api-tests  — the fast suite, run against SQLite (no external
 #      services needed). This is what proves day-to-day application behavior.
 #   2. postgres-migrations — stands up a REAL PostgreSQL service container,
@@ -8,6 +8,9 @@ name: Tests
 #      validation script, and runs the PostgreSQL-only tests (JSONB, native
 #      ENUMs, partial unique index, CHECK constraints, UUID) that SQLite
 #      cannot faithfully exercise.
+#   3. celery-smoke — stands up REAL PostgreSQL + Redis services, starts a
+#      real FastAPI process and a real Celery worker, then drives /process-async
+#      through scripts/celery_smoke_test.py. Still mock inference only.
 #
 # No deployment step, no Docker image build, and no secrets are used. The
 # PostgreSQL credentials below are throwaway values for an ephemeral CI
@@ -79,3 +82,85 @@ jobs:
 
       - name: Run PostgreSQL-specific tests
         run: pytest -v -m postgres tests/integration/postgres
+
+  celery-smoke:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: blueberry
+          POSTGRES_PASSWORD: blueberry
+          POSTGRES_DB: blueberry_microid_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U blueberry -d blueberry_microid_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid_test
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CELERY_TASK_EAGER_PROPAGATES: "true"
+      API_BASE_URL: http://127.0.0.1:8000
+      STORAGE_ROOT: ${{ runner.temp }}/blueberry-storage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Apply Alembic migrations
+        run: alembic upgrade head
+
+      - name: Start Celery worker
+        run: |
+          python -m celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --loglevel=info -Q analysis --pool=solo > celery-worker.log 2>&1 &
+          echo $! > celery-worker.pid
+          sleep 5
+
+      - name: Start API
+        run: |
+          python -m uvicorn blueberry_microid.interfaces.api.app:create_app --factory --host 127.0.0.1 --port 8000 > api.log 2>&1 &
+          echo $! > api.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat api.log
+          exit 1
+
+      - name: Run real Celery Redis smoke
+        run: python scripts/celery_smoke_test.py
+
+      - name: Show service logs on failure
+        if: failure()
+        run: |
+          echo "===== API LOG ====="
+          cat api.log || true
+          echo "===== CELERY WORKER LOG ====="
+          cat celery-worker.log || true

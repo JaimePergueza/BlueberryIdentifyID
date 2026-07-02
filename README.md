@@ -23,9 +23,9 @@ creation, simulated (mock) inference with crash-safe/idempotent processing
 inconclusive/reject) — all behind a versioned FastAPI, backed by SQLAlchemy
 models and Alembic migrations. 208 automated tests (196 SQLite/eager-based +
 12 PostgreSQL-only); the CI workflow is configured to run the fast suite on
-SQLite **and**, in a separate job, apply the migrations to a real PostgreSQL
-service and run the PostgreSQL-only tests against it on every push/PR to
-`main`.
+SQLite, apply migrations and PostgreSQL-only tests against a real PostgreSQL
+service, and run an operational Celery smoke against real PostgreSQL + Redis
+services on every push/PR to `main`.
 
 **What does not exist yet, on purpose:** a real or trained inference model (only
 `MockInferenceEngine`, a deterministic non-diagnostic simulation), any
@@ -82,10 +82,13 @@ celery -A blueberry_microid.infrastructure.tasks.celery_app.celery_app worker --
 # 8. Smoke-test the running API (separate terminal)
 python scripts/api_smoke_test.py
 
-# 9. Run the test suite (fast; PostgreSQL-only tests auto-skip)
+# 9. Smoke-test the real Redis + Celery async path (separate terminal)
+python scripts/celery_smoke_test.py
+
+# 10. Run the test suite (fast; PostgreSQL-only tests auto-skip)
 pytest -v
 
-# 10. Run the PostgreSQL-only tests against the database from step 4
+# 11. Run the PostgreSQL-only tests against the database from step 4
 export DATABASE_URL=postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid
 pytest -v -m postgres tests/integration/postgres
 ```
@@ -96,13 +99,14 @@ See [docs/development.md](docs/development.md) for full details, including the e
 
 - **Simulated inference only:** the only `InferenceEnginePort` implementation is `MockInferenceEngine` — deterministic (hashes `analysis_run.id`, no randomness), never reads image content, never names a species/genus, and keeps `confidence_score` moderate (≤ 0.75) by design. See `docs/development.md` § 10.
 - **Async mock processing:** `POST /api/v1/analysis-runs/{id}/process-async` enqueues the same mock processing use case in Celery and returns `202 Accepted`. The worker creates the `Prediction`; the source of truth is still `GET /api/v1/analysis-runs/{id}` and `GET /api/v1/analysis-runs/{id}/prediction`, not the Celery result backend.
+- **Real Celery smoke:** `scripts/celery_smoke_test.py` exercises `/process-async` against a running API, Redis broker/backend, and real Celery worker. It still uses only generated Pillow images and `MockInferenceEngine`.
 - **Idempotent, crash-safe processing:** `POST /analysis-runs/{id}/process` claims the `pending -> processing` transition with a single atomic conditional database update, so two simultaneous calls for the same AnalysisRun can never both proceed — one gets `409 Conflict`, whichever loses the race, and no state is left ambiguous. `processing` is never a permanent state: any processing failure after the claim is caught, logged server-side, persisted as `failed` with a controlled `error_message`, and returned as a safe HTTP error rather than `200 OK`; a duplicate `Prediction` returns `409 Conflict` and also leaves the run `failed`, without creating a second prediction. See `docs/development.md` § 11.
 - **Human review audit flow:** after an `AnalysisRun` has a `Prediction`, an expert can submit reviews under `/api/v1/analysis-runs/{id}/reviews`. A new final review demotes any previous final review in the same transaction, while the original `Prediction` stays immutable for traceability. See `docs/development.md` § 12.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
 - **PostgreSQL validation status:** Estado B as of Fase 6.5 - the GitHub Actions workflow was pushed to `origin`, but no run has been observed from this environment because `gh` is not installed and the unauthenticated Actions API request returned `404 Not Found`. PostgreSQL is therefore **not yet validated in CI**. To validate locally, start PostgreSQL and run `pytest -m postgres tests/integration/postgres` and `python scripts/check_postgres_migrations.py` - see `docs/development.md` § 5 and § 15.
-- **Continuous integration:** `.github/workflows/tests.yml` has two jobs on every push/PR to `main` - `unit-and-api-tests` (full suite on SQLite) and `postgres-migrations` (spins up a real `postgres:16` service, applies the Alembic migrations, and runs the PostgreSQL-only tests). No deployment step and no secrets. The workflow must still be verified in GitHub Actions.
+- **Continuous integration:** `.github/workflows/tests.yml` has three jobs on every push/PR to `main` - `unit-and-api-tests` (full suite on SQLite), `postgres-migrations` (real `postgres:16` service, Alembic migrations, PostgreSQL-only tests), and `celery-smoke` (real PostgreSQL + Redis services, real API process, real Celery worker, and `scripts/celery_smoke_test.py`). No deployment step, Docker image build, secrets, real AI, PyTorch, frontend, or taxonomy.
 
 ## API overview
 

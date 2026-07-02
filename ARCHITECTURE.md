@@ -489,4 +489,18 @@ Objetivo: ejecutar el análisis mock fuera del request HTTP sin cambiar las regl
 
 **Pruebas.** Se agregan tests unitarios para settings Celery, configuración JSON/no-pickle y task; tests API con task fake para demostrar que `/process-async` solo encola; y tests eager con SQLite de archivo para ejecutar la task real sin Redis, verificar `202`, estado final, `Prediction`, revisión humana posterior y duplicados sin segunda `Prediction`.
 
-**Riesgos pendientes antes de Fase 8.** (a) Falta smoke real con un worker Celery separado y Redis real en esta máquina si Docker sigue no disponible. (b) El endpoint `/tasks/{task_id}` depende de la retención del result backend y no debe usarse como fuente de verdad. (c) Sigue pendiente observar un run verde de GitHub Actions desde esta sesión, según Fase 6.5. (d) No existe IA real ni procesamiento pesado todavía; Celery solo mueve el mock fuera del request.
+**Riesgos pendientes antes de Fase 7.5.** (a) Falta smoke real con un worker Celery separado y Redis real en esta máquina si Docker sigue no disponible. (b) El endpoint `/tasks/{task_id}` depende de la retención del result backend y no debe usarse como fuente de verdad. (c) Sigue pendiente observar un run verde de GitHub Actions desde esta sesión, según Fase 6.5. (d) No existe IA real ni procesamiento pesado todavía; Celery solo mueve el mock fuera del request.
+
+## 23. Fase 7.5 — smoke operativo real con Redis + Celery worker
+
+Objetivo: comprobar que el flujo asíncrono funciona con cola real, no solo con Celery eager mode. No se cambia lógica de negocio: el worker sigue llamando `process_analysis_run_task()`, que usa `ProcessAnalysisRunUseCase` y `MockInferenceEngine`. Sin IA real, sin PyTorch, sin entrenamiento, sin datasets, sin métricas inventadas, sin frontend, sin autenticación y sin taxonomía microbiológica.
+
+**Diagnóstico de configuración.** `docker-compose.yml` ya define `postgres` y `redis` como servicios separados. `Settings` separa `DATABASE_URL` de `CELERY_BROKER_URL`/`CELERY_RESULT_BACKEND`, y agrega `API_BASE_URL` para scripts operativos. `celery_app.py` configura JSON-only, cola `analysis` y Redis configurable; `analysis_tasks.py` no depende de FastAPI y conserva el camino por `ProcessAnalysisRunUseCase`.
+
+**Script de smoke real.** `scripts/celery_smoke_test.py` asume que PostgreSQL, Redis, la API y el worker ya están corriendo. Ejecuta: `GET /health`, crea `Sample`, `ModelVersion mock`, imágenes Petri/micro generadas en memoria con Pillow, `AnalysisRun`, llama `POST /process-async`, obtiene `task_id`, consulta `GET /tasks/{task_id}` hasta `SUCCESS`, verifica que el `AnalysisRun` ya no esté `pending`, consulta `Prediction`, crea una `HumanReview` final y consulta la final. Falla con exit code 1 si algo no coincide o si la task no llega a `SUCCESS` dentro del timeout. No usa datasets ni imprime secretos.
+
+**CI `celery-smoke`.** `.github/workflows/tests.yml` tiene un tercer job que levanta service containers efímeros de PostgreSQL 16 y Redis 7, instala dependencias, ejecuta `alembic upgrade head`, inicia un worker Celery real en background, inicia la API en background, y corre `python scripts/celery_smoke_test.py`. No hay deploy, no hay build de imagen Docker, no hay secrets, no hay IA real ni PyTorch.
+
+**Fuente de verdad.** `GET /tasks/{task_id}` solo prueba que el backend de resultados real recibe el resultado de Celery. La fuente durable sigue siendo `AnalysisRun` y `Prediction`; el smoke verifica ambos después del `SUCCESS`.
+
+**Riesgos pendientes antes de Fase 8.** (a) Si no se puede ejecutar Docker localmente, el smoke real queda validado por GitHub Actions, no por esta máquina. (b) El result backend de Celery sigue siendo auxiliar y puede tener retención limitada. (c) El worker real todavía procesa solo el mock determinista; una futura IA real requerirá otra fase de validación, no una extensión silenciosa de esta.
