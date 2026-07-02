@@ -360,7 +360,9 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 5 this collects **188 tests**, all passing:
+As of Fase 6 this collects **200 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **188 passed, 12 skipped** (the 12 PostgreSQL-only tests
+skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
@@ -369,14 +371,15 @@ As of Fase 5 this collects **188 tests**, all passing:
 | `tests/unit/infrastructure/` | 14 | `Settings` + `PillowImageValidator`, in isolation. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
 | `tests/api/` | 62 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status and the human-review endpoints. |
+| `tests/integration/postgres/` | 12 | **PostgreSQL-only** (Fase 6): real migrations, JSONB, native ENUMs, partial unique index, CHECK constraints, UUID, and a full API smoke flow. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 58 + 14 + 28 + 62 = **188**, matching `pytest --collect-only -q`.
+26 + 58 + 14 + 28 + 62 + 12 = **200**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
-and 188 in Fase 5.)
+188 in Fase 5, and 200 in Fase 6.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -390,9 +393,13 @@ and 188 in Fase 5.)
   temporary directory for image storage — see `tests/api/conftest.py`.
   Uploaded test images are generated in memory with Pillow; no external or
   invented image/dataset files are used anywhere in the test suite.
+- `tests/integration/postgres/` requires a **real PostgreSQL** and is the
+  one place that validates PostgreSQL-only behavior — SQLite is never used
+  as a stand-in there (see § 15).
 
-None of the above replaces validating migrations/constraints against real
-PostgreSQL (see § 5).
+SQLite-based tests do not replace validating migrations/constraints against
+real PostgreSQL — that is exactly what `tests/integration/postgres/` and the
+`postgres-migrations` CI job now do (§ 15).
 
 ## 14. Project sanitation, Git, and CI (Fase 5.5)
 
@@ -412,12 +419,9 @@ business functionality. See ARCHITECTURE.md § 19 for the full rationale.
   `storage/micro_images/` contain nothing but their `.gitkeep` placeholders —
   no leftover test-uploaded files. No `.pytest_cache/`, `.coverage`, or
   `*.sqlite*` files were present at the time of cleanup.
-- **CI:** `.github/workflows/tests.yml` runs on every push/PR to `main`:
-  checkout → `actions/setup-python@v5` (3.10) → `pip install -e ".[dev]"` →
-  `pytest -v`. No deployment step, no Postgres service container, no
-  secrets. Real PostgreSQL validation (§ 5) is explicitly **not** part of
-  this CI yet — it remains a manual, separate step until a future
-  improvement decides to add a `services: postgres:` block.
+- **CI:** `.github/workflows/tests.yml` runs on every push/PR to `main`.
+  (As of Fase 6 this now has a second job that stands up real PostgreSQL —
+  see § 15; the description here reflects the original Fase 5.5 state.)
 - **PostgreSQL real validation:** re-attempted in this phase — `docker` is
   not installed in this environment (`command not found` from both Bash and
   PowerShell), so `docker compose up -d` could not run.
@@ -432,3 +436,82 @@ business functionality. See ARCHITECTURE.md § 19 for the full rationale.
   required dependencies (FastAPI, Uvicorn, SQLAlchemy, Alembic, Pydantic,
   Pydantic Settings, Pillow, python-multipart, psycopg, pytest, httpx) are
   both declared in `pyproject.toml` and installed at matching versions.
+
+## 15. Real PostgreSQL validation and CI (Fase 6)
+
+Fase 6 closed the long-standing gap where the schema was only ever exercised
+against SQLite. There are now real PostgreSQL tests and a dedicated CI job
+that runs them against a live PostgreSQL service. No new business
+functionality was added — this is purely validation infrastructure. See
+ARCHITECTURE.md § 20 for the design rationale.
+
+### Running the normal (fast) tests
+
+```bash
+pytest -v
+```
+
+On a machine without PostgreSQL this is **188 passed, 12 skipped** — the 12
+PostgreSQL-only tests skip automatically. Nothing fails just because you have
+no database.
+
+### Running the PostgreSQL-only tests locally
+
+You need a real PostgreSQL. The simplest way is the bundled Docker Compose
+service (§ 4):
+
+```bash
+# 1. start PostgreSQL
+docker compose up -d          # or point DATABASE_URL at any PostgreSQL you have
+
+# 2. tell the tests (and Alembic) where it is
+export DATABASE_URL=postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid
+#   PowerShell: $env:DATABASE_URL = "postgresql+psycopg://blueberry:blueberry@localhost:5432/blueberry_microid"
+
+# 3. run just the PostgreSQL suite
+pytest -v -m postgres tests/integration/postgres
+```
+
+The `postgres` marker (registered in `pyproject.toml`) tags these tests. The
+gate is the `DATABASE_URL` environment variable actually being set to a
+`postgresql...` URL — not the app's default, which is a PostgreSQL URL even
+when nothing is configured. If it is not set, the tests skip; they never fall
+back to SQLite.
+
+`tests/integration/postgres/conftest.py` applies the **real Alembic
+migrations** (`downgrade base` → `upgrade head`) against that database before
+the tests run, so a green run means the migrations themselves are valid on
+PostgreSQL. Each test then runs against a truncated-clean schema.
+
+### What the PostgreSQL tests validate (that SQLite cannot)
+
+- All seven tables are created by the migrations.
+- `predictions.class_probabilities` is real `JSONB` (round-trips a dict, the
+  `->>` operator works, and the server-side column type is `jsonb`).
+- Native `ENUM` columns store the enum **value** (`mock`, `pending`), not the
+  Python member name.
+- `UUID` columns return real `uuid.UUID` values.
+- The partial unique index allows only one `is_final = true` human review per
+  analysis run, while permitting many historical (non-final) ones.
+- The `CHECK` constraints reject an out-of-range `confidence_score` and a
+  `corrected` review missing its `corrected_label`.
+- A full API smoke flow (sample → images → analysis run → mock processing →
+  prediction → final human review) works end-to-end on PostgreSQL.
+
+### CI
+
+`.github/workflows/tests.yml` now has two jobs:
+
+1. `unit-and-api-tests` — installs the project and runs the full suite. It
+   does not set `DATABASE_URL`, so the PostgreSQL-only tests skip here.
+2. `postgres-migrations` — starts a `postgres:16` service container
+   (`blueberry`/`blueberry`, database `blueberry_microid_test`), sets
+   `DATABASE_URL`, runs `python scripts/check_postgres_migrations.py` (which
+   applies the migrations and verifies they are reversible), then runs
+   `pytest -m postgres tests/integration/postgres`.
+
+No deployment, no Docker image build, and no secrets — the PostgreSQL
+credentials in the workflow are throwaway values for an ephemeral CI
+database. Validating migrations against a *self-managed/production*
+PostgreSQL still uses the same `scripts/check_postgres_migrations.py` (§ 5)
+and remains an operational step outside CI.

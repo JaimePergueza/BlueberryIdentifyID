@@ -26,6 +26,7 @@ This script never prints a success message unless every step above actually
 succeeded — it does not "assume" or "simulate" success.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -35,10 +36,28 @@ SRC_ROOT = REPO_ROOT / "src"
 
 
 def _get_database_url() -> str:
+    """Resolve the database URL, preferring an explicit DATABASE_URL env var.
+
+    Prints which source was used so the output can never be mistaken for a
+    validation against some other, unintended database. If the env var is not
+    set, it falls back to the app's `Settings` default (local development
+    convenience) — but says so loudly, because CI must set it explicitly.
+    """
+    env_url = os.environ.get("DATABASE_URL")
+    if env_url:
+        print(f"[0/4] Using DATABASE_URL from the environment: {env_url}")
+        return env_url
+
     sys.path.insert(0, str(SRC_ROOT))
     from blueberry_microid.infrastructure.config.settings import Settings
 
-    return Settings().database_url
+    settings_url = Settings().database_url
+    print(
+        "[0/4] WARNING: no DATABASE_URL environment variable is set; falling back "
+        f"to the Settings default ({settings_url})."
+    )
+    print("      In CI this must be set explicitly to the PostgreSQL service URL.")
+    return settings_url
 
 
 def _check_connection(database_url: str) -> None:
@@ -81,6 +100,12 @@ def main() -> None:
         print("This check is only meaningful against a real PostgreSQL instance;")
         print("refusing to report a false positive against SQLite or another dialect.")
         sys.exit(1)
+
+    # Ensure the alembic subprocess (which reads DATABASE_URL via
+    # alembic/env.py) targets the exact same database this script just
+    # verified it can connect to — not the alembic.ini placeholder URL. This
+    # matters on the fallback path where DATABASE_URL was not originally set.
+    os.environ["DATABASE_URL"] = database_url
 
     _check_connection(database_url)
 
