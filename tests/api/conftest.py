@@ -30,6 +30,8 @@ from blueberry_microid.infrastructure.db.models import (
     SampleModel,
     TrainingPreflightIssueModel,
     TrainingPreflightRunModel,
+    TrainingPredictionModel,
+    TrainingRunModel,
 )
 from blueberry_microid.infrastructure.db.session.session_factory import create_session_factory
 from blueberry_microid.interfaces.api.app import create_app
@@ -48,6 +50,8 @@ _SQLITE_TABLES = [
     DatasetSplitItemModel.__table__,
     TrainingPreflightRunModel.__table__,
     TrainingPreflightIssueModel.__table__,
+    TrainingRunModel.__table__,
+    TrainingPredictionModel.__table__,
 ]
 
 

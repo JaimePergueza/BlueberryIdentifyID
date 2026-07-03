@@ -56,6 +56,10 @@ class TrainingPreflightRunNotFoundError(NotFoundError):
     """Raised when a requested TrainingPreflightRun does not exist."""
 
 
+class TrainingRunNotFoundError(NotFoundError):
+    """Raised when a requested TrainingRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -107,6 +111,10 @@ class DatasetSplitMetadataError(ApplicationError):
     itself is well-formed, but the referenced data cannot satisfy the
     requested split strategy.
     """
+
+
+class BaselineTrainingNotAllowedError(ConflictError):
+    """Raised when a baseline TrainingRun cannot be created from current state."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

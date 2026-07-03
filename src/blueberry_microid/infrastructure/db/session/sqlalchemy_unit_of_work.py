@@ -31,6 +31,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prefli
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_preflight_run_repository import (
     SqlAlchemyTrainingPreflightRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prediction_repository import (
+    SqlAlchemyTrainingPredictionRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_repository import (
+    SqlAlchemyTrainingRunRepository,
+)
 
 
 class SqlAlchemyUnitOfWork(UnitOfWorkPort):
@@ -71,6 +77,8 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
         self.training_preflight_run_repository = SqlAlchemyTrainingPreflightRunRepository(
             self.session, auto_commit=False
         )
+        self.training_prediction_repository = SqlAlchemyTrainingPredictionRepository(self.session, auto_commit=False)
+        self.training_run_repository = SqlAlchemyTrainingRunRepository(self.session, auto_commit=False)
         return self
 
     def __exit__(

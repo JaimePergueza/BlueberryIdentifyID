@@ -16,6 +16,8 @@ from blueberry_microid.application.ports.sample_repository import SampleReposito
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
+from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 
 __all__ = [
     "ALLOWED_EXTENSIONS",
@@ -36,4 +38,6 @@ __all__ = [
     "UnitOfWorkPort",
     "TrainingPreflightIssueRepositoryPort",
     "TrainingPreflightRunRepositoryPort",
+    "TrainingPredictionRepositoryPort",
+    "TrainingRunRepositoryPort",
 ]

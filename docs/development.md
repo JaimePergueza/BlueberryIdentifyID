@@ -426,19 +426,19 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 12 this collects **327 tests**. On a machine without PostgreSQL,
+As of Fase 13 this collects **340 tests**. On a machine without PostgreSQL,
 `pytest -v` reports **296 passed, 31 skipped** (the 31 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 121 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, and persisted ML preflight creation/rollback rules) — no database, no filesystem. |
+| `tests/unit/application/` | 124 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, and majority-class baseline persistence/failure rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
-| `tests/unit/ml/` | 22 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, and the intentionally unimplemented `TrainerPort` — no image decoding, tensors, PyTorch, or model metrics. |
+| `tests/unit/ml/` | 25 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, and the Fase 13 majority-class baseline trainer — no image decoding, tensors, PyTorch, or neural model metrics. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 81 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, and ML preflight persistence/history flow. |
-| `tests/integration/postgres/` | 31 | **PostgreSQL-only** (Fase 6/8/9/10/12): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 83 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, and majority-class baseline API/history flow. |
+| `tests/integration/postgres/` | 36 | **PostgreSQL-only** (Fase 6/8/9/10/12/13): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
 26 + 121 + 18 + 22 + 28 + 81 + 31 = **327**, matching `pytest --collect-only -q`.
 
@@ -447,7 +447,7 @@ up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
-289 in Fase 10, 311 in Fase 11, and 327 in Fase 12.)
+289 in Fase 10, 311 in Fase 11, 327 in Fase 12, and 340 in Fase 13.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -1045,3 +1045,48 @@ It prints a report but does not persist anything. Use the API when an
 auditable `TrainingPreflightRun`/`TrainingPreflightIssue` history is required.
 A `passed` preflight is only a technical gate result; it does not prove the
 dataset is scientifically sufficient or that training should proceed.
+
+## 22. Majority-class baseline training runs (Fase 13)
+
+Fase 13 adds a persisted experimental baseline over an existing
+`DatasetRelease`. It is deliberately small: no image decoding, no tensors, no
+PyTorch/TensorFlow, no CNN/ViT, no Celery, no external datasets, and no
+replacement of `MockInferenceEngine`.
+
+`TrainingRun` stores one baseline execution: release, preflight, run kind,
+baseline model type, status, exact `TrainingConfig`, baseline state, metrics,
+summary, timestamps, author notes, and any error message. `TrainingPrediction`
+stores one prediction per `DatasetSplitItem`, preserving the reviewed
+`ground_truth_label`, the baseline `predicted_label`, split, correctness, and
+references to the release item. The database enforces allowed statuses,
+`run_kind=baseline`, `baseline_model_type=majority_class`, allowed splits,
+allowed preliminary labels, FKs, and uniqueness of one prediction per
+`(training_run_id, dataset_split_item_id)`.
+
+`MajorityClassBaselineTrainer` uses only the train split labels to choose the
+majority preliminary label. Ties are deterministic, using the existing
+`PredictedLabel` enum order. It then predicts that same label for all
+train/validation/test items. The only metrics recorded are calculated directly
+from those predictions: `accuracy_overall`, `accuracy_by_split`,
+`support_by_split`, `label_distribution_by_split`, and `confusion_matrix`.
+Precision, recall and F1 remain out of scope.
+
+`CreateBaselineTrainingRunUseCase` requires a matching non-failed
+`TrainingPreflightRun`, exports and revalidates the release manifest, and then
+persists the completed `TrainingRun` plus all `TrainingPrediction`s
+transactionally. If manifest revalidation fails, it persists a `failed`
+`TrainingRun` with validation errors and no predictions, so the failed attempt
+is still auditable.
+
+Endpoints:
+
+- `POST /api/v1/ml/training-runs/baseline`
+- `GET /api/v1/ml/training-runs`
+- `GET /api/v1/ml/training-runs/{training_run_id}`
+- `GET /api/v1/ml/training-runs/{training_run_id}/predictions`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/training-runs`
+- `GET /api/v1/ml/preflight-runs/{preflight_run_id}/training-runs`
+
+This baseline is not real AI and does not establish scientific performance. It
+only provides a reproducible, transparent lower-bound experiment over reviewed
+labels for later comparison.

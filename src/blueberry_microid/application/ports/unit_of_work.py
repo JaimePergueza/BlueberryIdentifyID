@@ -11,6 +11,8 @@ from blueberry_microid.application.ports.human_review_repository import HumanRev
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
+from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 
 
 class UnitOfWorkPort(ABC):
@@ -39,6 +41,8 @@ class UnitOfWorkPort(ABC):
     prediction_repository: PredictionRepositoryPort
     training_preflight_issue_repository: TrainingPreflightIssueRepositoryPort
     training_preflight_run_repository: TrainingPreflightRunRepositoryPort
+    training_prediction_repository: TrainingPredictionRepositoryPort
+    training_run_repository: TrainingRunRepositoryPort
 
     @abstractmethod
     def __enter__(self) -> "UnitOfWorkPort":

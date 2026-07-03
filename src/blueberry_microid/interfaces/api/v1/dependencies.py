@@ -33,6 +33,8 @@ from blueberry_microid.application.ports.prediction_repository import Prediction
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
+from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
@@ -62,6 +64,12 @@ from blueberry_microid.application.use_cases.ml_preflight.list_training_prefligh
 from blueberry_microid.application.use_cases.ml_preflight.list_training_preflight_runs import (
     ListTrainingPreflightRunsUseCase,
 )
+from blueberry_microid.application.use_cases.training.create_baseline_training_run import (
+    CreateBaselineTrainingRunUseCase,
+)
+from blueberry_microid.application.use_cases.training.get_training_run import GetTrainingRunUseCase
+from blueberry_microid.application.use_cases.training.list_training_predictions import ListTrainingPredictionsUseCase
+from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
 from blueberry_microid.application.use_cases.micro_image.register_micro_image import RegisterMicroImageUseCase
 from blueberry_microid.application.use_cases.model_version.create_model_version import CreateModelVersionUseCase
 from blueberry_microid.application.use_cases.model_version.list_model_versions import ListModelVersionsUseCase
@@ -112,12 +120,19 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prefli
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_preflight_run_repository import (
     SqlAlchemyTrainingPreflightRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prediction_repository import (
+    SqlAlchemyTrainingPredictionRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_repository import (
+    SqlAlchemyTrainingRunRepository,
+)
 from blueberry_microid.infrastructure.db.session.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from blueberry_microid.infrastructure.storage.local_image_storage import LocalImageStorage
 from blueberry_microid.infrastructure.storage.pillow_image_validator import PillowImageValidator
 from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
+from blueberry_microid.ml.training.majority_class_baseline import MajorityClassBaselineTrainer
 from blueberry_microid.ml.validation.image_path_validator import ImagePathValidator
 from blueberry_microid.ml.validation.manifest_validator import ManifestValidator
 
@@ -246,6 +261,16 @@ def get_training_preflight_issue_repository(
     return SqlAlchemyTrainingPreflightIssueRepository(session)
 
 
+def get_training_run_repository(session: Session = Depends(get_db_session)) -> TrainingRunRepositoryPort:
+    return SqlAlchemyTrainingRunRepository(session)
+
+
+def get_training_prediction_repository(
+    session: Session = Depends(get_db_session),
+) -> TrainingPredictionRepositoryPort:
+    return SqlAlchemyTrainingPredictionRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -259,6 +284,10 @@ def get_manifest_validator() -> ManifestValidator:
 
 def get_image_path_validator() -> ImagePathValidator:
     return ImagePathValidator()
+
+
+def get_majority_class_baseline_trainer() -> MajorityClassBaselineTrainer:
+    return MajorityClassBaselineTrainer()
 
 
 # --- inference engine --------------------------------------------------------
@@ -540,3 +569,44 @@ def get_list_training_preflight_issues_use_case(
     ),
 ) -> ListTrainingPreflightIssuesUseCase:
     return ListTrainingPreflightIssuesUseCase(preflight_run_repository, preflight_issue_repository)
+
+
+def get_create_baseline_training_run_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    preflight_run_repository: TrainingPreflightRunRepositoryPort = Depends(get_training_preflight_run_repository),
+    dataset_split_item_repository: DatasetSplitItemRepositoryPort = Depends(get_dataset_split_item_repository),
+    dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+    manifest_exporter: DatasetReleaseManifestExporter = Depends(get_dataset_release_manifest_exporter),
+    manifest_validator: ManifestValidator = Depends(get_manifest_validator),
+    trainer: MajorityClassBaselineTrainer = Depends(get_majority_class_baseline_trainer),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateBaselineTrainingRunUseCase:
+    return CreateBaselineTrainingRunUseCase(
+        dataset_release_repository,
+        preflight_run_repository,
+        dataset_split_item_repository,
+        dataset_item_repository,
+        manifest_exporter,
+        manifest_validator,
+        trainer,
+        unit_of_work,
+    )
+
+
+def get_get_training_run_use_case(
+    training_run_repository: TrainingRunRepositoryPort = Depends(get_training_run_repository),
+) -> GetTrainingRunUseCase:
+    return GetTrainingRunUseCase(training_run_repository)
+
+
+def get_list_training_runs_use_case(
+    training_run_repository: TrainingRunRepositoryPort = Depends(get_training_run_repository),
+) -> ListTrainingRunsUseCase:
+    return ListTrainingRunsUseCase(training_run_repository)
+
+
+def get_list_training_predictions_use_case(
+    training_run_repository: TrainingRunRepositoryPort = Depends(get_training_run_repository),
+    training_prediction_repository: TrainingPredictionRepositoryPort = Depends(get_training_prediction_repository),
+) -> ListTrainingPredictionsUseCase:
+    return ListTrainingPredictionsUseCase(training_run_repository, training_prediction_repository)

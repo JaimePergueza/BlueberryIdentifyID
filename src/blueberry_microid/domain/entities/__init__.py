@@ -7,6 +7,8 @@ from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.domain.entities.training_preflight_issue import TrainingPreflightIssue
 from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
+from blueberry_microid.domain.entities.training_prediction import TrainingPrediction
+from blueberry_microid.domain.entities.training_run import TrainingRun
 
 __all__ = [
     "AnalysisRun",
@@ -18,4 +20,6 @@ __all__ = [
     "Sample",
     "TrainingPreflightIssue",
     "TrainingPreflightRun",
+    "TrainingPrediction",
+    "TrainingRun",
 ]

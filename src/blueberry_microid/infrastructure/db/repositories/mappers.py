@@ -18,9 +18,16 @@ from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.domain.entities.training_preflight_issue import TrainingPreflightIssue
 from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
+from blueberry_microid.domain.entities.training_prediction import TrainingPrediction
+from blueberry_microid.domain.entities.training_run import TrainingRun
+from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
+from blueberry_microid.domain.enums.dataset_split import DatasetSplit
+from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 from blueberry_microid.domain.enums.training_preflight_issue_severity import TrainingPreflightIssueSeverity
 from blueberry_microid.domain.enums.training_preflight_status import TrainingPreflightStatus
+from blueberry_microid.domain.enums.training_run_kind import TrainingRunKind
+from blueberry_microid.domain.enums.training_run_status import TrainingRunStatus
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
@@ -34,6 +41,8 @@ from blueberry_microid.infrastructure.db.models.prediction import PredictionMode
 from blueberry_microid.infrastructure.db.models.sample import SampleModel
 from blueberry_microid.infrastructure.db.models.training_preflight_issue import TrainingPreflightIssueModel
 from blueberry_microid.infrastructure.db.models.training_preflight_run import TrainingPreflightRunModel
+from blueberry_microid.infrastructure.db.models.training_prediction import TrainingPredictionModel
+from blueberry_microid.infrastructure.db.models.training_run import TrainingRunModel
 
 
 def sample_to_entity(model: SampleModel) -> Sample:
@@ -248,5 +257,41 @@ def training_preflight_issue_to_entity(model: TrainingPreflightIssueModel) -> Tr
         id=model.id,
         field=model.field,
         item_ref=model.item_ref,
+        created_at=model.created_at,
+    )
+
+
+def training_run_to_entity(model: TrainingRunModel) -> TrainingRun:
+    return TrainingRun(
+        dataset_release_id=model.dataset_release_id,
+        preflight_run_id=model.preflight_run_id,
+        run_kind=TrainingRunKind(model.run_kind),
+        baseline_model_type=BaselineModelType(model.baseline_model_type),
+        status=TrainingRunStatus(model.status),
+        experiment_name=model.experiment_name,
+        config=model.config,
+        baseline_state=model.baseline_state,
+        metrics=model.metrics,
+        summary=model.summary,
+        started_at=model.started_at,
+        id=model.id,
+        completed_at=model.completed_at,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def training_prediction_to_entity(model: TrainingPredictionModel) -> TrainingPrediction:
+    return TrainingPrediction(
+        training_run_id=model.training_run_id,
+        dataset_split_item_id=model.dataset_split_item_id,
+        dataset_item_id=model.dataset_item_id,
+        split=DatasetSplit(model.split),
+        ground_truth_label=PredictedLabel(model.ground_truth_label),
+        predicted_label=PredictedLabel(model.predicted_label),
+        is_correct=model.is_correct,
+        id=model.id,
         created_at=model.created_at,
     )

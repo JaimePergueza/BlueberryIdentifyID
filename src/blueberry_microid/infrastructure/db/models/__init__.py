@@ -17,6 +17,8 @@ from blueberry_microid.infrastructure.db.models.prediction import PredictionMode
 from blueberry_microid.infrastructure.db.models.sample import SampleModel
 from blueberry_microid.infrastructure.db.models.training_preflight_issue import TrainingPreflightIssueModel
 from blueberry_microid.infrastructure.db.models.training_preflight_run import TrainingPreflightRunModel
+from blueberry_microid.infrastructure.db.models.training_prediction import TrainingPredictionModel
+from blueberry_microid.infrastructure.db.models.training_run import TrainingRunModel
 
 __all__ = [
     "AnalysisRunModel",
@@ -33,4 +35,6 @@ __all__ = [
     "SampleModel",
     "TrainingPreflightIssueModel",
     "TrainingPreflightRunModel",
+    "TrainingPredictionModel",
+    "TrainingRunModel",
 ]

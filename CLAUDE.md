@@ -166,3 +166,12 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 2. Verificar en qué fase del MVP se está trabajando (ver `docs/`).
 3. Desde la Fase 5.5, el repositorio tiene control de versiones real (`git init` ejecutado, rama por defecto `main`). Ejecutar `git status --short` antes de empezar a modificar código para no confundir cambios propios con trabajo en curso preexistente sin commitear.
 4. No avanzar de fase sin validación del usuario si la tarea implica una decisión arquitectónica nueva.
+## 10. Majority-class baseline experimental (Fase 13)
+
+- `TrainingRun` y `TrainingPrediction` persisten un baseline auditable, no un modelo de IA real. El unico `baseline_model_type` permitido es `majority_class`; `run_kind` sigue siendo `baseline`.
+- El baseline solo puede usar labels revisadas del manifest/release: selecciona la clase mayoritaria del split `train` y predice esa misma etiqueta preliminar para `train`, `validation` y `test`. En empate, el desempate debe ser determinista y documentado.
+- Requiere un `TrainingPreflightRun` no fallido y perteneciente al mismo `DatasetRelease`; el manifest se revalida antes de persistir el experimento. Si la revalidacion falla, se persiste un `TrainingRun` con `status=failed` y sin predicciones.
+- Las metricas permitidas son solo las derivadas de las `TrainingPrediction` del baseline: accuracy overall, accuracy por split, soporte por split, distribucion de etiquetas por split y matriz de confusion. Sigue prohibido precision, recall y F1.
+- Esta es la excepcion estrecha a la regla general de no escribir metricas: las cifras se calculan directamente desde predicciones persistidas y ground truth revisado, nunca son relleno ni afirmacion de IA real.
+- No abrir ni decodificar imagenes, no crear tensores, no usar PyTorch/TensorFlow/CNN/ViT/deep learning, no entrenar redes, no descargar datasets externos, no lanzar Celery y no reemplazar `MockInferenceEngine`.
+- Los endpoints viven bajo `/api/v1/ml/training-runs` y deben conservar `X-Request-ID`; los endpoints de historial por release/preflight solo listan runs existentes.

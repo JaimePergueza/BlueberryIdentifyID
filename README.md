@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 11)
+## MVP status (as of Fase 13)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -31,9 +31,9 @@ runs an operational Celery smoke against real PostgreSQL + Redis services on
 every push/PR to `main`.
 
 **What does not exist yet, on purpose:** a real or trained inference model
-(only `MockInferenceEngine`, a deterministic non-diagnostic simulation), any
-training run, performance metrics, taxonomic species/genus identification, a
-frontend, and authentication.
+(only `MockInferenceEngine`, a deterministic non-diagnostic simulation), image
+tensor training, PyTorch/TensorFlow/deep learning, taxonomic species/genus
+identification, a frontend, and authentication.
 
 **ML training contracts (Fase 11):** `TrainingManifest` reads the deterministic
 DatasetRelease manifest shape, `TrainingConfig` records future experiment
@@ -49,6 +49,16 @@ the result of validating a `DatasetRelease` manifest with a specific
 `TrainingConfig`; `TrainingPreflightIssue` stores each validation error or
 warning. A passed preflight means only that technical gates passed. It is not
 scientific sufficiency, model performance, or approval to train.
+
+**Majority-class baseline training runs (Fase 13):** `TrainingRun` records a
+baseline experiment and `TrainingPrediction` records one prediction per
+`DatasetSplitItem`. The only implemented model type is `majority_class`: it
+chooses the most frequent reviewed label in the train split, predicts that
+same broad visual label for train/validation/test, and calculates only metrics
+derived from those persisted predictions (`accuracy_overall`,
+`accuracy_by_split`, support, label distributions, confusion matrix). It never
+opens images, creates tensors, uses PyTorch/TensorFlow/deep learning, launches
+Celery, or changes `MockInferenceEngine`.
 
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original
@@ -145,6 +155,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Human review audit flow:** after an `AnalysisRun` has a `Prediction`, an expert can submit reviews under `/api/v1/analysis-runs/{id}/reviews`. A new final review demotes any previous final review in the same transaction, while the original `Prediction` stays immutable for traceability. See `docs/development.md` § 12.
 - **Training manifest validation only:** `scripts/validate_training_manifest.py` validates the JSON manifest exported by a `DatasetRelease` against the Fase 11 contracts. It checks structure, split coverage, allowed preliminary labels, duplicate/leakage risks, and minimum counts; it does not open image bytes, train a model, calculate accuracy/precision/recall/F1, or use PyTorch.
 - **Persistent preflight validation:** `POST /api/v1/ml/preflight-runs` runs the same manifest validation and persists the report. Use the standalone CLI for quick local checks; use the API when the result must be auditable and queryable by `DatasetRelease`.
+- **Majority-class baseline:** `POST /api/v1/ml/training-runs/baseline` runs the only implemented experimental baseline. It requires a matching non-failed preflight, revalidates the release manifest, uses train labels only to select the majority class, persists one prediction per split item, and reports real baseline metrics from those predictions. It does not read image bytes, train neural networks, use PyTorch, or alter the mock inference engine.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
@@ -179,6 +190,7 @@ Dataset release endpoints (Fase 9 — reproducible train/validation/test splits)
 - `GET /api/v1/datasets/releases/{dataset_release_id}/items` lists each item's split assignment.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/manifest` returns a deterministic JSON manifest including each item's split.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/preflight-runs` lists persisted ML preflight validations for that release.
+- `GET /api/v1/datasets/releases/{dataset_release_id}/training-runs` lists baseline training runs for that release.
 
 ML preflight endpoints (Fase 12 — persistent validation reports, no training):
 
@@ -186,6 +198,14 @@ ML preflight endpoints (Fase 12 — persistent validation reports, no training):
 - `GET /api/v1/ml/preflight-runs` lists persisted preflight runs.
 - `GET /api/v1/ml/preflight-runs/{preflight_run_id}` returns a preflight run with its issues.
 - `GET /api/v1/ml/preflight-runs/{preflight_run_id}/issues` lists validation errors/warnings.
+- `GET /api/v1/ml/preflight-runs/{preflight_run_id}/training-runs` lists baseline training runs linked to that preflight.
+
+ML baseline endpoints (Fase 13 - majority-class baseline only, no image training):
+
+- `POST /api/v1/ml/training-runs/baseline` creates a majority-class baseline `TrainingRun`.
+- `GET /api/v1/ml/training-runs` lists training runs.
+- `GET /api/v1/ml/training-runs/{training_run_id}` returns one training run.
+- `GET /api/v1/ml/training-runs/{training_run_id}/predictions` lists persisted baseline predictions; optional `split=train|validation|test`.
 
 Async processing endpoints:
 

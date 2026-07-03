@@ -34,6 +34,8 @@ from blueberry_microid.application.ports.training_preflight_issue_repository imp
     TrainingPreflightIssueRepositoryPort,
 )
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
+from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
@@ -48,6 +50,8 @@ from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.domain.entities.training_preflight_issue import TrainingPreflightIssue
 from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
+from blueberry_microid.domain.entities.training_prediction import TrainingPrediction
+from blueberry_microid.domain.entities.training_run import TrainingRun
 from blueberry_microid.domain.enums.analysis_status import AnalysisStatus
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 
@@ -289,6 +293,78 @@ class InMemoryTrainingPreflightIssueRepository(TrainingPreflightIssueRepositoryP
         self._by_id = copy.deepcopy(state)
 
 
+class InMemoryTrainingRunRepository(TrainingRunRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, TrainingRun] = {}
+
+    def add(self, training_run: TrainingRun) -> TrainingRun:
+        self._by_id[training_run.id] = training_run
+        return training_run
+
+    def get_by_id(self, training_run_id: UUID) -> Optional[TrainingRun]:
+        return self._by_id.get(training_run_id)
+
+    def list_all(self) -> list[TrainingRun]:
+        return sorted(self._by_id.values(), key=lambda run: (run.created_at, run.id))
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[TrainingRun]:
+        return sorted(
+            [run for run in self._by_id.values() if run.dataset_release_id == dataset_release_id],
+            key=lambda run: (run.created_at, run.id),
+        )
+
+    def list_by_preflight_run_id(self, preflight_run_id: UUID) -> list[TrainingRun]:
+        return sorted(
+            [run for run in self._by_id.values() if run.preflight_run_id == preflight_run_id],
+            key=lambda run: (run.created_at, run.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, TrainingRun]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, TrainingRun]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryTrainingPredictionRepository(TrainingPredictionRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, TrainingPrediction] = {}
+
+    def add_many(self, predictions: list[TrainingPrediction]) -> list[TrainingPrediction]:
+        seen = {
+            (prediction.training_run_id, prediction.dataset_split_item_id)
+            for prediction in self._by_id.values()
+        }
+        for prediction in predictions:
+            key = (prediction.training_run_id, prediction.dataset_split_item_id)
+            if key in seen:
+                raise ValueError("duplicate dataset_split_item in training run")
+            seen.add(key)
+            self._by_id[prediction.id] = prediction
+        return predictions
+
+    def list_by_training_run_id(self, training_run_id: UUID) -> list[TrainingPrediction]:
+        return sorted(
+            [prediction for prediction in self._by_id.values() if prediction.training_run_id == training_run_id],
+            key=lambda prediction: (prediction.split.value, prediction.dataset_split_item_id, prediction.id),
+        )
+
+    def list_by_training_run_id_and_split(
+        self, training_run_id: UUID, split: DatasetSplit
+    ) -> list[TrainingPrediction]:
+        return [
+            prediction
+            for prediction in self.list_by_training_run_id(training_run_id)
+            if prediction.split == split
+        ]
+
+    def snapshot_state(self) -> dict[UUID, TrainingPrediction]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, TrainingPrediction]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
 class InMemoryPredictionRepository(PredictionRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, Prediction] = {}
@@ -380,6 +456,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         dataset_split_item_repository: Optional[DatasetSplitItemRepositoryPort] = None,
         training_preflight_run_repository: Optional[TrainingPreflightRunRepositoryPort] = None,
         training_preflight_issue_repository: Optional[TrainingPreflightIssueRepositoryPort] = None,
+        training_run_repository: Optional[TrainingRunRepositoryPort] = None,
+        training_prediction_repository: Optional[TrainingPredictionRepositoryPort] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
@@ -390,11 +468,15 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.dataset_split_item_repository = dataset_split_item_repository
         self.training_preflight_run_repository = training_preflight_run_repository
         self.training_preflight_issue_repository = training_preflight_issue_repository
+        self.training_run_repository = training_run_repository
+        self.training_prediction_repository = training_prediction_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
         self._training_preflight_run_snapshot = None
         self._training_preflight_issue_snapshot = None
+        self._training_run_snapshot = None
+        self._training_prediction_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
@@ -404,6 +486,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._training_preflight_run_snapshot = self.training_preflight_run_repository.snapshot_state()
         if hasattr(self.training_preflight_issue_repository, "snapshot_state"):
             self._training_preflight_issue_snapshot = self.training_preflight_issue_repository.snapshot_state()
+        if hasattr(self.training_run_repository, "snapshot_state"):
+            self._training_run_snapshot = self.training_run_repository.snapshot_state()
+        if hasattr(self.training_prediction_repository, "snapshot_state"):
+            self._training_prediction_snapshot = self.training_prediction_repository.snapshot_state()
         return self
 
     def __exit__(
@@ -418,6 +504,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self.training_preflight_run_repository.restore_state(self._training_preflight_run_snapshot)
         if exc_type is not None and self._training_preflight_issue_snapshot is not None:
             self.training_preflight_issue_repository.restore_state(self._training_preflight_issue_snapshot)
+        if exc_type is not None and self._training_run_snapshot is not None:
+            self.training_run_repository.restore_state(self._training_run_snapshot)
+        if exc_type is not None and self._training_prediction_snapshot is not None:
+            self.training_prediction_repository.restore_state(self._training_prediction_snapshot)
         return None
 
     def commit(self) -> None:

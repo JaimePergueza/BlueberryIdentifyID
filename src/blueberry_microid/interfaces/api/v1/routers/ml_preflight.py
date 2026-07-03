@@ -15,17 +15,20 @@ from blueberry_microid.application.use_cases.ml_preflight.list_training_prefligh
 from blueberry_microid.application.use_cases.ml_preflight.list_training_preflight_runs import (
     ListTrainingPreflightRunsUseCase,
 )
+from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
 from blueberry_microid.interfaces.api.v1.dependencies import (
     get_create_training_preflight_run_use_case,
     get_get_training_preflight_run_use_case,
     get_list_training_preflight_issues_use_case,
     get_list_training_preflight_runs_use_case,
+    get_list_training_runs_use_case,
 )
 from blueberry_microid.interfaces.api.v1.schemas.ml_preflight import (
     CreateTrainingPreflightRunRequestBody,
     TrainingPreflightIssueResponse,
     TrainingPreflightRunResponse,
 )
+from blueberry_microid.interfaces.api.v1.schemas.training_run import TrainingRunResponse
 from blueberry_microid.ml.configs.training_config import TrainingConfig
 
 router = APIRouter(prefix="/ml/preflight-runs", tags=["ml-preflight"])
@@ -69,3 +72,11 @@ def list_training_preflight_issues(
     use_case: ListTrainingPreflightIssuesUseCase = Depends(get_list_training_preflight_issues_use_case),
 ) -> list[TrainingPreflightIssueResponse]:
     return [TrainingPreflightIssueResponse.model_validate(dto) for dto in use_case.execute(preflight_run_id)]
+
+
+@router.get("/{preflight_run_id}/training-runs", response_model=list[TrainingRunResponse])
+def list_preflight_training_runs(
+    preflight_run_id: UUID,
+    use_case: ListTrainingRunsUseCase = Depends(get_list_training_runs_use_case),
+) -> list[TrainingRunResponse]:
+    return [TrainingRunResponse.model_validate(dto) for dto in use_case.execute(preflight_run_id=preflight_run_id)]

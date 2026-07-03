@@ -22,6 +22,7 @@ from blueberry_microid.application.exceptions import (
     AnalysisRunNotFoundError,
     AnalysisRunNotReviewableError,
     ApplicationError,
+    BaselineTrainingNotAllowedError,
     ConflictError,
     DatasetReleaseNotFoundError,
     DatasetSnapshotNotFoundError,
@@ -46,6 +47,7 @@ from blueberry_microid.application.exceptions import (
     PredictionNotFoundError,
     SampleNotFoundError,
     TrainingPreflightRunNotFoundError,
+    TrainingRunNotFoundError,
 )
 from blueberry_microid.domain.exceptions.errors import (
     CrossSampleAnalysisError,
@@ -86,6 +88,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "dataset_release_not_found"
     if isinstance(exc, TrainingPreflightRunNotFoundError):
         return 404, "training_preflight_run_not_found"
+    if isinstance(exc, TrainingRunNotFoundError):
+        return 404, "training_run_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -107,6 +111,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_dataset_split_item"
     if isinstance(exc, EmptyDatasetSnapshotError):
         return 409, "empty_dataset_snapshot"
+    if isinstance(exc, BaselineTrainingNotAllowedError):
+        return 409, "baseline_training_not_allowed"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
     if isinstance(exc, ConflictError):

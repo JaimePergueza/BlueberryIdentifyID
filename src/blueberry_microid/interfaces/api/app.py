@@ -25,6 +25,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     petri_images,
     samples,
     tasks,
+    training_runs,
 )
 
 API_V1_PREFIX = "/api/v1"
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(human_reviews.router, prefix=API_V1_PREFIX)
     app.include_router(datasets.router, prefix=API_V1_PREFIX)
     app.include_router(ml_preflight.router, prefix=API_V1_PREFIX)
+    app.include_router(training_runs.router, prefix=API_V1_PREFIX)
     app.include_router(tasks.router, prefix=API_V1_PREFIX)
 
     register_exception_handlers(app)

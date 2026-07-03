@@ -782,3 +782,57 @@ técnicos pasaron, no que el dataset sea científicamente suficiente. (b) Aún n
 hay entrenamiento ni evaluación real. (c) Las rutas de imagen solo se verifican
 si el caller lo pide. (d) Sigue pendiente modelar confusores adicionales si el
 protocolo científico los requiere.
+## 29. Fase 13 - baseline experimental de clase mayoritaria (implementada)
+
+Objetivo: crear un baseline auditable sobre un `DatasetRelease` ya curado y
+prevalidado, sin introducir IA real, PyTorch, TensorFlow, CNN, ViT,
+entrenamiento de imagenes, datasets externos, frontend, autenticacion,
+taxonomia ni cambios al `MockInferenceEngine`.
+
+**Entidades.** `TrainingRun` registra una ejecucion experimental: release,
+preflight, `run_kind=baseline`, `baseline_model_type=majority_class`, status,
+configuracion, estado del baseline, metricas, resumen, timestamps, autor/notas
+y error controlado si falla. `TrainingPrediction` registra una prediccion por
+`DatasetSplitItem`, con `ground_truth_label`, `predicted_label`, split,
+`is_correct` y referencias al item original. No copia imagenes ni crea
+artefactos de modelo.
+
+**Persistencia.** Migracion `0007_training_runs.py` crea `training_runs` y
+`training_predictions`, con FKs a releases, preflights, split items y dataset
+items; `JSONB` para config/estado/metricas/resumen; `CHECK` para status,
+run kind, tipo de baseline, split y etiquetas preliminares permitidas; e
+indice unico `(training_run_id, dataset_split_item_id)`.
+
+**Baseline.** `MajorityClassBaselineTrainer` mira solo el split `train` para
+elegir la etiqueta mayoritaria revisada. En empate usa el orden del enum
+`PredictedLabel`, por lo que el resultado es determinista. Luego predice esa
+misma etiqueta para `train`, `validation` y `test`.
+
+**Metricas permitidas.** Solo se calculan metricas reales derivadas de las
+`TrainingPrediction` persistidas: accuracy global, accuracy por split, soporte
+por split, distribucion de etiquetas por split y matriz de confusion. No se
+calcula precision, recall ni F1.
+
+**Caso de uso.** `CreateBaselineTrainingRunUseCase` exige que el preflight no
+este fallido y pertenezca al mismo release, reexporta/revalida el manifest, y
+persiste todo transaccionalmente. Si la revalidacion falla, crea un
+`TrainingRun` `failed` con los errores y sin predicciones. No llama Celery, no
+lee imagenes y no modifica `DatasetRelease`, `DatasetSnapshot`, `DatasetItem`,
+`Prediction`, `HumanReview` ni `MockInferenceEngine`.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/training-runs/baseline` | Crea un baseline majority-class |
+| GET | `/api/v1/ml/training-runs` | Lista training runs |
+| GET | `/api/v1/ml/training-runs/{id}` | Obtiene un run |
+| GET | `/api/v1/ml/training-runs/{id}/predictions` | Lista predicciones, con filtro opcional `split` |
+| GET | `/api/v1/datasets/releases/{id}/training-runs` | Historial por release |
+| GET | `/api/v1/ml/preflight-runs/{id}/training-runs` | Historial por preflight |
+
+**Riesgos pendientes antes de Fase 14.** (a) El baseline no prueba suficiencia
+cientifica; solo sirve como referencia minima reproducible. (b) Las metricas
+dependen del tamano y calidad del dataset curado. (c) Siguen pendientes
+confusores no modelados por el protocolo. (d) Sigue sin existir IA real,
+PyTorch, entrenamiento profundo, taxonomia ni frontend.
