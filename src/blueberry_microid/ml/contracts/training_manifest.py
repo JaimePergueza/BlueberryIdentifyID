@@ -18,6 +18,14 @@ class TrainingManifestItem:
     final_review_id: str
     lot_code: Optional[str] = None
     origin: Optional[str] = None
+    dataset_item_id: Optional[str] = None
+    dataset_split_item_id: Optional[str] = None
+    petri_width: Optional[int] = None
+    petri_height: Optional[int] = None
+    petri_file_size_bytes: Optional[int] = None
+    micro_width: Optional[int] = None
+    micro_height: Optional[int] = None
+    micro_file_size_bytes: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TrainingManifestItem":
@@ -28,8 +36,16 @@ class TrainingManifestItem:
             sample_code=str(data.get("sample_code", "")),
             lot_code=data.get("lot_code"),
             origin=data.get("origin"),
+            dataset_item_id=data.get("dataset_item_id"),
+            dataset_split_item_id=data.get("dataset_split_item_id"),
             petri_image_path=str(data.get("petri_image_path", "")),
             micro_image_path=str(data.get("micro_image_path", "")),
+            petri_width=data.get("petri_width"),
+            petri_height=data.get("petri_height"),
+            petri_file_size_bytes=data.get("petri_file_size_bytes"),
+            micro_width=data.get("micro_width"),
+            micro_height=data.get("micro_height"),
+            micro_file_size_bytes=data.get("micro_file_size_bytes"),
             ground_truth_label=str(data.get("ground_truth_label", "")),
             prediction_label=str(data.get("prediction_label", "")),
             source_review_decision=str(data.get("source_review_decision", "")),

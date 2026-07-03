@@ -60,6 +60,10 @@ class TrainingRunNotFoundError(NotFoundError):
     """Raised when a requested TrainingRun does not exist."""
 
 
+class ImageDatasetAuditRunNotFoundError(NotFoundError):
+    """Raised when a requested ImageDatasetAuditRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 

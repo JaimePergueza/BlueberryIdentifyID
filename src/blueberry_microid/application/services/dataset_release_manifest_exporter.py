@@ -85,8 +85,20 @@ class DatasetReleaseManifestExporter:
                     "sample_code": sample.sample_code,
                     "lot_code": sample.lot_code,
                     "origin": sample.origin,
+                    "dataset_item_id": str(dataset_item.id),
+                    "dataset_split_item_id": str(split_item.id),
                     "petri_image_path": petri_image.file_path,
                     "micro_image_path": micro_image.file_path,
+                    # Included so a future image audit can flag images whose
+                    # persisted metadata never got recorded, or whose file on
+                    # disk no longer matches what was recorded at upload time,
+                    # without a second query against the image repositories.
+                    "petri_width": petri_image.width,
+                    "petri_height": petri_image.height,
+                    "petri_file_size_bytes": petri_image.file_size_bytes,
+                    "micro_width": micro_image.width,
+                    "micro_height": micro_image.height,
+                    "micro_file_size_bytes": micro_image.file_size_bytes,
                     "ground_truth_label": (
                         split_item.ground_truth_label.value if split_item.ground_truth_label else None
                     ),

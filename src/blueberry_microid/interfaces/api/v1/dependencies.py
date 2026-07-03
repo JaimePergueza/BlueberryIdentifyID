@@ -23,6 +23,12 @@ from blueberry_microid.application.ports.dataset_release_repository import Datas
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
+from blueberry_microid.application.ports.image_dataset_audit_issue_repository import (
+    ImageDatasetAuditIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.image_dataset_audit_run_repository import (
+    ImageDatasetAuditRunRepositoryPort,
+)
 from blueberry_microid.application.ports.image_storage import ImageStoragePort
 from blueberry_microid.application.ports.image_validator import ImageValidatorPort
 from blueberry_microid.application.ports.inference_engine import InferenceEnginePort
@@ -52,6 +58,18 @@ from blueberry_microid.application.use_cases.inference.create_analysis_run impor
 from blueberry_microid.application.use_cases.inference.get_analysis_run import GetAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_prediction import GetPredictionForAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.process_analysis_run import ProcessAnalysisRunUseCase
+from blueberry_microid.application.use_cases.image_audit.create_image_dataset_audit_run import (
+    CreateImageDatasetAuditRunUseCase,
+)
+from blueberry_microid.application.use_cases.image_audit.get_image_dataset_audit_run import (
+    GetImageDatasetAuditRunUseCase,
+)
+from blueberry_microid.application.use_cases.image_audit.list_image_dataset_audit_issues import (
+    ListImageDatasetAuditIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.image_audit.list_image_dataset_audit_runs import (
+    ListImageDatasetAuditRunsUseCase,
+)
 from blueberry_microid.application.use_cases.ml_preflight.create_training_preflight_run import (
     CreateTrainingPreflightRunUseCase,
 )
@@ -101,6 +119,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_i
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
     SqlAlchemyHumanReviewRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_audit_issue_repository import (
+    SqlAlchemyImageDatasetAuditIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_audit_run_repository import (
+    SqlAlchemyImageDatasetAuditRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_micro_image_repository import (
     SqlAlchemyMicroImageRepository,
 )
@@ -133,6 +157,7 @@ from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analys
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
 from blueberry_microid.ml.training.majority_class_baseline import MajorityClassBaselineTrainer
+from blueberry_microid.ml.validation.image_dataset_auditor import ImageDatasetAuditor
 from blueberry_microid.ml.validation.image_path_validator import ImagePathValidator
 from blueberry_microid.ml.validation.manifest_validator import ManifestValidator
 
@@ -271,6 +296,18 @@ def get_training_prediction_repository(
     return SqlAlchemyTrainingPredictionRepository(session)
 
 
+def get_image_dataset_audit_run_repository(
+    session: Session = Depends(get_db_session),
+) -> ImageDatasetAuditRunRepositoryPort:
+    return SqlAlchemyImageDatasetAuditRunRepository(session)
+
+
+def get_image_dataset_audit_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> ImageDatasetAuditIssueRepositoryPort:
+    return SqlAlchemyImageDatasetAuditIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -284,6 +321,10 @@ def get_manifest_validator() -> ManifestValidator:
 
 def get_image_path_validator() -> ImagePathValidator:
     return ImagePathValidator()
+
+
+def get_image_dataset_auditor() -> ImageDatasetAuditor:
+    return ImageDatasetAuditor()
 
 
 def get_majority_class_baseline_trainer() -> MajorityClassBaselineTrainer:
@@ -610,3 +651,32 @@ def get_list_training_predictions_use_case(
     training_prediction_repository: TrainingPredictionRepositoryPort = Depends(get_training_prediction_repository),
 ) -> ListTrainingPredictionsUseCase:
     return ListTrainingPredictionsUseCase(training_run_repository, training_prediction_repository)
+
+
+def get_create_image_dataset_audit_run_use_case(
+    manifest_exporter: DatasetReleaseManifestExporter = Depends(get_dataset_release_manifest_exporter),
+    image_dataset_auditor: ImageDatasetAuditor = Depends(get_image_dataset_auditor),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateImageDatasetAuditRunUseCase:
+    return CreateImageDatasetAuditRunUseCase(manifest_exporter, image_dataset_auditor, unit_of_work)
+
+
+def get_get_image_dataset_audit_run_use_case(
+    audit_run_repository: ImageDatasetAuditRunRepositoryPort = Depends(get_image_dataset_audit_run_repository),
+    audit_issue_repository: ImageDatasetAuditIssueRepositoryPort = Depends(get_image_dataset_audit_issue_repository),
+) -> GetImageDatasetAuditRunUseCase:
+    return GetImageDatasetAuditRunUseCase(audit_run_repository, audit_issue_repository)
+
+
+def get_list_image_dataset_audit_runs_use_case(
+    audit_run_repository: ImageDatasetAuditRunRepositoryPort = Depends(get_image_dataset_audit_run_repository),
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+) -> ListImageDatasetAuditRunsUseCase:
+    return ListImageDatasetAuditRunsUseCase(audit_run_repository, dataset_release_repository)
+
+
+def get_list_image_dataset_audit_issues_use_case(
+    audit_run_repository: ImageDatasetAuditRunRepositoryPort = Depends(get_image_dataset_audit_run_repository),
+    audit_issue_repository: ImageDatasetAuditIssueRepositoryPort = Depends(get_image_dataset_audit_issue_repository),
+) -> ListImageDatasetAuditIssuesUseCase:
+    return ListImageDatasetAuditIssuesUseCase(audit_run_repository, audit_issue_repository)

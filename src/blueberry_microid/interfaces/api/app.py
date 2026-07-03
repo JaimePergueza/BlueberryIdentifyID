@@ -19,6 +19,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     analysis_runs,
     datasets,
     human_reviews,
+    image_audits,
     ml_preflight,
     micro_images,
     model_versions,
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(datasets.router, prefix=API_V1_PREFIX)
     app.include_router(ml_preflight.router, prefix=API_V1_PREFIX)
     app.include_router(training_runs.router, prefix=API_V1_PREFIX)
+    app.include_router(image_audits.router, prefix=API_V1_PREFIX)
     app.include_router(tasks.router, prefix=API_V1_PREFIX)
 
     register_exception_handlers(app)

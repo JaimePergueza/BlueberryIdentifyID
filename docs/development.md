@@ -426,28 +426,29 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 13 this collects **340 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **296 passed, 31 skipped** (the 31 PostgreSQL-only tests
+As of Fase 14 this collects **384 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **340 passed, 44 skipped** (the 44 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 124 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, and majority-class baseline persistence/failure rules) — no database, no filesystem. |
+| `tests/unit/application/` | 134 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, majority-class baseline persistence/failure rules, and `CreateImageDatasetAuditRunUseCase` persistence/rollback rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
-| `tests/unit/ml/` | 25 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, and the Fase 13 majority-class baseline trainer — no image decoding, tensors, PyTorch, or neural model metrics. |
+| `tests/unit/ml/` | 42 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, the Fase 13 majority-class baseline trainer, and the Fase 14 `ImageDatasetAuditor` (passed/warning/failed by cause, per-modality distinction, distributions, determinism, no file mutation, no tensors) — no image decoding beyond Pillow metadata reads, no tensors, no PyTorch, no neural model metrics. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 83 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, and majority-class baseline API/history flow. |
-| `tests/integration/postgres/` | 36 | **PostgreSQL-only** (Fase 6/8/9/10/12/13): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 92 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, majority-class baseline API/history flow, and the Fase 14 image-audit flow (default vs. lenient config, missing-file detection via a real deleted file, no taxonomy/model-metrics leakage). |
+| `tests/integration/postgres/` | 44 | **PostgreSQL-only** (Fase 6/8/9/10/12/13/14): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, image-dataset-audit tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 121 + 18 + 22 + 28 + 81 + 31 = **327**, matching `pytest --collect-only -q`.
+26 + 134 + 18 + 42 + 28 + 92 + 44 = **384**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
-289 in Fase 10, 311 in Fase 11, 327 in Fase 12, and 340 in Fase 13.)
+289 in Fase 10, 311 in Fase 11, 327 in Fase 12, 340 in Fase 13, and 384 in
+Fase 14.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -1090,3 +1091,64 @@ Endpoints:
 This baseline is not real AI and does not establish scientific performance. It
 only provides a reproducible, transparent lower-bound experiment over reviewed
 labels for later comparison.
+
+## 23. Image dataset audit reports (Fase 14)
+
+Fase 14 adds a persisted **technical** audit of the Petri/micro image *files*
+referenced by a `DatasetRelease` — separate from, and independent of, the
+Fase 12 `TrainingPreflightRun` (which validates the manifest's structure:
+splits, labels, sample/lot leakage). An image audit answers a narrower
+question: are the files themselves technically usable (exist, decode without
+corruption, plausible format/dimensions/color mode)? It never opens an image
+as a training tensor, never trains a model, and never makes a
+microbiological/taxonomic judgment.
+
+`ImageDatasetAuditRun` stores: the release, `status`
+(`passed`/`warning`/`failed`), `is_passed` (true for passed/warning, false
+for failed — same convention as `TrainingPreflightRun.is_valid`), per-modality
+counts (total/checked/failed for Petri and micro separately),
+`warning_count`/`error_count`, a `summary` dict, and four JSON distributions
+(format, color mode, dimension bucket, file-size bucket). `ImageDatasetAuditIssue`
+stores one finding per image: severity, modality (`petri`/`micro`), optional
+references to the originating `DatasetItem`/`DatasetSplitItem`, the image
+path, a machine-readable `code`, a message, and optional `details`.
+
+`ImageDatasetAuditor` (`ml/validation/image_dataset_auditor.py`) opens each
+image with Pillow the same lightweight way `PillowImageValidator` already
+does at upload time: `Image.open().verify()` on one handle to catch
+corruption, a fresh second `Image.open()` to read format/size/mode. Severity
+is fixed by design (documented in the module docstring since several codes
+were left as an implementation choice): `image_empty_path`, `image_missing`,
+`image_unreadable`, `image_format_mismatch`, and `image_size_bytes_mismatch`
+are **errors** (block a clean `passed` audit); `image_too_small`,
+`image_too_large`, `image_unsupported_color_mode`, `image_metadata_missing`,
+`image_dimension_outlier`, and `image_duplicate_path` are **warnings** (do
+not block). `ImageAuditConfig` controls which checks run and their
+thresholds — a technical config, not a training config.
+
+`TrainingManifestItem` was extended with eight new optional fields
+(`dataset_item_id`, `dataset_split_item_id`, `petri_width`, `petri_height`,
+`petri_file_size_bytes`, `micro_width`, `micro_height`,
+`micro_file_size_bytes`), populated by `DatasetReleaseManifestExporter` from
+the `PetriImage`/`MicroImage` records it already loads — so
+`ImageDatasetAuditor` only depends on `TrainingManifest` + `ImageAuditConfig`,
+never on the image repositories directly, and `DatasetItem` itself was not
+widened.
+
+`CreateImageDatasetAuditRunUseCase` re-exports the release manifest (same
+`DatasetReleaseManifestExporter` the preflight uses), runs the auditor, and
+persists the run plus all issues transactionally via `UnitOfWorkPort`. It
+never modifies `DatasetRelease`, `DatasetItem`, `TrainingRun`, or the image
+files, and never touches Celery or PyTorch.
+
+Endpoints:
+
+- `POST /api/v1/ml/image-audits`
+- `GET /api/v1/ml/image-audits`
+- `GET /api/v1/ml/image-audits/{audit_run_id}`
+- `GET /api/v1/ml/image-audits/{audit_run_id}/issues`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/image-audits`
+
+A `passed` image audit only certifies basic technical fitness of the image
+files — it says nothing about scientific quality, dataset sufficiency, or
+microbiological validity.

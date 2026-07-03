@@ -10,6 +10,8 @@ from blueberry_microid.infrastructure.db.models.dataset_release import DatasetRe
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
+from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
+from blueberry_microid.infrastructure.db.models.image_dataset_audit_run import ImageDatasetAuditRunModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
@@ -28,6 +30,8 @@ __all__ = [
     "DatasetSnapshotModel",
     "DatasetSplitItemModel",
     "HumanReviewModel",
+    "ImageDatasetAuditIssueModel",
+    "ImageDatasetAuditRunModel",
     "MicroImageModel",
     "ModelVersionModel",
     "PetriImageModel",

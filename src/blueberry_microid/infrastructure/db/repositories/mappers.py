@@ -11,6 +11,8 @@ from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
 from blueberry_microid.domain.entities.human_review import HumanReview
+from blueberry_microid.domain.entities.image_dataset_audit_issue import ImageDatasetAuditIssue
+from blueberry_microid.domain.entities.image_dataset_audit_run import ImageDatasetAuditRun
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
@@ -22,6 +24,9 @@ from blueberry_microid.domain.entities.training_prediction import TrainingPredic
 from blueberry_microid.domain.entities.training_run import TrainingRun
 from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
+from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import ImageDatasetAuditIssueSeverity
+from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
+from blueberry_microid.domain.enums.image_modality import ImageModality
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 from blueberry_microid.domain.enums.training_preflight_issue_severity import TrainingPreflightIssueSeverity
@@ -34,6 +39,8 @@ from blueberry_microid.infrastructure.db.models.dataset_release import DatasetRe
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
+from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
+from blueberry_microid.infrastructure.db.models.image_dataset_audit_run import ImageDatasetAuditRunModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
@@ -293,5 +300,47 @@ def training_prediction_to_entity(model: TrainingPredictionModel) -> TrainingPre
         predicted_label=PredictedLabel(model.predicted_label),
         is_correct=model.is_correct,
         id=model.id,
+        created_at=model.created_at,
+    )
+
+
+def image_dataset_audit_run_to_entity(model: ImageDatasetAuditRunModel) -> ImageDatasetAuditRun:
+    return ImageDatasetAuditRun(
+        dataset_release_id=model.dataset_release_id,
+        status=ImageDatasetAuditStatus(model.status),
+        is_passed=model.is_passed,
+        total_items=model.total_items,
+        total_petri_images=model.total_petri_images,
+        total_micro_images=model.total_micro_images,
+        checked_petri_images=model.checked_petri_images,
+        checked_micro_images=model.checked_micro_images,
+        failed_petri_images=model.failed_petri_images,
+        failed_micro_images=model.failed_micro_images,
+        warning_count=model.warning_count,
+        error_count=model.error_count,
+        summary=model.summary,
+        format_distribution=model.format_distribution,
+        color_mode_distribution=model.color_mode_distribution,
+        dimension_distribution=model.dimension_distribution,
+        file_size_distribution=model.file_size_distribution,
+        id=model.id,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+    )
+
+
+def image_dataset_audit_issue_to_entity(model: ImageDatasetAuditIssueModel) -> ImageDatasetAuditIssue:
+    return ImageDatasetAuditIssue(
+        audit_run_id=model.audit_run_id,
+        severity=ImageDatasetAuditIssueSeverity(model.severity),
+        modality=ImageModality(model.modality),
+        code=model.code,
+        message=model.message,
+        id=model.id,
+        dataset_item_id=model.dataset_item_id,
+        dataset_split_item_id=model.dataset_split_item_id,
+        image_path=model.image_path,
+        details=model.details,
         created_at=model.created_at,
     )

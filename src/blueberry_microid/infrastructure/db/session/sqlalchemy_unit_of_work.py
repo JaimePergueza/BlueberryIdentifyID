@@ -22,6 +22,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_i
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
     SqlAlchemyHumanReviewRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_audit_issue_repository import (
+    SqlAlchemyImageDatasetAuditIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_audit_run_repository import (
+    SqlAlchemyImageDatasetAuditRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_prediction_repository import (
     SqlAlchemyPredictionRepository,
 )
@@ -70,6 +76,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
         self.dataset_snapshot_repository = SqlAlchemyDatasetSnapshotRepository(self.session, auto_commit=False)
         self.dataset_split_item_repository = SqlAlchemyDatasetSplitItemRepository(self.session, auto_commit=False)
         self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)
+        self.image_dataset_audit_issue_repository = SqlAlchemyImageDatasetAuditIssueRepository(
+            self.session, auto_commit=False
+        )
+        self.image_dataset_audit_run_repository = SqlAlchemyImageDatasetAuditRunRepository(
+            self.session, auto_commit=False
+        )
         self.prediction_repository = SqlAlchemyPredictionRepository(self.session, auto_commit=False)
         self.training_preflight_issue_repository = SqlAlchemyTrainingPreflightIssueRepository(
             self.session, auto_commit=False

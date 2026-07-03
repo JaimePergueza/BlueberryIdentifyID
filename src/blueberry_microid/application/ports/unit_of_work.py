@@ -8,6 +8,12 @@ from blueberry_microid.application.ports.dataset_release_repository import Datas
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
+from blueberry_microid.application.ports.image_dataset_audit_issue_repository import (
+    ImageDatasetAuditIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.image_dataset_audit_run_repository import (
+    ImageDatasetAuditRunRepositoryPort,
+)
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
@@ -38,6 +44,8 @@ class UnitOfWorkPort(ABC):
     dataset_snapshot_repository: DatasetSnapshotRepositoryPort
     dataset_split_item_repository: DatasetSplitItemRepositoryPort
     human_review_repository: HumanReviewRepositoryPort
+    image_dataset_audit_issue_repository: ImageDatasetAuditIssueRepositoryPort
+    image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort
     prediction_repository: PredictionRepositoryPort
     training_preflight_issue_repository: TrainingPreflightIssueRepositoryPort
     training_preflight_run_repository: TrainingPreflightRunRepositoryPort

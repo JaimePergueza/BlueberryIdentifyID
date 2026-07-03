@@ -836,3 +836,109 @@ cientifica; solo sirve como referencia minima reproducible. (b) Las metricas
 dependen del tamano y calidad del dataset curado. (c) Siguen pendientes
 confusores no modelados por el protocolo. (d) Sigue sin existir IA real,
 PyTorch, entrenamiento profundo, taxonomia ni frontend.
+
+## 30. Fase 14 — Image Dataset Audit tecnico de archivos (implementada)
+
+Objetivo: auditar tecnicamente los archivos Petri/micro referenciados por un
+`DatasetRelease` antes de cualquier entrenamiento futuro con imagenes reales,
+sin entrenar modelos, sin PyTorch/TensorFlow/CNN/ViT, sin tensores, sin
+taxonomia y sin reemplazar `MockInferenceEngine`.
+
+**Diagnostico previo (Tarea 1).** El manifest existente
+(`DatasetReleaseManifestExporter`/`TrainingManifest`) ya traia
+`petri_image_path`/`micro_image_path`, `sample_id`, `lot_code`, `origin`, pero
+no `dataset_item_id`/`dataset_split_item_id` ni las dimensiones/tamano ya
+persistidos en `PetriImage`/`MicroImage` (`width`, `height`,
+`file_size_bytes`). `ImagePathValidator` (Fase 11) solo comprueba
+`Path.exists()`, nunca abre Pillow — sigue existiendo sin cambios como gate
+rapido de preflight; el audit tecnico de esta fase es una capa aparte, mas
+profunda y persistente.
+
+**Entidades.** `ImageDatasetAuditRun` registra: release, status
+(`passed`/`warning`/`failed`), `is_passed` (true para passed/warning, false
+para failed — igual semantica que `TrainingPreflightRun.is_valid`), conteos
+totales/chequeados/fallidos por modalidad, `warning_count`/`error_count`,
+`summary` y cuatro distribuciones JSON (formato, modo de color, dimension,
+tamano en bytes). `ImageDatasetAuditIssue` registra un hallazgo por imagen:
+severidad, modalidad (`petri`/`micro`), referencias opcionales a
+`DatasetItem`/`DatasetSplitItem`, ruta, codigo, mensaje y `details` JSON. Nunca
+guardan binarios ni contenido de imagen.
+
+**Extension del manifest.** `TrainingManifestItem` gano seis campos opcionales
+nuevos (`dataset_item_id`, `dataset_split_item_id`, `petri_width`,
+`petri_height`, `petri_file_size_bytes`, `micro_width`, `micro_height`,
+`micro_file_size_bytes`), poblados por `DatasetReleaseManifestExporter` desde
+`PetriImage`/`MicroImage` ya cargados en el propio loop de export — sin
+consultas adicionales. Esto permite que `ImageDatasetAuditor` dependa
+unicamente de `TrainingManifest` + `ImageAuditConfig`, sin inyectar
+`PetriImageRepositoryPort`/`MicroImageRepositoryPort`, y sin ampliar
+`DatasetItem` con metadata de imagen (que seguiria viviendo solo en
+`PetriImage`/`MicroImage`).
+
+**`ImageAuditConfig`.** Configuracion tecnica independiente de
+`TrainingConfig`: banderas para activar/desactivar cada validacion
+(existencia, legibilidad, formato, dimensiones, modo de color, tamano en
+bytes, deteccion de duplicados), umbrales de dimension/tamano de archivo,
+formatos y modos de color permitidos, y deteccion de outliers de dimension.
+Valida en `__post_init__` que los minimos sean positivos y que los maximos
+(si existen) sean mayores que los minimos.
+
+**`ImageDatasetAuditor` y severidad por diseno.** Abre cada imagen con
+Pillow de forma liviana: `Image.open().verify()` en un handle para detectar
+corrupcion, y una segunda apertura fresca para leer formato/dimensiones/modo
+de color (mismo patron que `PillowImageValidator`, Fase 3.5) — nunca crea
+tensores ni usa OpenCV/Cellpose. Diseno de severidad, documentado porque el
+enunciado dejaba varios codigos a criterio de implementacion: `error`
+(bloquea `passed`) para `image_empty_path`, `image_missing`,
+`image_unreadable`, `image_format_mismatch` e `image_size_bytes_mismatch`
+(el archivo en disco ya no coincide con el tamano registrado al subirlo —
+senal de integridad, no de calidad); `warning` (no bloquea) para
+`image_too_small`, `image_too_large` (dimension o tamano en bytes segun
+`details.reason`), `image_unsupported_color_mode`, `image_metadata_missing`
+(el registro de `PetriImage`/`MicroImage` nunca guardo width/height),
+`image_dimension_outlier` (mediana de dimensiones por modalidad, umbral 3x) y
+`image_duplicate_path`. Un `DatasetItem`/`DatasetSplitItem` con ruta
+duplicada, imagen corrupta o formato no permitido nunca se oculta ni se
+excluye silenciosamente — siempre genera un hallazgo persistido.
+
+**Persistencia.** Migracion `0008_image_dataset_audit_reports.py` crea
+`image_dataset_audit_runs` e `image_dataset_audit_issues`, con FK de runs a
+`dataset_releases`, FK de issues a `image_dataset_audit_runs` y
+opcionalmente a `dataset_items`/`dataset_split_items`, `CHECK` de
+status/severity/modality, y columnas `JSONB` para summary/distribuciones/
+`details`. Validada offline con `alembic upgrade head --sql` y
+`alembic downgrade head:base --sql` contra el dialecto PostgreSQL.
+
+**Caso de uso.** `CreateImageDatasetAuditRunUseCase` reexporta el manifest
+via `DatasetReleaseManifestExporter` (igual patron que el preflight de la
+Fase 12), ejecuta `ImageDatasetAuditor`, y persiste
+`ImageDatasetAuditRun` + `ImageDatasetAuditIssue` en una unica transaccion
+via `UnitOfWorkPort`. Nunca modifica `DatasetRelease`, `DatasetItem`,
+`TrainingRun` ni los archivos de imagen; no usa Celery ni PyTorch.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/image-audits` | Ejecuta un audit tecnico de imagenes para un DatasetRelease |
+| GET | `/api/v1/ml/image-audits` | Lista audits |
+| GET | `/api/v1/ml/image-audits/{id}` | Obtiene un audit con sus issues |
+| GET | `/api/v1/ml/image-audits/{id}/issues` | Lista issues de un audit |
+| GET | `/api/v1/datasets/releases/{id}/image-audits` | Historial de audits por release |
+
+**Pruebas.** 17 tests unitarios de `ImageDatasetAuditor` (passed/warning/
+failed por causa, distribuciones, determinismo, no modifica archivos, no usa
+tensores), 10 tests del caso de uso (persistencia, transaccionalidad,
+config, listados, no-modificacion de release/item), 9 tests API (flujo
+completo, config laxa vs. estricta, imagen faltante real via manifest,
+X-Request-ID, ausencia de taxonomia/metricas), 8 tests PostgreSQL (tablas,
+CHECKs, JSONB, FKs).
+
+**Riesgos pendientes antes de Fase 15.** (a) Un audit `passed` certifica solo
+aptitud tecnica basica del archivo — nunca calidad cientifica, suficiencia de
+dataset ni validez microbiologica. (b) La deteccion de outliers de dimension
+es una heuristica simple (mediana ± 3x), no un modelo estadistico robusto.
+(c) `image_size_bytes_mismatch` solo detecta que el archivo cambio desde que
+se registro su tamano — no explica la causa. (d) Sigue sin existir
+entrenamiento real, PyTorch, TensorFlow, deep learning, dataset externo,
+frontend ni taxonomia.
