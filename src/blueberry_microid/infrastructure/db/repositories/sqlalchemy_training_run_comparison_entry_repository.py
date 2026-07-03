@@ -50,7 +50,7 @@ class SqlAlchemyTrainingRunComparisonEntryRepository(TrainingRunComparisonEntryR
             select(TrainingRunComparisonEntryModel)
             .where(TrainingRunComparisonEntryModel.comparison_id == comparison_id)
             .order_by(
-                TrainingRunComparisonEntryModel.rank.asc().nulls_last(),
+                TrainingRunComparisonEntryModel.rank.asc(),
                 TrainingRunComparisonEntryModel.training_run_id.asc(),
             )
         )

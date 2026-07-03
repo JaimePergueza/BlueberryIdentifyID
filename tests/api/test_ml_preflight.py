@@ -88,8 +88,8 @@ def _create_release_with_all_splits(api_client) -> dict:
     labels = [
         "suspicious_growth",
         "no_evident_growth",
-        "suspicious_growth",
         "probable_fungal_growth",
+        "probable_bacterial_growth",
     ]
     for index, label in enumerate(labels):
         _create_reviewed_run(api_client, f"S-PREFLIGHT-{index}", model_version_id, label)
