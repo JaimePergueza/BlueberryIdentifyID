@@ -717,3 +717,68 @@ controles de preparación, no criterios científicos suficientes. (c) La fuga po
 confusores no modelados (día, técnico, equipo, batch de medio) sigue pendiente.
 (d) Si una futura fase agrega PyTorch u otra dependencia ML, debe justificarla,
 probarla y mantener intacto el contrato de manifest validado aquí.
+
+## 28. Fase 12 — ML Preflight Reports persistentes (implementada)
+
+Objetivo: persistir el resultado de validar un `DatasetRelease` para
+entrenamiento futuro, sin entrenar todavía. Esta fase no agrega IA real,
+PyTorch, datasets externos, métricas de rendimiento, frontend, autenticación,
+taxonomía ni tracking externo de experimentos.
+
+**Entidades.** `TrainingPreflightRun` registra una ejecución de validación:
+`dataset_release_id`, `status` (`passed`/`warning`/`failed`), `is_valid`,
+`config` JSON, `summary` JSON, conteos por split, distribución de etiquetas,
+`split_label_counts`, `leakage_checks`, recomendación, `created_at`,
+`created_by` y `notes`. `TrainingPreflightIssue` registra cada error/warning
+con `severity`, `code`, `message`, `field` e `item_ref` opcionales. Ninguna
+entidad almacena imágenes, binarios, secretos, métricas de modelo o taxonomía.
+
+**Persistencia.** Migración `0006_training_preflight_reports.py` crea
+`training_preflight_runs` y `training_preflight_issues`, con FK a
+`dataset_releases`, FK issue→run, `CHECK` para status/severity, `JSONB` en
+PostgreSQL a través del patrón existente, e índices por `dataset_release_id`,
+`created_at` y `preflight_run_id`. Los modelos SQLAlchemy usan
+`PortableJSON`, por lo que los tests SQLite siguen funcionando.
+
+**Puertos/repos/UoW.** Se agregaron `TrainingPreflightRunRepositoryPort` y
+`TrainingPreflightIssueRepositoryPort`, más implementaciones SQLAlchemy con el
+mismo patrón `auto_commit` de datasets. `SqlAlchemyUnitOfWork` expone ambos
+repos para guardar run + issues de forma transaccional: si fallan los issues,
+el run no queda persistido a medias.
+
+**Caso de uso.** `CreateTrainingPreflightRunUseCase` reutiliza
+`DatasetReleaseManifestExporter`, convierte a `TrainingManifest`, ejecuta
+`ManifestValidator` con la `TrainingConfig` recibida y, solo si
+`validate_image_paths=true`, ejecuta `ImagePathValidator`. No duplica reglas de
+validación, no abre imágenes salvo comprobación de existencia de ruta, no
+entrena y no modifica `DatasetRelease`, `DatasetSnapshot`, `DatasetItem`,
+`Prediction` ni `HumanReview`. Un manifest inválido igualmente genera un run
+persistido con `status=failed`.
+
+**API.**
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/api/v1/ml/preflight-runs` | Valida y persiste un preflight |
+| GET | `/api/v1/ml/preflight-runs` | Lista runs |
+| GET | `/api/v1/ml/preflight-runs/{id}` | Obtiene detalle + issues |
+| GET | `/api/v1/ml/preflight-runs/{id}/issues` | Lista issues |
+| GET | `/api/v1/datasets/releases/{id}/preflight-runs` | Historial por release |
+
+**CLI.** `scripts/validate_training_manifest.py` sigue siendo standalone: no
+persiste. Su ayuda ahora aclara que el historial auditable se obtiene por API.
+
+**Tests nuevos.** Unitarios (8): estados `passed`/`warning`/`failed`, issues
+por error/warning, persistencia de config y conteos, no filesystem cuando
+`validate_image_paths=false`, detección de rutas faltantes cuando es `true`,
+no mutación de release/items y rollback si falla la persistencia de issues.
+API (2): flujo completo con 4 muestras revisadas, snapshot, release,
+preflight, consulta de detalle/issues/historial y ausencia de métricas/taxonomía;
+caso failed persistido. PostgreSQL (6): tablas, `CHECK` de status/severity,
+JSONB, FK a release y FK issue→run.
+
+**Riesgos pendientes antes de Fase 13.** (a) `passed` significa que gates
+técnicos pasaron, no que el dataset sea científicamente suficiente. (b) Aún no
+hay entrenamiento ni evaluación real. (c) Las rutas de imagen solo se verifican
+si el caller lo pide. (d) Sigue pendiente modelar confusores adicionales si el
+protocolo científico los requiere.

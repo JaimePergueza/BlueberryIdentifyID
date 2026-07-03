@@ -15,6 +15,8 @@ from blueberry_microid.infrastructure.db.models.model_version import ModelVersio
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
 from blueberry_microid.infrastructure.db.models.prediction import PredictionModel
 from blueberry_microid.infrastructure.db.models.sample import SampleModel
+from blueberry_microid.infrastructure.db.models.training_preflight_issue import TrainingPreflightIssueModel
+from blueberry_microid.infrastructure.db.models.training_preflight_run import TrainingPreflightRunModel
 
 __all__ = [
     "AnalysisRunModel",
@@ -29,4 +31,6 @@ __all__ = [
     "PetriImageModel",
     "PredictionModel",
     "SampleModel",
+    "TrainingPreflightIssueModel",
+    "TrainingPreflightRunModel",
 ]

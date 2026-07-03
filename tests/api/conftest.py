@@ -28,6 +28,8 @@ from blueberry_microid.infrastructure.db.models import (
     PetriImageModel,
     PredictionModel,
     SampleModel,
+    TrainingPreflightIssueModel,
+    TrainingPreflightRunModel,
 )
 from blueberry_microid.infrastructure.db.session.session_factory import create_session_factory
 from blueberry_microid.interfaces.api.app import create_app
@@ -44,6 +46,8 @@ _SQLITE_TABLES = [
     DatasetItemModel.__table__,
     DatasetReleaseModel.__table__,
     DatasetSplitItemModel.__table__,
+    TrainingPreflightRunModel.__table__,
+    TrainingPreflightIssueModel.__table__,
 ]
 
 

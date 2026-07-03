@@ -31,6 +31,8 @@ from blueberry_microid.application.ports.model_version_repository import ModelVe
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
+from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
+from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
@@ -48,6 +50,18 @@ from blueberry_microid.application.use_cases.inference.create_analysis_run impor
 from blueberry_microid.application.use_cases.inference.get_analysis_run import GetAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_prediction import GetPredictionForAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.process_analysis_run import ProcessAnalysisRunUseCase
+from blueberry_microid.application.use_cases.ml_preflight.create_training_preflight_run import (
+    CreateTrainingPreflightRunUseCase,
+)
+from blueberry_microid.application.use_cases.ml_preflight.get_training_preflight_run import (
+    GetTrainingPreflightRunUseCase,
+)
+from blueberry_microid.application.use_cases.ml_preflight.list_training_preflight_issues import (
+    ListTrainingPreflightIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.ml_preflight.list_training_preflight_runs import (
+    ListTrainingPreflightRunsUseCase,
+)
 from blueberry_microid.application.use_cases.micro_image.register_micro_image import RegisterMicroImageUseCase
 from blueberry_microid.application.use_cases.model_version.create_model_version import CreateModelVersionUseCase
 from blueberry_microid.application.use_cases.model_version.list_model_versions import ListModelVersionsUseCase
@@ -92,12 +106,20 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_prediction_repo
     SqlAlchemyPredictionRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_sample_repository import SqlAlchemySampleRepository
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_preflight_issue_repository import (
+    SqlAlchemyTrainingPreflightIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_preflight_run_repository import (
+    SqlAlchemyTrainingPreflightRunRepository,
+)
 from blueberry_microid.infrastructure.db.session.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from blueberry_microid.infrastructure.storage.local_image_storage import LocalImageStorage
 from blueberry_microid.infrastructure.storage.pillow_image_validator import PillowImageValidator
 from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
+from blueberry_microid.ml.validation.image_path_validator import ImagePathValidator
+from blueberry_microid.ml.validation.manifest_validator import ManifestValidator
 
 # --- settings & database session -----------------------------------------
 
@@ -212,11 +234,31 @@ def get_dataset_split_item_repository(session: Session = Depends(get_db_session)
     return SqlAlchemyDatasetSplitItemRepository(session)
 
 
+def get_training_preflight_run_repository(
+    session: Session = Depends(get_db_session),
+) -> TrainingPreflightRunRepositoryPort:
+    return SqlAlchemyTrainingPreflightRunRepository(session)
+
+
+def get_training_preflight_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> TrainingPreflightIssueRepositoryPort:
+    return SqlAlchemyTrainingPreflightIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
 def get_dataset_splitter() -> DatasetSplitter:
     return DatasetSplitter()
+
+
+def get_manifest_validator() -> ManifestValidator:
+    return ManifestValidator()
+
+
+def get_image_path_validator() -> ImagePathValidator:
+    return ImagePathValidator()
 
 
 # --- inference engine --------------------------------------------------------
@@ -459,3 +501,42 @@ def get_dataset_release_manifest_exporter(
         micro_image_repository,
         prediction_repository,
     )
+
+
+def get_create_training_preflight_run_use_case(
+    manifest_exporter: DatasetReleaseManifestExporter = Depends(get_dataset_release_manifest_exporter),
+    manifest_validator: ManifestValidator = Depends(get_manifest_validator),
+    image_path_validator: ImagePathValidator = Depends(get_image_path_validator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateTrainingPreflightRunUseCase:
+    return CreateTrainingPreflightRunUseCase(
+        manifest_exporter,
+        manifest_validator,
+        image_path_validator,
+        unit_of_work,
+    )
+
+
+def get_get_training_preflight_run_use_case(
+    preflight_run_repository: TrainingPreflightRunRepositoryPort = Depends(get_training_preflight_run_repository),
+    preflight_issue_repository: TrainingPreflightIssueRepositoryPort = Depends(
+        get_training_preflight_issue_repository
+    ),
+) -> GetTrainingPreflightRunUseCase:
+    return GetTrainingPreflightRunUseCase(preflight_run_repository, preflight_issue_repository)
+
+
+def get_list_training_preflight_runs_use_case(
+    preflight_run_repository: TrainingPreflightRunRepositoryPort = Depends(get_training_preflight_run_repository),
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+) -> ListTrainingPreflightRunsUseCase:
+    return ListTrainingPreflightRunsUseCase(preflight_run_repository, dataset_release_repository)
+
+
+def get_list_training_preflight_issues_use_case(
+    preflight_run_repository: TrainingPreflightRunRepositoryPort = Depends(get_training_preflight_run_repository),
+    preflight_issue_repository: TrainingPreflightIssueRepositoryPort = Depends(
+        get_training_preflight_issue_repository
+    ),
+) -> ListTrainingPreflightIssuesUseCase:
+    return ListTrainingPreflightIssuesUseCase(preflight_run_repository, preflight_issue_repository)

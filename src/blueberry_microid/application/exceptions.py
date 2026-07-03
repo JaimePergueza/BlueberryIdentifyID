@@ -52,6 +52,10 @@ class DatasetReleaseNotFoundError(NotFoundError):
     """Raised when a requested DatasetRelease does not exist."""
 
 
+class TrainingPreflightRunNotFoundError(NotFoundError):
+    """Raised when a requested TrainingPreflightRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 

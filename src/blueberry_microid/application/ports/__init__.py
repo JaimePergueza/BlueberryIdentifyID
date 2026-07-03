@@ -14,6 +14,8 @@ from blueberry_microid.application.ports.petri_image_repository import PetriImag
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
+from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
+from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
 
 __all__ = [
     "ALLOWED_EXTENSIONS",
@@ -32,4 +34,6 @@ __all__ = [
     "PredictionRepositoryPort",
     "SampleRepositoryPort",
     "UnitOfWorkPort",
+    "TrainingPreflightIssueRepositoryPort",
+    "TrainingPreflightRunRepositoryPort",
 ]

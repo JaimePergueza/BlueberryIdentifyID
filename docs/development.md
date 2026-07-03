@@ -426,28 +426,28 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 11 this collects **311 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **286 passed, 25 skipped** (the 25 PostgreSQL-only tests
+As of Fase 12 this collects **327 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **296 passed, 31 skipped** (the 31 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 113 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, and `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, and `by_sample`/`by_lot`/`by_origin_lot` strategy rules) — no database, no filesystem. |
+| `tests/unit/application/` | 121 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, and persisted ML preflight creation/rollback rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
 | `tests/unit/ml/` | 22 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, and the intentionally unimplemented `TrainerPort` — no image decoding, tensors, PyTorch, or model metrics. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 79 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, and dataset release/split/manifest flow across all three split strategies. |
-| `tests/integration/postgres/` | 25 | **PostgreSQL-only** (Fase 6/8/9/10): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot and dataset release tables (incl. the `split_strategy` CHECK constraint), UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 81 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, and ML preflight persistence/history flow. |
+| `tests/integration/postgres/` | 31 | **PostgreSQL-only** (Fase 6/8/9/10/12): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 113 + 18 + 22 + 28 + 79 + 25 = **311**, matching `pytest --collect-only -q`.
+26 + 121 + 18 + 22 + 28 + 81 + 31 = **327**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
-289 in Fase 10, and 311 in Fase 11.)
+289 in Fase 10, 311 in Fase 11, and 327 in Fase 12.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -1001,3 +1001,47 @@ The command prints a JSON validation report and exits `0` only when the
 manifest is valid. It exits `1` for validation failures and `2` for load/config
 errors. It never calculates accuracy, precision, recall, F1, or any other
 model metric.
+
+## 21. Persistent ML preflight reports (Fase 12)
+
+Fase 12 persists the result of the Fase 11 manifest validation so a future
+training attempt can be audited before it exists. It still does **not** train a
+model, load PyTorch, compute model metrics, download datasets, launch Celery,
+or add taxonomy.
+
+`TrainingPreflightRun` records one validation execution for a
+`DatasetRelease`: status (`passed`, `warning`, `failed`), `is_valid`, the
+exact `TrainingConfig` JSON used, summary counts, split/label distributions,
+leakage checks, recommendation text, timestamp, optional `created_by`, and
+optional notes. It stores metadata only: no images, no binaries, no secrets,
+no model artifacts, no accuracy/precision/recall/F1.
+
+`TrainingPreflightIssue` records every validation finding from the report:
+`severity` (`error` or `warning`), a simple code, message, optional field, and
+optional item reference. Errors come from `ManifestValidator` and, only when
+explicitly requested, `ImagePathValidator`. Warnings remain warnings; a run
+with warnings and no errors is persisted as `warning`, not failed.
+
+The persistent API reuses the existing `DatasetReleaseManifestExporter` and
+Fase 11 validators. It does not duplicate validation logic in repositories or
+routers, and it does not modify `DatasetRelease`, `DatasetSnapshot`,
+`DatasetItem`, `Prediction`, or `HumanReview`.
+
+Endpoints:
+
+- `POST /api/v1/ml/preflight-runs`
+- `GET /api/v1/ml/preflight-runs`
+- `GET /api/v1/ml/preflight-runs/{preflight_run_id}`
+- `GET /api/v1/ml/preflight-runs/{preflight_run_id}/issues`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/preflight-runs`
+
+The standalone CLI remains useful for local checks:
+
+```bash
+python scripts/validate_training_manifest.py path/to/dataset_release_manifest.json
+```
+
+It prints a report but does not persist anything. Use the API when an
+auditable `TrainingPreflightRun`/`TrainingPreflightIssue` history is required.
+A `passed` preflight is only a technical gate result; it does not prove the
+dataset is scientifically sufficient or that training should proceed.

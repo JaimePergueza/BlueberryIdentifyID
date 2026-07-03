@@ -9,6 +9,8 @@ from blueberry_microid.application.ports.dataset_snapshot_repository import Data
 from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
+from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
+from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
 
 
 class UnitOfWorkPort(ABC):
@@ -35,6 +37,8 @@ class UnitOfWorkPort(ABC):
     dataset_split_item_repository: DatasetSplitItemRepositoryPort
     human_review_repository: HumanReviewRepositoryPort
     prediction_repository: PredictionRepositoryPort
+    training_preflight_issue_repository: TrainingPreflightIssueRepositoryPort
+    training_preflight_run_repository: TrainingPreflightRunRepositoryPort
 
     @abstractmethod
     def __enter__(self) -> "UnitOfWorkPort":

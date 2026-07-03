@@ -44,6 +44,12 @@ is a contract only: `train()` deliberately raises a not-implemented error. No
 tensors, PyTorch, real model training, model metrics, external datasets, or
 taxonomy were added.
 
+**Persistent ML preflight reports (Fase 12):** `TrainingPreflightRun` stores
+the result of validating a `DatasetRelease` manifest with a specific
+`TrainingConfig`; `TrainingPreflightIssue` stores each validation error or
+warning. A passed preflight means only that technical gates passed. It is not
+scientific sufficiency, model performance, or approval to train.
+
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original
 `AnalysisRun`, images, `Prediction`, and final `HumanReview`. A trainable item
@@ -138,6 +144,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Idempotent, crash-safe processing:** `POST /analysis-runs/{id}/process` claims the `pending -> processing` transition with a single atomic conditional database update, so two simultaneous calls for the same AnalysisRun can never both proceed — one gets `409 Conflict`, whichever loses the race, and no state is left ambiguous. `processing` is never a permanent state: any processing failure after the claim is caught, logged server-side, persisted as `failed` with a controlled `error_message`, and returned as a safe HTTP error rather than `200 OK`; a duplicate `Prediction` returns `409 Conflict` and also leaves the run `failed`, without creating a second prediction. See `docs/development.md` § 11.
 - **Human review audit flow:** after an `AnalysisRun` has a `Prediction`, an expert can submit reviews under `/api/v1/analysis-runs/{id}/reviews`. A new final review demotes any previous final review in the same transaction, while the original `Prediction` stays immutable for traceability. See `docs/development.md` § 12.
 - **Training manifest validation only:** `scripts/validate_training_manifest.py` validates the JSON manifest exported by a `DatasetRelease` against the Fase 11 contracts. It checks structure, split coverage, allowed preliminary labels, duplicate/leakage risks, and minimum counts; it does not open image bytes, train a model, calculate accuracy/precision/recall/F1, or use PyTorch.
+- **Persistent preflight validation:** `POST /api/v1/ml/preflight-runs` runs the same manifest validation and persists the report. Use the standalone CLI for quick local checks; use the API when the result must be auditable and queryable by `DatasetRelease`.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
@@ -171,6 +178,14 @@ Dataset release endpoints (Fase 9 — reproducible train/validation/test splits)
 - `GET /api/v1/datasets/releases/{dataset_release_id}` returns release metadata (ratios, counts, label/split distributions).
 - `GET /api/v1/datasets/releases/{dataset_release_id}/items` lists each item's split assignment.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/manifest` returns a deterministic JSON manifest including each item's split.
+- `GET /api/v1/datasets/releases/{dataset_release_id}/preflight-runs` lists persisted ML preflight validations for that release.
+
+ML preflight endpoints (Fase 12 — persistent validation reports, no training):
+
+- `POST /api/v1/ml/preflight-runs` validates a DatasetRelease manifest with a `TrainingConfig` and persists the report.
+- `GET /api/v1/ml/preflight-runs` lists persisted preflight runs.
+- `GET /api/v1/ml/preflight-runs/{preflight_run_id}` returns a preflight run with its issues.
+- `GET /api/v1/ml/preflight-runs/{preflight_run_id}/issues` lists validation errors/warnings.
 
 Async processing endpoints:
 

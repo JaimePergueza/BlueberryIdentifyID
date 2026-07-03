@@ -13,6 +13,9 @@ from blueberry_microid.application.use_cases.dataset.list_dataset_items import L
 from blueberry_microid.application.use_cases.dataset.list_dataset_releases import ListDatasetReleasesUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_snapshots import ListDatasetSnapshotsUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_split_items import ListDatasetSplitItemsUseCase
+from blueberry_microid.application.use_cases.ml_preflight.list_training_preflight_runs import (
+    ListTrainingPreflightRunsUseCase,
+)
 from blueberry_microid.interfaces.api.v1.dependencies import (
     get_create_dataset_release_use_case,
     get_create_dataset_snapshot_use_case,
@@ -24,6 +27,7 @@ from blueberry_microid.interfaces.api.v1.dependencies import (
     get_list_dataset_releases_use_case,
     get_list_dataset_snapshots_use_case,
     get_list_dataset_split_items_use_case,
+    get_list_training_preflight_runs_use_case,
 )
 from blueberry_microid.interfaces.api.v1.schemas.dataset import (
     DatasetItemRead,
@@ -33,6 +37,7 @@ from blueberry_microid.interfaces.api.v1.schemas.dataset import (
     DatasetSnapshotRead,
     DatasetSplitItemRead,
 )
+from blueberry_microid.interfaces.api.v1.schemas.ml_preflight import TrainingPreflightRunResponse
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
@@ -139,3 +144,10 @@ def get_dataset_release_manifest(
 ) -> dict:
     return exporter.export(dataset_release_id)
 
+
+@router.get("/releases/{dataset_release_id}/preflight-runs", response_model=list[TrainingPreflightRunResponse])
+def list_dataset_release_preflight_runs(
+    dataset_release_id: UUID,
+    use_case: ListTrainingPreflightRunsUseCase = Depends(get_list_training_preflight_runs_use_case),
+) -> list[TrainingPreflightRunResponse]:
+    return [TrainingPreflightRunResponse.model_validate(dto) for dto in use_case.execute(dataset_release_id)]

@@ -107,6 +107,16 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - El CLI `scripts/validate_training_manifest.py` imprime un reporte JSON y devuelve códigos de salida (`0` válido, `1` inválido, `2` error de carga/config). No debe conectar a FastAPI, PostgreSQL, Redis o Celery.
 - Sigue prohibido afirmar taxonomía, especie/género, accuracy, precision, recall, F1 o cualquier resultado experimental que no exista.
 
+## 5.5. ML Preflight Reports persistentes (Fase 12)
+
+- `TrainingPreflightRun` y `TrainingPreflightIssue` persisten resultados de validación de manifests, no experimentos de entrenamiento. No agregues MLflow, TensorBoard, Weights & Biases ni otro tracker externo sin una fase aprobada.
+- `CreateTrainingPreflightRunUseCase` debe reutilizar `DatasetReleaseManifestExporter`, `TrainingManifest`, `ManifestValidator` y opcionalmente `ImagePathValidator`. No dupliques reglas de validación en routers, repositorios o modelos SQLAlchemy.
+- Status permitido: `failed` si hay errores, `warning` si no hay errores pero sí warnings, `passed` si no hay errores ni warnings. Un manifest inválido también se persiste como run `failed`; no conviertas la validación fallida en rollback salvo que falle la persistencia.
+- `validate_image_paths=false` no debe tocar filesystem. `validate_image_paths=true` solo comprueba existencia de rutas; no abre, decodifica, copia ni transforma imágenes.
+- Los repositorios de preflight solo persisten/listan. La operación run+issues debe seguir siendo transaccional vía `UnitOfWorkPort`.
+- Un preflight `passed` no autoriza entrenamiento ni prueba suficiencia científica. Solo significa que los gates técnicos configurados pasaron.
+- Sigue prohibido guardar imágenes, binarios, secretos, métricas de modelo, matriz de confusión, taxonomía, especie/género o cualquier resultado experimental inexistente.
+
 ## 6. Estándares de código Python
 
 - Type hints obligatorios en toda función/método público. `mypy`-friendly (evitar `Any` salvo justificación).

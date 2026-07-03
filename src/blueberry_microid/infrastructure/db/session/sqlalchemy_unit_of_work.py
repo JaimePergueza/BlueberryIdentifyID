@@ -25,6 +25,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_re
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_prediction_repository import (
     SqlAlchemyPredictionRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_preflight_issue_repository import (
+    SqlAlchemyTrainingPreflightIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_preflight_run_repository import (
+    SqlAlchemyTrainingPreflightRunRepository,
+)
 
 
 class SqlAlchemyUnitOfWork(UnitOfWorkPort):
@@ -59,6 +65,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
         self.dataset_split_item_repository = SqlAlchemyDatasetSplitItemRepository(self.session, auto_commit=False)
         self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)
         self.prediction_repository = SqlAlchemyPredictionRepository(self.session, auto_commit=False)
+        self.training_preflight_issue_repository = SqlAlchemyTrainingPreflightIssueRepository(
+            self.session, auto_commit=False
+        )
+        self.training_preflight_run_repository = SqlAlchemyTrainingPreflightRunRepository(
+            self.session, auto_commit=False
+        )
         return self
 
     def __exit__(

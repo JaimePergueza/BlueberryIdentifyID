@@ -45,6 +45,7 @@ from blueberry_microid.application.exceptions import (
     PetriImageNotFoundError,
     PredictionNotFoundError,
     SampleNotFoundError,
+    TrainingPreflightRunNotFoundError,
 )
 from blueberry_microid.domain.exceptions.errors import (
     CrossSampleAnalysisError,
@@ -83,6 +84,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "dataset_snapshot_not_found"
     if isinstance(exc, DatasetReleaseNotFoundError):
         return 404, "dataset_release_not_found"
+    if isinstance(exc, TrainingPreflightRunNotFoundError):
+        return 404, "training_preflight_run_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):

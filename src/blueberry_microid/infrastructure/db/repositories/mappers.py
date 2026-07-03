@@ -16,7 +16,11 @@ from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
 from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
+from blueberry_microid.domain.entities.training_preflight_issue import TrainingPreflightIssue
+from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
+from blueberry_microid.domain.enums.training_preflight_issue_severity import TrainingPreflightIssueSeverity
+from blueberry_microid.domain.enums.training_preflight_status import TrainingPreflightStatus
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
@@ -28,6 +32,8 @@ from blueberry_microid.infrastructure.db.models.model_version import ModelVersio
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
 from blueberry_microid.infrastructure.db.models.prediction import PredictionModel
 from blueberry_microid.infrastructure.db.models.sample import SampleModel
+from blueberry_microid.infrastructure.db.models.training_preflight_issue import TrainingPreflightIssueModel
+from blueberry_microid.infrastructure.db.models.training_preflight_run import TrainingPreflightRunModel
 
 
 def sample_to_entity(model: SampleModel) -> Sample:
@@ -206,5 +212,41 @@ def dataset_split_item_to_entity(model: DatasetSplitItemModel) -> DatasetSplitIt
         split=model.split,
         id=model.id,
         ground_truth_label=model.ground_truth_label,
+        created_at=model.created_at,
+    )
+
+
+def training_preflight_run_to_entity(model: TrainingPreflightRunModel) -> TrainingPreflightRun:
+    return TrainingPreflightRun(
+        dataset_release_id=model.dataset_release_id,
+        status=TrainingPreflightStatus(model.status),
+        is_valid=model.is_valid,
+        config=model.config,
+        summary=model.summary,
+        item_count=model.item_count,
+        train_count=model.train_count,
+        validation_count=model.validation_count,
+        test_count=model.test_count,
+        label_counts=model.label_counts,
+        split_counts=model.split_counts,
+        split_label_counts=model.split_label_counts,
+        leakage_checks=model.leakage_checks,
+        id=model.id,
+        recommendation_summary=model.recommendation_summary,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+    )
+
+
+def training_preflight_issue_to_entity(model: TrainingPreflightIssueModel) -> TrainingPreflightIssue:
+    return TrainingPreflightIssue(
+        preflight_run_id=model.preflight_run_id,
+        severity=TrainingPreflightIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
+        field=model.field,
+        item_ref=model.item_ref,
         created_at=model.created_at,
     )

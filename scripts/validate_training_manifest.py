@@ -19,7 +19,11 @@ def _load_config(path: str | None) -> TrainingConfig:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate a DatasetRelease training manifest without training a model."
+        description=(
+            "Validate a DatasetRelease training manifest without training a model. "
+            "This standalone CLI does not persist results; use the API ML preflight endpoints "
+            "when an auditable TrainingPreflightRun is required."
+        )
     )
     parser.add_argument("manifest_path", help="Path to the DatasetRelease manifest JSON.")
     parser.add_argument("--config", help="Optional TrainingConfig JSON path.", default=None)
@@ -40,4 +44,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
