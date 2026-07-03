@@ -25,6 +25,8 @@ from blueberry_microid.infrastructure.db.models import (
     HumanReviewModel,
     ImageDatasetAuditIssueModel,
     ImageDatasetAuditRunModel,
+    ImageFeatureExtractionRunModel,
+    ImageFeatureVectorModel,
     MicroImageModel,
     ModelVersionModel,
     PetriImageModel,
@@ -56,6 +58,8 @@ _SQLITE_TABLES = [
     TrainingPredictionModel.__table__,
     ImageDatasetAuditRunModel.__table__,
     ImageDatasetAuditIssueModel.__table__,
+    ImageFeatureExtractionRunModel.__table__,
+    ImageFeatureVectorModel.__table__,
 ]
 
 

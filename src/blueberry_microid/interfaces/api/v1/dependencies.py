@@ -29,6 +29,10 @@ from blueberry_microid.application.ports.image_dataset_audit_issue_repository im
 from blueberry_microid.application.ports.image_dataset_audit_run_repository import (
     ImageDatasetAuditRunRepositoryPort,
 )
+from blueberry_microid.application.ports.image_feature_extraction_run_repository import (
+    ImageFeatureExtractionRunRepositoryPort,
+)
+from blueberry_microid.application.ports.image_feature_vector_repository import ImageFeatureVectorRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageStoragePort
 from blueberry_microid.application.ports.image_validator import ImageValidatorPort
 from blueberry_microid.application.ports.inference_engine import InferenceEnginePort
@@ -69,6 +73,18 @@ from blueberry_microid.application.use_cases.image_audit.list_image_dataset_audi
 )
 from blueberry_microid.application.use_cases.image_audit.list_image_dataset_audit_runs import (
     ListImageDatasetAuditRunsUseCase,
+)
+from blueberry_microid.application.use_cases.image_feature_extraction.create_image_feature_extraction_run import (
+    CreateImageFeatureExtractionRunUseCase,
+)
+from blueberry_microid.application.use_cases.image_feature_extraction.get_image_feature_extraction_run import (
+    GetImageFeatureExtractionRunUseCase,
+)
+from blueberry_microid.application.use_cases.image_feature_extraction.list_image_feature_extraction_runs import (
+    ListImageFeatureExtractionRunsUseCase,
+)
+from blueberry_microid.application.use_cases.image_feature_extraction.list_image_feature_vectors import (
+    ListImageFeatureVectorsUseCase,
 )
 from blueberry_microid.application.use_cases.ml_preflight.create_training_preflight_run import (
     CreateTrainingPreflightRunUseCase,
@@ -125,6 +141,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_a
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_audit_run_repository import (
     SqlAlchemyImageDatasetAuditRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_extraction_run_repository import (
+    SqlAlchemyImageFeatureExtractionRunRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_vector_repository import (
+    SqlAlchemyImageFeatureVectorRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_micro_image_repository import (
     SqlAlchemyMicroImageRepository,
 )
@@ -156,6 +178,7 @@ from blueberry_microid.infrastructure.storage.pillow_image_validator import Pill
 from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
+from blueberry_microid.ml.preprocessing.image_feature_extractor import ImageFeatureExtractor
 from blueberry_microid.ml.training.majority_class_baseline import MajorityClassBaselineTrainer
 from blueberry_microid.ml.validation.image_dataset_auditor import ImageDatasetAuditor
 from blueberry_microid.ml.validation.image_path_validator import ImagePathValidator
@@ -308,6 +331,18 @@ def get_image_dataset_audit_issue_repository(
     return SqlAlchemyImageDatasetAuditIssueRepository(session)
 
 
+def get_image_feature_extraction_run_repository(
+    session: Session = Depends(get_db_session),
+) -> ImageFeatureExtractionRunRepositoryPort:
+    return SqlAlchemyImageFeatureExtractionRunRepository(session)
+
+
+def get_image_feature_vector_repository(
+    session: Session = Depends(get_db_session),
+) -> ImageFeatureVectorRepositoryPort:
+    return SqlAlchemyImageFeatureVectorRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -325,6 +360,10 @@ def get_image_path_validator() -> ImagePathValidator:
 
 def get_image_dataset_auditor() -> ImageDatasetAuditor:
     return ImageDatasetAuditor()
+
+
+def get_image_feature_extractor() -> ImageFeatureExtractor:
+    return ImageFeatureExtractor()
 
 
 def get_majority_class_baseline_trainer() -> MajorityClassBaselineTrainer:
@@ -680,3 +719,53 @@ def get_list_image_dataset_audit_issues_use_case(
     audit_issue_repository: ImageDatasetAuditIssueRepositoryPort = Depends(get_image_dataset_audit_issue_repository),
 ) -> ListImageDatasetAuditIssuesUseCase:
     return ListImageDatasetAuditIssuesUseCase(audit_run_repository, audit_issue_repository)
+
+
+def get_create_image_feature_extraction_run_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort = Depends(
+        get_image_dataset_audit_run_repository
+    ),
+    manifest_exporter: DatasetReleaseManifestExporter = Depends(get_dataset_release_manifest_exporter),
+    image_feature_extractor: ImageFeatureExtractor = Depends(get_image_feature_extractor),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateImageFeatureExtractionRunUseCase:
+    return CreateImageFeatureExtractionRunUseCase(
+        dataset_release_repository,
+        image_dataset_audit_run_repository,
+        manifest_exporter,
+        image_feature_extractor,
+        unit_of_work,
+    )
+
+
+def get_get_image_feature_extraction_run_use_case(
+    extraction_run_repository: ImageFeatureExtractionRunRepositoryPort = Depends(
+        get_image_feature_extraction_run_repository
+    ),
+    feature_vector_repository: ImageFeatureVectorRepositoryPort = Depends(get_image_feature_vector_repository),
+) -> GetImageFeatureExtractionRunUseCase:
+    return GetImageFeatureExtractionRunUseCase(extraction_run_repository, feature_vector_repository)
+
+
+def get_list_image_feature_extraction_runs_use_case(
+    extraction_run_repository: ImageFeatureExtractionRunRepositoryPort = Depends(
+        get_image_feature_extraction_run_repository
+    ),
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort = Depends(
+        get_image_dataset_audit_run_repository
+    ),
+) -> ListImageFeatureExtractionRunsUseCase:
+    return ListImageFeatureExtractionRunsUseCase(
+        extraction_run_repository, dataset_release_repository, image_dataset_audit_run_repository
+    )
+
+
+def get_list_image_feature_vectors_use_case(
+    extraction_run_repository: ImageFeatureExtractionRunRepositoryPort = Depends(
+        get_image_feature_extraction_run_repository
+    ),
+    feature_vector_repository: ImageFeatureVectorRepositoryPort = Depends(get_image_feature_vector_repository),
+) -> ListImageFeatureVectorsUseCase:
+    return ListImageFeatureVectorsUseCase(extraction_run_repository, feature_vector_repository)

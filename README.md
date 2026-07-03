@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 14)
+## MVP status (as of Fase 15)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -24,9 +24,10 @@ creation, simulated (mock) inference with crash-safe/idempotent processing
 reproducible dataset releases with deterministic train/validation/test
 splits under three leakage-prevention strategies (`by_sample`, `by_lot`,
 `by_origin_lot`), future-training manifest contracts and validators under
-`ml/`, and a persisted technical image-file audit for a release's Petri/micro
-images — all behind a versioned FastAPI, backed by SQLAlchemy models and
-Alembic migrations. 384 automated tests (340 SQLite/eager-based + 44
+`ml/`, a persisted technical image-file audit for a release's Petri/micro
+images, and a persisted non-deep feature-extraction layer over those same
+audited images — all behind a versioned FastAPI, backed by SQLAlchemy models
+and Alembic migrations. 432 automated tests (379 SQLite/eager-based + 53
 PostgreSQL-only); the CI workflow runs the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
@@ -72,6 +73,17 @@ preflight (which validates manifest *structure*, not image *files*). A
 `passed` audit only means the files are technically usable; it says nothing
 about scientific quality or dataset sufficiency.
 
+**Non-deep image feature extraction (Fase 15):** `ImageFeatureExtractionRun`/`ImageFeatureVector`
+persist simple, reproducible, technical features (geometry, intensity, color,
+approximate sharpness/edge density, grayscale histogram) computed with
+Pillow + numpy from the Petri/micro images of a `DatasetRelease` whose
+Fase 14 audit was not failed. This is a third independent layer — preflight
+validates the manifest, audit validates the files, extraction computes
+numbers from those same files — and never trains a model, never uses
+PyTorch/TensorFlow, and never assigns taxonomy. `numpy` was added as an
+explicit dependency for this phase (array arithmetic only, not a deep
+learning framework).
+
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original
 `AnalysisRun`, images, `Prediction`, and final `HumanReview`. A trainable item
@@ -95,14 +107,14 @@ weaker strategy — `by_lot`/`by_origin_lot` fail with
 eliminates leakage risk completely (e.g. same-day/same-technician confounds
 are not modeled). See `docs/development.md` § 19 and ARCHITECTURE.md § 26.
 
-**CI validation status:** GitHub Actions was observed green on 2026-07-02 for
-Fase 10 at commit `572b15ab8e41d148f9886794f9d8f1db45eca61a`, run
-`28625425889`: `unit-and-api-tests`, `postgres-migrations`, and
-`celery-smoke` all completed successfully. Fases 11, 12, 13, and 14 have
-**not** been separately re-verified against a fresh Actions run as of this
-paragraph — only the local (SQLite) suite was run for them, and it stays
-green. Local PostgreSQL/Redis smoke still requires Docker, which is not
-installed in this development environment.
+**CI validation status:** GitHub Actions was observed green on 2026-07-03 for
+Fase 14 at commit `d61673f2fceda3b1f7de0664665ce46f3702385d`:
+`unit-and-api-tests`, `postgres-migrations`, and `celery-smoke` all completed
+successfully. Fases 11, 12, 13, and 15 have **not** been separately
+re-verified against a fresh Actions run as of this paragraph — only the
+local (SQLite) suite was run for them, and it stays green. Local
+PostgreSQL/Redis smoke still requires Docker, which is not installed in this
+development environment.
 
 **Repository root folder name:** currently `IndetificadorMicro` (a
 misspelling); the recommended name is `BlueberryMicroID`. This has not been
@@ -169,6 +181,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Persistent preflight validation:** `POST /api/v1/ml/preflight-runs` runs the same manifest validation and persists the report. Use the standalone CLI for quick local checks; use the API when the result must be auditable and queryable by `DatasetRelease`.
 - **Majority-class baseline:** `POST /api/v1/ml/training-runs/baseline` runs the only implemented experimental baseline. It requires a matching non-failed preflight, revalidates the release manifest, uses train labels only to select the majority class, persists one prediction per split item, and reports real baseline metrics from those predictions. It does not read image bytes, train neural networks, use PyTorch, or alter the mock inference engine.
 - **Technical image dataset audit:** `POST /api/v1/ml/image-audits` opens each Petri/micro image file referenced by a `DatasetRelease` with Pillow (existence, corruption, format, dimensions, color mode, declared-vs-real file size) and persists the result. It is a technical file check, not the Fase 12 manifest preflight and not a scientific/microbiological evaluation; it never creates tensors or uses PyTorch/TensorFlow.
+- **Non-deep image feature extraction:** `POST /api/v1/ml/image-feature-extractions` requires a non-failed `ImageDatasetAuditRun` for the same `DatasetRelease`, then computes geometry/intensity/color/sharpness/texture/histogram features per Petri/micro image with Pillow + numpy and persists one `ImageFeatureVector` per image. It never trains a model, never uses PyTorch/TensorFlow, and never assigns taxonomy.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
 - **Strict image validation:** every upload must have an allowed MIME type and extension, decode cleanly with Pillow, *and* have its real detected format agree with both the declared MIME type and the extension — a mislabeled file is rejected even if each check would pass in isolation.
 - **Structured logging:** every request gets a `request_id` (echoed back via an `X-Request-ID` response header) and one structured log line (JSON or console format, via `LOG_FORMAT`); 5xx errors are logged server-side with a full stack trace but never expose internal details to the client.
@@ -227,6 +240,16 @@ Image dataset audit endpoints (Fase 14 — technical file audit, no training):
 - `GET /api/v1/ml/image-audits` lists persisted image audit runs.
 - `GET /api/v1/ml/image-audits/{audit_run_id}` returns an audit run with its issues.
 - `GET /api/v1/ml/image-audits/{audit_run_id}/issues` lists per-image technical findings.
+- `GET /api/v1/datasets/releases/{dataset_release_id}/image-audits` lists audits for that release.
+
+Image feature extraction endpoints (Fase 15 — non-deep technical features, no training):
+
+- `POST /api/v1/ml/image-feature-extractions` extracts features for a `DatasetRelease` + `ImageDatasetAuditRun` and persists the run and its vectors.
+- `GET /api/v1/ml/image-feature-extractions` lists persisted extraction runs.
+- `GET /api/v1/ml/image-feature-extractions/{feature_extraction_run_id}` returns a run with its vectors.
+- `GET /api/v1/ml/image-feature-extractions/{feature_extraction_run_id}/vectors` lists feature vectors; optional `modality=petri|micro` and `split=train|validation|test` filters.
+- `GET /api/v1/datasets/releases/{dataset_release_id}/image-feature-extractions` lists extraction runs for that release.
+- `GET /api/v1/ml/image-audits/{image_audit_run_id}/feature-extractions` lists extraction runs for that audit.
 
 Async processing endpoints:
 

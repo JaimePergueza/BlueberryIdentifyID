@@ -64,6 +64,10 @@ class ImageDatasetAuditRunNotFoundError(NotFoundError):
     """Raised when a requested ImageDatasetAuditRun does not exist."""
 
 
+class ImageFeatureExtractionRunNotFoundError(NotFoundError):
+    """Raised when a requested ImageFeatureExtractionRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -119,6 +123,14 @@ class DatasetSplitMetadataError(ApplicationError):
 
 class BaselineTrainingNotAllowedError(ConflictError):
     """Raised when a baseline TrainingRun cannot be created from current state."""
+
+
+class ImageFeatureExtractionNotAllowedError(ConflictError):
+    """Raised when an ImageFeatureExtractionRun cannot be created from the
+    current state: the referenced ImageDatasetAuditRun does not exist,
+    belongs to a different DatasetRelease, or has a status the requested
+    ImageFeatureExtractionConfig does not accept (failed audits are never
+    accepted, regardless of config)."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

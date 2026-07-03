@@ -13,6 +13,8 @@ from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitIte
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.image_dataset_audit_issue import ImageDatasetAuditIssue
 from blueberry_microid.domain.entities.image_dataset_audit_run import ImageDatasetAuditRun
+from blueberry_microid.domain.entities.image_feature_extraction_run import ImageFeatureExtractionRun
+from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureVector
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
@@ -26,6 +28,7 @@ from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import ImageDatasetAuditIssueSeverity
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
+from blueberry_microid.domain.enums.image_feature_extraction_status import ImageFeatureExtractionStatus
 from blueberry_microid.domain.enums.image_modality import ImageModality
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
@@ -41,6 +44,8 @@ from blueberry_microid.infrastructure.db.models.dataset_split_item import Datase
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_run import ImageDatasetAuditRunModel
+from blueberry_microid.infrastructure.db.models.image_feature_extraction_run import ImageFeatureExtractionRunModel
+from blueberry_microid.infrastructure.db.models.image_feature_vector import ImageFeatureVectorModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
@@ -342,5 +347,46 @@ def image_dataset_audit_issue_to_entity(model: ImageDatasetAuditIssueModel) -> I
         dataset_split_item_id=model.dataset_split_item_id,
         image_path=model.image_path,
         details=model.details,
+        created_at=model.created_at,
+    )
+
+
+def image_feature_extraction_run_to_entity(model: ImageFeatureExtractionRunModel) -> ImageFeatureExtractionRun:
+    return ImageFeatureExtractionRun(
+        dataset_release_id=model.dataset_release_id,
+        image_audit_run_id=model.image_audit_run_id,
+        status=ImageFeatureExtractionStatus(model.status),
+        is_completed=model.is_completed,
+        config=model.config,
+        total_items=model.total_items,
+        processed_items=model.processed_items,
+        failed_items=model.failed_items,
+        total_feature_vectors=model.total_feature_vectors,
+        petri_feature_count=model.petri_feature_count,
+        micro_feature_count=model.micro_feature_count,
+        summary=model.summary,
+        started_at=model.started_at,
+        id=model.id,
+        completed_at=model.completed_at,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def image_feature_vector_to_entity(model: ImageFeatureVectorModel) -> ImageFeatureVector:
+    return ImageFeatureVector(
+        feature_extraction_run_id=model.feature_extraction_run_id,
+        dataset_release_id=model.dataset_release_id,
+        dataset_item_id=model.dataset_item_id,
+        dataset_split_item_id=model.dataset_split_item_id,
+        split=DatasetSplit(model.split),
+        modality=ImageModality(model.modality),
+        image_path=model.image_path,
+        features=model.features,
+        preprocessing=model.preprocessing,
+        extraction_version=model.extraction_version,
+        id=model.id,
         created_at=model.created_at,
     )

@@ -942,3 +942,125 @@ es una heuristica simple (mediana ± 3x), no un modelo estadistico robusto.
 se registro su tamano — no explica la causa. (d) Sigue sin existir
 entrenamiento real, PyTorch, TensorFlow, deep learning, dataset externo,
 frontend ni taxonomia.
+
+## 31. Fase 15 — extraccion de features no profunda (implementada)
+
+Objetivo: extraer features tecnicas simples, reproducibles y auditables desde
+los archivos Petri/micro de un `DatasetRelease` ya auditado, sin entrenar
+modelos, sin PyTorch/TensorFlow/CNN/ViT y sin tensores de entrenamiento.
+
+**Diagnostico previo (Tarea 1).** El manifest (`TrainingManifest`) ya traia
+`dataset_item_id`/`dataset_split_item_id`/rutas Petri-micro desde la Fase 14,
+suficiente para leer y referenciar imagenes sin ampliar el contrato de nuevo.
+`ImageDatasetAuditRun.status` (Fase 14) es la unica senal de si un release
+tiene imagenes tecnicamente aptas; esta fase la consume como precondicion en
+vez de reimplementar sus checks. `PetriImage`/`MicroImage.width/height` no
+son necesarios aqui porque las features de geometria se recalculan siempre
+desde el archivo real, nunca desde el valor declarado en la fila.
+
+**Dependencia nueva: numpy.** Se agrego `numpy>=1.24,<2.0` a `pyproject.toml`
+(estaba disponible transitivamente en el entorno de desarrollo pero no
+declarada, lo que la hacia invisible para una instalacion limpia en CI).
+Se usa exclusivamente para aritmetica de arrays (media, desviacion estandar,
+histograma, un Laplaciano por diferencias finitas via `np.roll`) — no es
+PyTorch/TensorFlow, no crea tensores de entrenamiento ni participa en ningun
+grafo de computo; es la misma categoria de herramienta que el modulo
+`statistics` de Python, vectorizada para arrays de pixeles.
+
+**Entidades.** `ImageFeatureExtractionRun` registra: release, audit de
+origen, status (`completed`/`partial`/`failed`), `is_completed` (true para
+completed/partial — el run corrio hasta el final — false solo para failed,
+que representa un run que ni siquiera llego a ejecutar la extraccion),
+config, conteos (total/procesados/fallidos, vectores totales y por
+modalidad), summary y timestamps. `ImageFeatureVector` registra un vector
+por imagen: run de origen, release, item, split-item, split, modalidad,
+ruta, `features` JSON, `preprocessing` JSON (que se aplico realmente:
+conversion a RGB, resize, dimensiones antes/despues) y una version de
+extraccion (`v1`) para poder distinguir vectores calculados con una version
+futura del algoritmo. Ninguna de las dos guarda binarios, tensores ni
+metricas de clasificacion.
+
+**Diseno de status (documentado porque el enunciado dejaba el criterio
+abierto).** Cada imagen del manifest se intenta siempre — un fallo nunca
+corta el procesamiento de las demas imagenes. Al final: si no hubo ningun
+error, `completed`; si hubo al menos un error y
+`fail_on_unreadable_image=true` (default), `failed`; si hubo al menos un
+error y `fail_on_unreadable_image=false`, `partial`. Esto permite que un
+run con imagenes parcialmente rotas siga produciendo vectores utiles para
+las imagenes que si funcionaron, mientras la clasificacion del run avisa con
+claridad si el conjunto completo es confiable o no.
+
+**`ImageFeatureExtractionConfig`.** Configuracion tecnica independiente de
+`TrainingConfig` e `ImageAuditConfig`: banderas para aceptar audits
+`passed`/`warning`, conversion a RGB, resize opcional, y banderas para
+activar/desactivar cada grupo de features. Valida en `__post_init__` que
+`histogram_bins > 0` y que `resize_width`/`resize_height` sean positivos
+cuando `resize_enabled=true`.
+
+**`ImageFeatureExtractor` y features calculadas.** Vive en
+`ml/preprocessing/image_feature_extractor.py` (el directorio ya existia,
+reservado desde fases tempranas, vacio salvo un `.gitkeep`). Abre cada
+imagen con el mismo patron de dos aperturas que `PillowImageValidator`
+(`verify()` para corrupcion, reapertura para leer datos), y calcula:
+geometria (`width`, `height`, `aspect_ratio`, `file_size_bytes` real via
+`os.path.getsize`); intensidad (`mean`/`std`/`min`/`max_intensity` sobre la
+imagen en escala de grises); color (`mean_r/g/b`, `std_r/g/b`,
+`mean_saturation` via `Image.convert("HSV")`, solo si el modo final es
+RGB/RGBA); nitidez (`laplacian_variance` via un Laplaciano de diferencias
+finitas con `np.roll` — el borde de la imagen se envuelve en vez de rellenarse,
+una simplificacion deliberada y documentada para una metrica "aproximada");
+textura (`edge_density` por umbral de gradiente, `dark_pixel_ratio`,
+`bright_pixel_ratio`); histograma (`grayscale_histogram` de N bins,
+normalizado para sumar 1.0). Todo determinista, sin aleatoriedad.
+
+**Caso de uso.** `CreateImageFeatureExtractionRunUseCase` sigue el mismo
+patron que `CreateBaselineTrainingRunUseCase` (Fase 13) y
+`CreateImageDatasetAuditRunUseCase` (Fase 14): busca el release, busca el
+audit, valida pertenencia y status, reexporta el manifest, ejecuta el
+extractor, y persiste run + vectores en una unica transaccion via
+`UnitOfWorkPort`. Un audit `failed` nunca se acepta, sin importar la config;
+un audit que no pertenece al release siempre se rechaza. Nunca modifica
+`DatasetRelease`, `DatasetItem` ni `ImageDatasetAuditRun`.
+
+**Persistencia.** Migracion `0009_image_feature_extraction.py` crea
+`image_feature_extraction_runs` e `image_feature_vectors`, con FKs a
+`dataset_releases`, `image_dataset_audit_runs`, `dataset_items` y
+`dataset_split_items`, `CHECK` de status/modality/split, indice unico
+`(feature_extraction_run_id, dataset_split_item_id, modality)`, y columnas
+`JSONB` para config/summary/features/preprocessing. Todas las columnas con
+`CHECK` usan `VARCHAR(32)` — no `VARCHAR(16)` — aplicando la leccion de la
+Fase 14 (un valor deliberadamente invalido en un test de CHECK puede exceder
+un ancho de columna demasiado angosto y disparar `StringDataRightTruncation`
+antes de que el CHECK se evalue, algo que SQLite nunca revela porque ignora
+la longitud de VARCHAR). Validada offline con `alembic upgrade head --sql` y
+`alembic downgrade head:base --sql`.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/image-feature-extractions` | Ejecuta extraccion de features para un DatasetRelease + ImageDatasetAuditRun |
+| GET | `/api/v1/ml/image-feature-extractions` | Lista extracciones |
+| GET | `/api/v1/ml/image-feature-extractions/{id}` | Obtiene una extraccion con sus vectores |
+| GET | `/api/v1/ml/image-feature-extractions/{id}/vectors` | Lista vectores, filtro opcional `modality`/`split` |
+| GET | `/api/v1/datasets/releases/{id}/image-feature-extractions` | Historial por release |
+| GET | `/api/v1/ml/image-audits/{id}/feature-extractions` | Historial por audit |
+
+**Pruebas.** 16 tests unitarios de `ImageFeatureExtractor` (features por
+tipo, determinismo, imagen faltante/corrupta, resize, no modifica archivos,
+sin PyTorch, sin metricas de clasificacion), 12 tests del caso de uso
+(aceptacion/rechazo de audit por status y pertenencia, persistencia,
+transaccionalidad, listados), 11 tests API (flujo completo, filtros por
+modalidad/split, listados por release/audit, casos de error de audit
+failed/cruzado, X-Request-ID, ausencia de taxonomia/metricas), 9 tests
+PostgreSQL (tablas, CHECKs, indice unico, JSONB, FKs).
+
+**Riesgos pendientes antes de Fase 16.** (a) Las features son puramente
+tecnicas — ninguna tiene significado microbiologico validado; no deben
+interpretarse como indicadores de crecimiento, contaminacion ni genero/especie.
+(b) `laplacian_variance`/`edge_density` son aproximaciones deliberadamente
+simples (sin OpenCV), no equivalentes a implementaciones de vision por
+computador certificadas. (c) No existe todavia normalizacion/escalado de
+features entre imagenes de distinto tamano real — el resize es opcional y
+nunca se aplica por defecto. (d) Sigue sin existir entrenamiento real,
+PyTorch, TensorFlow, deep learning, dataset externo, frontend ni taxonomia.

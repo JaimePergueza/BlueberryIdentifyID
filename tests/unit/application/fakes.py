@@ -29,6 +29,10 @@ from blueberry_microid.application.ports.image_dataset_audit_issue_repository im
 from blueberry_microid.application.ports.image_dataset_audit_run_repository import (
     ImageDatasetAuditRunRepositoryPort,
 )
+from blueberry_microid.application.ports.image_feature_extraction_run_repository import (
+    ImageFeatureExtractionRunRepositoryPort,
+)
+from blueberry_microid.application.ports.image_feature_vector_repository import ImageFeatureVectorRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
 from blueberry_microid.application.ports.inference_engine import InferenceEnginePort, InferenceOutput
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
@@ -51,6 +55,8 @@ from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitIte
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.image_dataset_audit_issue import ImageDatasetAuditIssue
 from blueberry_microid.domain.entities.image_dataset_audit_run import ImageDatasetAuditRun
+from blueberry_microid.domain.entities.image_feature_extraction_run import ImageFeatureExtractionRun
+from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureVector
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
@@ -350,6 +356,73 @@ class InMemoryImageDatasetAuditIssueRepository(ImageDatasetAuditIssueRepositoryP
         self._by_id = copy.deepcopy(state)
 
 
+class InMemoryImageFeatureExtractionRunRepository(ImageFeatureExtractionRunRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, ImageFeatureExtractionRun] = {}
+
+    def add(self, extraction_run: ImageFeatureExtractionRun) -> ImageFeatureExtractionRun:
+        self._by_id[extraction_run.id] = extraction_run
+        return extraction_run
+
+    def get_by_id(self, extraction_run_id: UUID) -> Optional[ImageFeatureExtractionRun]:
+        return self._by_id.get(extraction_run_id)
+
+    def list_all(self) -> list[ImageFeatureExtractionRun]:
+        return sorted(self._by_id.values(), key=lambda run: (run.created_at, run.id))
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[ImageFeatureExtractionRun]:
+        return sorted(
+            [run for run in self._by_id.values() if run.dataset_release_id == dataset_release_id],
+            key=lambda run: (run.created_at, run.id),
+        )
+
+    def list_by_image_audit_run_id(self, image_audit_run_id: UUID) -> list[ImageFeatureExtractionRun]:
+        return sorted(
+            [run for run in self._by_id.values() if run.image_audit_run_id == image_audit_run_id],
+            key=lambda run: (run.created_at, run.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, ImageFeatureExtractionRun]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, ImageFeatureExtractionRun]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryImageFeatureVectorRepository(ImageFeatureVectorRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, ImageFeatureVector] = {}
+
+    def add_many(self, feature_vectors: list[ImageFeatureVector]) -> list[ImageFeatureVector]:
+        for vector in feature_vectors:
+            self._by_id[vector.id] = vector
+        return feature_vectors
+
+    def list_by_feature_extraction_run_id(self, feature_extraction_run_id: UUID) -> list[ImageFeatureVector]:
+        return sorted(
+            [v for v in self._by_id.values() if v.feature_extraction_run_id == feature_extraction_run_id],
+            key=lambda v: (v.created_at, v.id),
+        )
+
+    def list_by_feature_extraction_run_id_and_modality(self, feature_extraction_run_id, modality):
+        return [
+            v
+            for v in self.list_by_feature_extraction_run_id(feature_extraction_run_id)
+            if v.modality == modality
+        ]
+
+    def list_by_feature_extraction_run_id_and_split(self, feature_extraction_run_id, split):
+        return [
+            v for v in self.list_by_feature_extraction_run_id(feature_extraction_run_id) if v.split == split
+        ]
+
+    def snapshot_state(self) -> dict[UUID, ImageFeatureVector]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, ImageFeatureVector]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
 class InMemoryTrainingRunRepository(TrainingRunRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, TrainingRun] = {}
@@ -517,6 +590,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         training_prediction_repository: Optional[TrainingPredictionRepositoryPort] = None,
         image_dataset_audit_run_repository: Optional[ImageDatasetAuditRunRepositoryPort] = None,
         image_dataset_audit_issue_repository: Optional[ImageDatasetAuditIssueRepositoryPort] = None,
+        image_feature_extraction_run_repository: Optional[ImageFeatureExtractionRunRepositoryPort] = None,
+        image_feature_vector_repository: Optional[ImageFeatureVectorRepositoryPort] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
@@ -531,6 +606,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.training_prediction_repository = training_prediction_repository
         self.image_dataset_audit_run_repository = image_dataset_audit_run_repository
         self.image_dataset_audit_issue_repository = image_dataset_audit_issue_repository
+        self.image_feature_extraction_run_repository = image_feature_extraction_run_repository
+        self.image_feature_vector_repository = image_feature_vector_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
@@ -540,6 +617,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._training_prediction_snapshot = None
         self._image_dataset_audit_run_snapshot = None
         self._image_dataset_audit_issue_snapshot = None
+        self._image_feature_extraction_run_snapshot = None
+        self._image_feature_vector_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
@@ -557,6 +636,12 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._image_dataset_audit_run_snapshot = self.image_dataset_audit_run_repository.snapshot_state()
         if hasattr(self.image_dataset_audit_issue_repository, "snapshot_state"):
             self._image_dataset_audit_issue_snapshot = self.image_dataset_audit_issue_repository.snapshot_state()
+        if hasattr(self.image_feature_extraction_run_repository, "snapshot_state"):
+            self._image_feature_extraction_run_snapshot = (
+                self.image_feature_extraction_run_repository.snapshot_state()
+            )
+        if hasattr(self.image_feature_vector_repository, "snapshot_state"):
+            self._image_feature_vector_snapshot = self.image_feature_vector_repository.snapshot_state()
         return self
 
     def __exit__(
@@ -579,6 +664,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self.image_dataset_audit_run_repository.restore_state(self._image_dataset_audit_run_snapshot)
         if exc_type is not None and self._image_dataset_audit_issue_snapshot is not None:
             self.image_dataset_audit_issue_repository.restore_state(self._image_dataset_audit_issue_snapshot)
+        if exc_type is not None and self._image_feature_extraction_run_snapshot is not None:
+            self.image_feature_extraction_run_repository.restore_state(self._image_feature_extraction_run_snapshot)
+        if exc_type is not None and self._image_feature_vector_snapshot is not None:
+            self.image_feature_vector_repository.restore_state(self._image_feature_vector_snapshot)
         return None
 
     def commit(self) -> None:

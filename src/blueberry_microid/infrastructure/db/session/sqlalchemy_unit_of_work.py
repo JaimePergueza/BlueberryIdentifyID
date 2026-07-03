@@ -28,6 +28,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_a
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_dataset_audit_run_repository import (
     SqlAlchemyImageDatasetAuditRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_extraction_run_repository import (
+    SqlAlchemyImageFeatureExtractionRunRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_vector_repository import (
+    SqlAlchemyImageFeatureVectorRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_prediction_repository import (
     SqlAlchemyPredictionRepository,
 )
@@ -80,6 +86,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.image_dataset_audit_run_repository = SqlAlchemyImageDatasetAuditRunRepository(
+            self.session, auto_commit=False
+        )
+        self.image_feature_extraction_run_repository = SqlAlchemyImageFeatureExtractionRunRepository(
+            self.session, auto_commit=False
+        )
+        self.image_feature_vector_repository = SqlAlchemyImageFeatureVectorRepository(
             self.session, auto_commit=False
         )
         self.prediction_repository = SqlAlchemyPredictionRepository(self.session, auto_commit=False)

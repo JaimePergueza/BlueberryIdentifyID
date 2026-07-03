@@ -426,29 +426,29 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 14 this collects **384 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **340 passed, 44 skipped** (the 44 PostgreSQL-only tests
+As of Fase 15 this collects **432 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **379 passed, 53 skipped** (the 53 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 134 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, majority-class baseline persistence/failure rules, and `CreateImageDatasetAuditRunUseCase` persistence/rollback rules) — no database, no filesystem. |
+| `tests/unit/application/` | 146 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, majority-class baseline persistence/failure rules, `CreateImageDatasetAuditRunUseCase` persistence/rollback rules, and `CreateImageFeatureExtractionRunUseCase` audit-acceptance/persistence/rollback rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
-| `tests/unit/ml/` | 42 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, the Fase 13 majority-class baseline trainer, and the Fase 14 `ImageDatasetAuditor` (passed/warning/failed by cause, per-modality distinction, distributions, determinism, no file mutation, no tensors) — no image decoding beyond Pillow metadata reads, no tensors, no PyTorch, no neural model metrics. |
+| `tests/unit/ml/` | 58 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, the Fase 13 majority-class baseline trainer, the Fase 14 `ImageDatasetAuditor` (passed/warning/failed by cause, per-modality distinction, distributions, determinism, no file mutation, no tensors), and the Fase 15 `ImageFeatureExtractor` (geometry/intensity/color/sharpness/texture/histogram correctness, per-modality separation, missing/corrupted-image handling, resize preprocessing, determinism, no large arrays) — no image decoding beyond Pillow + numpy array reads, no tensors, no PyTorch/TensorFlow, no neural model metrics. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 92 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, majority-class baseline API/history flow, and the Fase 14 image-audit flow (default vs. lenient config, missing-file detection via a real deleted file, no taxonomy/model-metrics leakage). |
-| `tests/integration/postgres/` | 44 | **PostgreSQL-only** (Fase 6/8/9/10/12/13/14): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, image-dataset-audit tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 103 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, majority-class baseline API/history flow, the Fase 14 image-audit flow, and the Fase 15 image-feature-extraction flow (modality/split vector filters, release/audit history listings, rejecting a failed or cross-release audit, no taxonomy/model-metrics leakage). |
+| `tests/integration/postgres/` | 53 | **PostgreSQL-only** (Fase 6/8/9/10/12/13/14/15): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, image-dataset-audit tables, image-feature-extraction tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 134 + 18 + 42 + 28 + 92 + 44 = **384**, matching `pytest --collect-only -q`.
+26 + 146 + 18 + 58 + 28 + 103 + 53 = **432**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
-289 in Fase 10, 311 in Fase 11, 327 in Fase 12, 340 in Fase 13, and 384 in
-Fase 14.)
+289 in Fase 10, 311 in Fase 11, 327 in Fase 12, 340 in Fase 13, 384 in
+Fase 14, and 432 in Fase 15.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -1152,3 +1152,80 @@ Endpoints:
 A `passed` image audit only certifies basic technical fitness of the image
 files — it says nothing about scientific quality, dataset sufficiency, or
 microbiological validity.
+
+## 24. Non-deep image feature extraction (Fase 15)
+
+Fase 15 adds a persisted layer that extracts **simple, technical, non-deep**
+features from the Petri/micro images referenced by a `DatasetRelease` whose
+`ImageDatasetAuditRun` (Fase 14) was not failed. This is a third, independent
+layer on top of the Fase 12 preflight (manifest structure) and the Fase 14
+audit (file technical fitness): preflight validates the manifest, audit
+validates the files, feature extraction computes technical numbers from
+those same files. No model is trained; no PyTorch/TensorFlow/CNN/ViT is
+used; features have no microbiological meaning.
+
+**New dependency: numpy.** `numpy>=1.24,<2.0` was added explicitly to
+`pyproject.toml`. It was already present transitively in this development
+environment but not declared — meaning a clean `pip install -e ".[dev]"` in
+CI would not have had it. It is used only for array arithmetic (mean,
+standard deviation, histogram, a finite-differences Laplacian) — not a deep
+learning framework, and not involved in any model training.
+
+`ImageFeatureExtractionRun` records: the release, the audit it was validated
+against, `status` (`completed`/`partial`/`failed`), `is_completed` (true for
+completed/partial — the run finished running — false only for failed, i.e.
+it never got to run extraction at all), the exact
+`ImageFeatureExtractionConfig` used, item/vector counts, and a summary.
+`ImageFeatureVector` records one Petri or micro image's feature set: run,
+release, item, split item, split, modality, path, `features` (JSON),
+`preprocessing` (JSON — what was actually applied: RGB conversion, resize,
+before/after dimensions), and an `extraction_version` tag (`v1`).
+
+Status design (documented because the spec left the exact rule open): every
+image in the manifest is always attempted — one failure never stops the
+rest. At the end: no errors -> `completed`; at least one error and
+`fail_on_unreadable_image=true` (default) -> `failed`; at least one error and
+`fail_on_unreadable_image=false` -> `partial`. This lets a run with some
+broken images still persist useful vectors for the images that did work,
+while still flagging clearly whether the whole set can be trusted.
+
+`ImageFeatureExtractor` (`ml/preprocessing/image_feature_extractor.py`, a
+directory reserved since early phases) opens each image the same two-step
+way `PillowImageValidator` and `ImageDatasetAuditor` already do
+(`verify()` for corruption, then a fresh read), and computes:
+
+- **Geometry**: `width`, `height`, `aspect_ratio`, real `file_size_bytes`.
+- **Intensity**: `mean`/`std`/`min`/`max_intensity` over the grayscale image.
+- **Color** (only if the image is RGB/RGBA): `mean_r/g/b`, `std_r/g/b`,
+  `mean_saturation` (via `Image.convert("HSV")`).
+- **Sharpness**: `laplacian_variance`, a finite-differences discrete
+  Laplacian using `numpy.roll` (the border wraps instead of being padded —
+  a deliberate, documented simplification for this "approximate" metric).
+- **Texture**: `edge_density` (gradient-magnitude threshold),
+  `dark_pixel_ratio`, `bright_pixel_ratio`.
+- **Histogram**: `grayscale_histogram` with N bins (`histogram_bins`,
+  default 16), normalized to sum to 1.0.
+
+Everything is deterministic; no randomness is involved anywhere.
+
+`CreateImageFeatureExtractionRunUseCase` follows the same shape as
+`CreateBaselineTrainingRunUseCase` (Fase 13) and
+`CreateImageDatasetAuditRunUseCase` (Fase 14): look up the release, look up
+the audit, verify the audit belongs to that release and its status is
+acceptable per `require_audit_passed`/`allow_audit_warning` (a `failed`
+audit is never accepted, regardless of config), re-export the manifest, run
+the extractor, and persist the run plus every vector transactionally. It
+never modifies `DatasetRelease`, `DatasetItem`, or `ImageDatasetAuditRun`.
+
+Endpoints:
+
+- `POST /api/v1/ml/image-feature-extractions`
+- `GET /api/v1/ml/image-feature-extractions`
+- `GET /api/v1/ml/image-feature-extractions/{feature_extraction_run_id}`
+- `GET /api/v1/ml/image-feature-extractions/{feature_extraction_run_id}/vectors` (optional `modality`/`split` filters)
+- `GET /api/v1/datasets/releases/{dataset_release_id}/image-feature-extractions`
+- `GET /api/v1/ml/image-audits/{image_audit_run_id}/feature-extractions`
+
+These features are purely technical measurements of the image files. They
+are not a microbiological finding, not a growth/contamination indicator, and
+not a step toward taxonomic identification.

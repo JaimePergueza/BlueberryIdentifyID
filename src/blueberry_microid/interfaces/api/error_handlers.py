@@ -37,6 +37,8 @@ from blueberry_microid.application.exceptions import (
     EmptyDatasetSnapshotError,
     HumanReviewNotFoundError,
     ImageDatasetAuditRunNotFoundError,
+    ImageFeatureExtractionNotAllowedError,
+    ImageFeatureExtractionRunNotFoundError,
     ImageStorageCompensationError,
     ImageTooLargeError,
     InvalidImageError,
@@ -93,6 +95,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "training_run_not_found"
     if isinstance(exc, ImageDatasetAuditRunNotFoundError):
         return 404, "image_dataset_audit_run_not_found"
+    if isinstance(exc, ImageFeatureExtractionRunNotFoundError):
+        return 404, "image_feature_extraction_run_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -116,6 +120,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "empty_dataset_snapshot"
     if isinstance(exc, BaselineTrainingNotAllowedError):
         return 409, "baseline_training_not_allowed"
+    if isinstance(exc, ImageFeatureExtractionNotAllowedError):
+        return 409, "image_feature_extraction_not_allowed"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
     if isinstance(exc, ConflictError):

@@ -12,6 +12,8 @@ from blueberry_microid.infrastructure.db.models.dataset_split_item import Datase
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_run import ImageDatasetAuditRunModel
+from blueberry_microid.infrastructure.db.models.image_feature_extraction_run import ImageFeatureExtractionRunModel
+from blueberry_microid.infrastructure.db.models.image_feature_vector import ImageFeatureVectorModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
@@ -32,6 +34,8 @@ __all__ = [
     "HumanReviewModel",
     "ImageDatasetAuditIssueModel",
     "ImageDatasetAuditRunModel",
+    "ImageFeatureExtractionRunModel",
+    "ImageFeatureVectorModel",
     "MicroImageModel",
     "ModelVersionModel",
     "PetriImageModel",
