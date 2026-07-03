@@ -31,6 +31,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapsho
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_item_repository import (
     SqlAlchemyDatasetSplitItemRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_issue_repository import (
+    SqlAlchemyDetectionTrainingEnvironmentIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_spec_repository import (
+    SqlAlchemyDetectionTrainingEnvironmentSpecRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_issue_repository import (
     SqlAlchemyDetectionTrainingIssueRepository,
 )
@@ -144,6 +150,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.detection_training_readiness_report_repository = SqlAlchemyDetectionTrainingReadinessReportRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_environment_issue_repository = SqlAlchemyDetectionTrainingEnvironmentIssueRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_environment_spec_repository = SqlAlchemyDetectionTrainingEnvironmentSpecRepository(
             self.session, auto_commit=False
         )
         self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)

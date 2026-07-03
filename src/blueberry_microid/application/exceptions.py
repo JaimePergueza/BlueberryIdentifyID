@@ -100,6 +100,10 @@ class DetectionTrainingReadinessReportNotFoundError(NotFoundError):
     """Raised when a requested DetectionTrainingReadinessReport does not exist."""
 
 
+class DetectionTrainingEnvironmentSpecNotFoundError(NotFoundError):
+    """Raised when a requested DetectionTrainingEnvironmentSpec does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -195,6 +199,12 @@ class DetectionTrainingNotAllowedError(ConflictError):
     """Raised when a DetectionTrainingRun cannot be planned safely: the
     referenced AnnotationQualityGateRun does not belong to the referenced
     AnnotationBundleRun."""
+
+
+class DetectionTrainingEnvironmentNotAllowedError(ConflictError):
+    """Raised when a DetectionTrainingEnvironmentSpec cannot be created
+    safely: the referenced DetectionTrainingReadinessReport does not belong
+    to the referenced DetectionTrainingRun."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

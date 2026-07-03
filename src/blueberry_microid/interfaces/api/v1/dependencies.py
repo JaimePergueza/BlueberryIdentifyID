@@ -28,6 +28,12 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
+from blueberry_microid.application.ports.detection_training_environment_issue_repository import (
+    DetectionTrainingEnvironmentIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_environment_spec_repository import (
+    DetectionTrainingEnvironmentSpecRepositoryPort,
+)
 from blueberry_microid.application.ports.detection_training_issue_repository import (
     DetectionTrainingIssueRepositoryPort,
 )
@@ -87,6 +93,9 @@ from blueberry_microid.application.services.annotation_bundle_validator import A
 from blueberry_microid.application.services.annotation_bundle_writer import AnnotationBundleWriter
 from blueberry_microid.application.services.annotation_quality_gate_validator import AnnotationQualityGateValidator
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
+from blueberry_microid.application.services.detection_training_environment_evaluator import (
+    DetectionTrainingEnvironmentEvaluator,
+)
 from blueberry_microid.application.services.detection_training_readiness_evaluator import (
     DetectionTrainingReadinessEvaluator,
 )
@@ -144,6 +153,18 @@ from blueberry_microid.application.use_cases.detection_training_readiness.list_d
 )
 from blueberry_microid.application.use_cases.detection_training_readiness.list_detection_training_readiness_reports import (
     ListDetectionTrainingReadinessReportsUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_environment.create_detection_training_environment_spec import (
+    CreateDetectionTrainingEnvironmentSpecUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_environment.get_detection_training_environment_spec import (
+    GetDetectionTrainingEnvironmentSpecUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_environment.list_detection_training_environment_issues import (
+    ListDetectionTrainingEnvironmentIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_environment.list_detection_training_environment_specs import (
+    ListDetectionTrainingEnvironmentSpecsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -289,6 +310,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapsho
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_item_repository import (
     SqlAlchemyDatasetSplitItemRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_issue_repository import (
+    SqlAlchemyDetectionTrainingEnvironmentIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_spec_repository import (
+    SqlAlchemyDetectionTrainingEnvironmentSpecRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_issue_repository import (
     SqlAlchemyDetectionTrainingIssueRepository,
@@ -628,6 +655,18 @@ def get_detection_training_readiness_issue_repository(
     return SqlAlchemyDetectionTrainingReadinessIssueRepository(session)
 
 
+def get_detection_training_environment_spec_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingEnvironmentSpecRepositoryPort:
+    return SqlAlchemyDetectionTrainingEnvironmentSpecRepository(session)
+
+
+def get_detection_training_environment_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingEnvironmentIssueRepositoryPort:
+    return SqlAlchemyDetectionTrainingEnvironmentIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -669,6 +708,10 @@ def get_yolo_dry_run_trainer() -> ObjectDetectionTrainerPort:
 
 def get_detection_training_readiness_evaluator() -> DetectionTrainingReadinessEvaluator:
     return DetectionTrainingReadinessEvaluator()
+
+
+def get_detection_training_environment_evaluator() -> DetectionTrainingEnvironmentEvaluator:
+    return DetectionTrainingEnvironmentEvaluator()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1433,6 +1476,55 @@ def get_list_detection_training_readiness_issues_use_case(
     ),
 ) -> ListDetectionTrainingReadinessIssuesUseCase:
     return ListDetectionTrainingReadinessIssuesUseCase(report_repository, issue_repository)
+
+
+def get_create_detection_training_environment_spec_use_case(
+    detection_training_run_repository: DetectionTrainingRunRepositoryPort = Depends(
+        get_detection_training_run_repository
+    ),
+    readiness_report_repository: DetectionTrainingReadinessReportRepositoryPort = Depends(
+        get_detection_training_readiness_report_repository
+    ),
+    bundle_run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+    bundle_file_repository: AnnotationBundleFileRepositoryPort = Depends(get_annotation_bundle_file_repository),
+    evaluator: DetectionTrainingEnvironmentEvaluator = Depends(get_detection_training_environment_evaluator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDetectionTrainingEnvironmentSpecUseCase:
+    return CreateDetectionTrainingEnvironmentSpecUseCase(
+        detection_training_run_repository,
+        readiness_report_repository,
+        bundle_run_repository,
+        bundle_file_repository,
+        evaluator,
+        unit_of_work,
+    )
+
+
+def get_get_detection_training_environment_spec_use_case(
+    spec_repository: DetectionTrainingEnvironmentSpecRepositoryPort = Depends(
+        get_detection_training_environment_spec_repository
+    ),
+) -> GetDetectionTrainingEnvironmentSpecUseCase:
+    return GetDetectionTrainingEnvironmentSpecUseCase(spec_repository)
+
+
+def get_list_detection_training_environment_specs_use_case(
+    spec_repository: DetectionTrainingEnvironmentSpecRepositoryPort = Depends(
+        get_detection_training_environment_spec_repository
+    ),
+) -> ListDetectionTrainingEnvironmentSpecsUseCase:
+    return ListDetectionTrainingEnvironmentSpecsUseCase(spec_repository)
+
+
+def get_list_detection_training_environment_issues_use_case(
+    spec_repository: DetectionTrainingEnvironmentSpecRepositoryPort = Depends(
+        get_detection_training_environment_spec_repository
+    ),
+    issue_repository: DetectionTrainingEnvironmentIssueRepositoryPort = Depends(
+        get_detection_training_environment_issue_repository
+    ),
+) -> ListDetectionTrainingEnvironmentIssuesUseCase:
+    return ListDetectionTrainingEnvironmentIssuesUseCase(spec_repository, issue_repository)
 
 
 def get_list_detection_training_issues_use_case(

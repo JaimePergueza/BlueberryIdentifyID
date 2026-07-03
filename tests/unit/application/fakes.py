@@ -29,6 +29,12 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
+from blueberry_microid.application.ports.detection_training_environment_issue_repository import (
+    DetectionTrainingEnvironmentIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_environment_spec_repository import (
+    DetectionTrainingEnvironmentSpecRepositoryPort,
+)
 from blueberry_microid.application.ports.detection_training_issue_repository import (
     DetectionTrainingIssueRepositoryPort,
 )
@@ -91,6 +97,8 @@ from blueberry_microid.domain.entities.annotation_quality_gate_run import Annota
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
+from blueberry_microid.domain.entities.detection_training_environment_issue import DetectionTrainingEnvironmentIssue
+from blueberry_microid.domain.entities.detection_training_environment_spec import DetectionTrainingEnvironmentSpec
 from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
 from blueberry_microid.domain.entities.detection_training_readiness_issue import DetectionTrainingReadinessIssue
 from blueberry_microid.domain.entities.detection_training_readiness_report import DetectionTrainingReadinessReport
@@ -933,6 +941,92 @@ class FailingAddDetectionTrainingReadinessIssueRepository(DetectionTrainingReadi
         self._delegate.restore_state(state)
 
 
+class InMemoryDetectionTrainingEnvironmentSpecRepository(DetectionTrainingEnvironmentSpecRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DetectionTrainingEnvironmentSpec] = {}
+
+    def add(self, spec: DetectionTrainingEnvironmentSpec) -> DetectionTrainingEnvironmentSpec:
+        self._by_id[spec.id] = spec
+        return spec
+
+    def get_by_id(self, spec_id: UUID) -> Optional[DetectionTrainingEnvironmentSpec]:
+        return self._by_id.get(spec_id)
+
+    def list_all(self) -> list[DetectionTrainingEnvironmentSpec]:
+        return sorted(self._by_id.values(), key=lambda spec: (spec.created_at, spec.id))
+
+    def list_by_detection_training_run_id(
+        self, detection_training_run_id: UUID
+    ) -> list[DetectionTrainingEnvironmentSpec]:
+        return [
+            spec for spec in self.list_all() if spec.detection_training_run_id == detection_training_run_id
+        ]
+
+    def list_by_readiness_report_id(self, readiness_report_id: UUID) -> list[DetectionTrainingEnvironmentSpec]:
+        return [spec for spec in self.list_all() if spec.readiness_report_id == readiness_report_id]
+
+    def list_by_annotation_bundle_run_id(
+        self, annotation_bundle_run_id: UUID
+    ) -> list[DetectionTrainingEnvironmentSpec]:
+        return [
+            spec for spec in self.list_all() if spec.annotation_bundle_run_id == annotation_bundle_run_id
+        ]
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[DetectionTrainingEnvironmentSpec]:
+        return [spec for spec in self.list_all() if spec.dataset_release_id == dataset_release_id]
+
+    def snapshot_state(self) -> dict[UUID, DetectionTrainingEnvironmentSpec]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, DetectionTrainingEnvironmentSpec]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryDetectionTrainingEnvironmentIssueRepository(DetectionTrainingEnvironmentIssueRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DetectionTrainingEnvironmentIssue] = {}
+
+    def add_many(
+        self, issues: list[DetectionTrainingEnvironmentIssue]
+    ) -> list[DetectionTrainingEnvironmentIssue]:
+        for issue in issues:
+            self._by_id[issue.id] = issue
+        return issues
+
+    def list_by_environment_spec_id(self, environment_spec_id: UUID) -> list[DetectionTrainingEnvironmentIssue]:
+        return sorted(
+            [issue for issue in self._by_id.values() if issue.environment_spec_id == environment_spec_id],
+            key=lambda issue: (issue.severity.value, issue.code, issue.created_at, issue.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, DetectionTrainingEnvironmentIssue]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, DetectionTrainingEnvironmentIssue]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class FailingAddDetectionTrainingEnvironmentIssueRepository(DetectionTrainingEnvironmentIssueRepositoryPort):
+    """Delegates reads but always fails when adding new issues."""
+
+    def __init__(self, delegate: DetectionTrainingEnvironmentIssueRepositoryPort) -> None:
+        self._delegate = delegate
+
+    def add_many(
+        self, issues: list[DetectionTrainingEnvironmentIssue]
+    ) -> list[DetectionTrainingEnvironmentIssue]:
+        raise RuntimeError("simulated detection training environment issue insert failure")
+
+    def list_by_environment_spec_id(self, environment_spec_id: UUID) -> list[DetectionTrainingEnvironmentIssue]:
+        return self._delegate.list_by_environment_spec_id(environment_spec_id)
+
+    def snapshot_state(self):
+        return self._delegate.snapshot_state()
+
+    def restore_state(self, state) -> None:
+        self._delegate.restore_state(state)
+
+
 class InMemoryTrainingRunRepository(TrainingRunRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, TrainingRun] = {}
@@ -1179,6 +1273,12 @@ class FakeUnitOfWork(UnitOfWorkPort):
         detection_training_readiness_issue_repository: Optional[
             "DetectionTrainingReadinessIssueRepositoryPort"
         ] = None,
+        detection_training_environment_spec_repository: Optional[
+            "DetectionTrainingEnvironmentSpecRepositoryPort"
+        ] = None,
+        detection_training_environment_issue_repository: Optional[
+            "DetectionTrainingEnvironmentIssueRepositoryPort"
+        ] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
@@ -1210,6 +1310,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.detection_training_issue_repository = detection_training_issue_repository
         self.detection_training_readiness_report_repository = detection_training_readiness_report_repository
         self.detection_training_readiness_issue_repository = detection_training_readiness_issue_repository
+        self.detection_training_environment_spec_repository = detection_training_environment_spec_repository
+        self.detection_training_environment_issue_repository = detection_training_environment_issue_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
@@ -1236,6 +1338,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._detection_training_issue_snapshot = None
         self._detection_training_readiness_report_snapshot = None
         self._detection_training_readiness_issue_snapshot = None
+        self._detection_training_environment_spec_snapshot = None
+        self._detection_training_environment_issue_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
@@ -1301,6 +1405,14 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._detection_training_readiness_issue_snapshot = (
                 self.detection_training_readiness_issue_repository.snapshot_state()
             )
+        if hasattr(self.detection_training_environment_spec_repository, "snapshot_state"):
+            self._detection_training_environment_spec_snapshot = (
+                self.detection_training_environment_spec_repository.snapshot_state()
+            )
+        if hasattr(self.detection_training_environment_issue_repository, "snapshot_state"):
+            self._detection_training_environment_issue_snapshot = (
+                self.detection_training_environment_issue_repository.snapshot_state()
+            )
         return self
 
     def __exit__(
@@ -1362,6 +1474,14 @@ class FakeUnitOfWork(UnitOfWorkPort):
         if exc_type is not None and self._detection_training_readiness_issue_snapshot is not None:
             self.detection_training_readiness_issue_repository.restore_state(
                 self._detection_training_readiness_issue_snapshot
+            )
+        if exc_type is not None and self._detection_training_environment_spec_snapshot is not None:
+            self.detection_training_environment_spec_repository.restore_state(
+                self._detection_training_environment_spec_snapshot
+            )
+        if exc_type is not None and self._detection_training_environment_issue_snapshot is not None:
+            self.detection_training_environment_issue_repository.restore_state(
+                self._detection_training_environment_issue_snapshot
             )
         return None
 

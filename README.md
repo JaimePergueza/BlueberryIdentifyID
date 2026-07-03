@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 25)
+## MVP status (as of Fase 26)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -44,7 +44,14 @@ persisted `DetectionTrainingReadinessReport`/`DetectionTrainingReadinessIssue`
 layer that evaluates whether a dry-run `DetectionTrainingRun` is technically
 ready for a future real training phase (bundle/quality-gate/minimum-data/
 environment/contract checks) — still without training anything, installing
-`ultralytics`, importing `torch`, or requiring a GPU. The CI workflow runs
+`ultralytics`, importing `torch`, or requiring a GPU. Fase 26 adds a
+persisted `DetectionTrainingEnvironmentSpec`/`DetectionTrainingEnvironmentIssue`
+layer that specifies/validates the environment a future real training
+attempt would need (Python/OS, ultralytics/torch/GPU/CUDA policy, base
+weights policy, artifact storage policy, CI vs. local execution policy)
+using only safe checks (`sys.version_info`, `platform.system()`,
+`importlib.util.find_spec`, `pathlib`) — never installing dependencies,
+importing `ultralytics`/`torch`, or running training in CI. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
@@ -392,6 +399,17 @@ Detection training readiness report endpoints (Fase 25 - technical readiness onl
 - `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-readiness-reports`
 - `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-readiness-reports`
 - `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/detection-training-readiness-reports`
+
+Detection training environment spec endpoints (Fase 26 - environment specification/validation only, no training):
+
+- `POST /api/v1/ml/detection-training-environment-specs`
+- `GET /api/v1/ml/detection-training-environment-specs`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}/issues`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/environment-specs`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/environment-specs`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-environment-specs`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-environment-specs`
 
 Async processing endpoints:
 

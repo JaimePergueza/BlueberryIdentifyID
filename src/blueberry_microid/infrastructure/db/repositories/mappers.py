@@ -14,6 +14,8 @@ from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
+from blueberry_microid.domain.entities.detection_training_environment_issue import DetectionTrainingEnvironmentIssue
+from blueberry_microid.domain.entities.detection_training_environment_spec import DetectionTrainingEnvironmentSpec
 from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
 from blueberry_microid.domain.entities.detection_training_readiness_issue import DetectionTrainingReadinessIssue
 from blueberry_microid.domain.entities.detection_training_readiness_report import DetectionTrainingReadinessReport
@@ -50,6 +52,13 @@ from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonP
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
+from blueberry_microid.domain.enums.detection_training_environment_decision import (
+    DetectionTrainingEnvironmentDecision,
+)
+from blueberry_microid.domain.enums.detection_training_environment_issue_severity import (
+    DetectionTrainingEnvironmentIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_environment_status import DetectionTrainingEnvironmentStatus
 from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
 from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
 from blueberry_microid.domain.enums.detection_training_readiness_decision import DetectionTrainingReadinessDecision
@@ -82,6 +91,12 @@ from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemM
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
+from blueberry_microid.infrastructure.db.models.detection_training_environment_issue import (
+    DetectionTrainingEnvironmentIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_environment_spec import (
+    DetectionTrainingEnvironmentSpecModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
 from blueberry_microid.infrastructure.db.models.detection_training_readiness_issue import (
     DetectionTrainingReadinessIssueModel,
@@ -771,6 +786,53 @@ def detection_training_readiness_issue_to_entity(
     return DetectionTrainingReadinessIssue(
         readiness_report_id=model.readiness_report_id,
         severity=DetectionTrainingReadinessIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
+        details=model.details,
+        created_at=model.created_at,
+    )
+
+
+def detection_training_environment_spec_to_entity(
+    model: DetectionTrainingEnvironmentSpecModel,
+) -> DetectionTrainingEnvironmentSpec:
+    return DetectionTrainingEnvironmentSpec(
+        detection_training_run_id=model.detection_training_run_id,
+        readiness_report_id=model.readiness_report_id,
+        annotation_bundle_run_id=model.annotation_bundle_run_id,
+        dataset_release_id=model.dataset_release_id,
+        decision=DetectionTrainingEnvironmentDecision(model.decision),
+        status=DetectionTrainingEnvironmentStatus(model.status),
+        is_environment_ready=model.is_environment_ready,
+        config=model.config,
+        detected_environment=model.detected_environment,
+        dependency_policy=model.dependency_policy,
+        hardware_policy=model.hardware_policy,
+        artifact_policy=model.artifact_policy,
+        execution_policy=model.execution_policy,
+        setup_instructions=model.setup_instructions,
+        safe_check_summary=model.safe_check_summary,
+        risk_summary=model.risk_summary,
+        recommendation_summary=model.recommendation_summary,
+        error_count=model.error_count,
+        warning_count=model.warning_count,
+        info_count=model.info_count,
+        id=model.id,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def detection_training_environment_issue_to_entity(
+    model: DetectionTrainingEnvironmentIssueModel,
+) -> DetectionTrainingEnvironmentIssue:
+    return DetectionTrainingEnvironmentIssue(
+        environment_spec_id=model.environment_spec_id,
+        severity=DetectionTrainingEnvironmentIssueSeverity(model.severity),
         code=model.code,
         message=model.message,
         id=model.id,

@@ -13,6 +13,12 @@ from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemM
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
+from blueberry_microid.infrastructure.db.models.detection_training_environment_issue import (
+    DetectionTrainingEnvironmentIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_environment_spec import (
+    DetectionTrainingEnvironmentSpecModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
 from blueberry_microid.infrastructure.db.models.detection_training_readiness_issue import (
     DetectionTrainingReadinessIssueModel,
@@ -54,6 +60,8 @@ __all__ = [
     "DatasetReleaseModel",
     "DatasetSnapshotModel",
     "DatasetSplitItemModel",
+    "DetectionTrainingEnvironmentIssueModel",
+    "DetectionTrainingEnvironmentSpecModel",
     "DetectionTrainingIssueModel",
     "DetectionTrainingReadinessIssueModel",
     "DetectionTrainingReadinessReportModel",

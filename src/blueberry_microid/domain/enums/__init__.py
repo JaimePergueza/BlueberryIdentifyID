@@ -9,6 +9,13 @@ from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
+from blueberry_microid.domain.enums.detection_training_environment_decision import (
+    DetectionTrainingEnvironmentDecision,
+)
+from blueberry_microid.domain.enums.detection_training_environment_issue_severity import (
+    DetectionTrainingEnvironmentIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_environment_status import DetectionTrainingEnvironmentStatus
 from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
 from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
 from blueberry_microid.domain.enums.detection_training_readiness_decision import DetectionTrainingReadinessDecision
@@ -40,6 +47,9 @@ __all__ = [
     "ComparisonPrimaryMetric",
     "ComparisonSelectionPolicy",
     "DetectionTrainingAlgorithm",
+    "DetectionTrainingEnvironmentDecision",
+    "DetectionTrainingEnvironmentIssueSeverity",
+    "DetectionTrainingEnvironmentStatus",
     "DetectionTrainingIssueSeverity",
     "DetectionTrainingMode",
     "DetectionTrainingReadinessDecision",

@@ -1677,3 +1677,116 @@ pesos, no agrega frontend/autenticacion/taxonomia/diagnostico, no integra
 MLflow/TensorBoard/W&B, no usa Celery y no reemplaza `MockInferenceEngine`.
 Un reporte `ready_for_training` no certifica validez cientifica ni modelo
 entrenado — solo que los gates tecnicos configurados pasaron.
+
+## 42. Fase 26 - Training Environment Specification
+
+Objetivo: definir, validar y persistir una especificacion del entorno
+requerido para un futuro entrenamiento real de deteccion, dado un
+`DetectionTrainingRun` ya con `DetectionTrainingReadinessReport` (Fase 25) —
+sin instalar dependencias, sin importar `ultralytics`/`torch`, sin entrenar.
+
+**Entidades.** `DetectionTrainingEnvironmentSpec` referencia
+`DetectionTrainingRun`, `DetectionTrainingReadinessReport`,
+`AnnotationBundleRun` y `DatasetRelease`; guarda `decision`
+(`DetectionTrainingEnvironmentDecision`: `environment_ready`,
+`needs_manual_setup`, `blocked_by_missing_requirements`,
+`blocked_by_policy`, `blocked_by_unsupported_platform`,
+`blocked_by_storage_policy`, `blocked_by_dependency_policy`), `status`
+(`DetectionTrainingEnvironmentStatus`: `ready`/`warning`/`blocked`/`failed`),
+`is_environment_ready`, y siete resumenes/politicas JSON
+(`detected_environment`, `dependency_policy`, `hardware_policy`,
+`artifact_policy`, `execution_policy`, `setup_instructions`,
+`safe_check_summary`, mas `risk_summary`/`recommendation_summary`). Igual
+que en Fase 25, el invariante de la entidad permite `status=warning` con
+`is_environment_ready=true`. `DetectionTrainingEnvironmentIssue` guarda
+hallazgos `error`/`warning`/`info` con codigos fijos (24 sugeridos:
+`python_version_not_specified`, `python_version_mismatch`,
+`os_not_specified`, `unsupported_os`, `ultralytics_version_not_specified`,
+`torch_version_not_specified`, `dependency_installation_not_allowed`,
+`ultralytics_not_installed`, `torch_not_installed`, `gpu_not_available`,
+`cuda_not_available`, `cuda_policy_not_specified`, `weights_policy_missing`,
+`external_weights_not_allowed`, `external_weights_policy_declared`,
+`artifact_storage_policy_missing`, `output_dir_not_specified`,
+`output_dir_not_writable`, `artifacts_inside_repo_policy_risk`,
+`ci_training_not_allowed`, `manual_training_required`,
+`no_training_executed`, `environment_check_safe_only`,
+`taxonomy_not_allowed`). Ninguna de las dos guarda binarios, pesos,
+imagenes ni labels completos.
+
+**Config.** `DetectionTrainingEnvironmentConfig`
+(`ml/configs/detection_training_environment_config.py`) trae 22 campos:
+`target_python_version`/`target_os` opcionales, `allow_cpu_training=true`,
+`require_gpu`/`require_cuda=false`, `target_cuda_version` opcional,
+`require_ultralytics`/`require_torch=false` con sus `target_*_version`
+opcionales, `allow_dependency_installation=false`,
+`allow_external_weights=false`, `pretrained_weights_policy="none"`,
+`pretrained_weights_path` opcional, `artifact_output_dir` opcional,
+`allow_artifacts_outside_repo=true`/`allow_artifacts_inside_repo=false`,
+`max_expected_artifact_size_mb` opcional (`>=0`), `allow_ci_training=false`,
+`allow_local_training=true`, `require_manual_confirmation=true`,
+`strict_mode=false`, `notes` opcional. Ningun `require_*` en `true`
+provoca instalacion, importacion o descarga real — solo cambia que issues
+reporta el evaluador.
+
+**Evaluador.** `DetectionTrainingEnvironmentEvaluator`
+(`application/services/detection_training_environment_evaluator.py`) solo
+usa chequeos seguros: `sys.version_info` (Python), `platform.system()` (SO),
+`importlib.util.find_spec(...)` para detectar `ultralytics`/`torch`
+**sin importarlos**, `pathlib` para existencia/ubicacion de
+`artifact_output_dir` **sin escribir archivos por defecto**, y
+`os.environ` solo para variables de CI (`CI`, `GITHUB_ACTIONS`) de forma
+informativa. Nunca llama `subprocess`, nunca consulta GPU/CUDA real, nunca
+instala ni descarga nada, nunca modifica archivos del proyecto.
+`require_gpu=true`/`require_cuda=true` siempre bloquean
+(`blocked_by_missing_requirements`) porque no existe forma segura de
+confirmarlos sin comandos externos. Si el `DetectionTrainingReadinessReport`
+referenciado esta `blocked`/`failed`, o su `decision` no es
+`ready_for_training`, el spec queda bloqueado (`readiness_not_ready`) antes
+de evaluar nada mas. `allow_ci_training=true` es siempre un error
+bloqueante (`blocked_by_policy`); detectar que la propia evaluacion corre
+dentro de un job de CI genera solo un **warning** informativo con el mismo
+codigo — nunca bloquea por si solo, para no romper la propia suite de tests
+del proyecto cuando corre en GitHub Actions.
+
+**Caso de uso.** `CreateDetectionTrainingEnvironmentSpecUseCase` busca el
+`DetectionTrainingRun` y el `DetectionTrainingReadinessReport` (404 si
+faltan), verifica que el segundo pertenezca al primero (si no,
+`DetectionTrainingEnvironmentNotAllowedError` -> 409), busca el
+`AnnotationBundleRun` asociado, ejecuta el evaluador y persiste
+`DetectionTrainingEnvironmentSpec` + `DetectionTrainingEnvironmentIssue`s en
+una unica transaccion via `UnitOfWorkPort`. Nunca modifica
+`DetectionTrainingRun`, `DetectionTrainingReadinessReport` ni
+`AnnotationBundleRun`. Un fallo interno de evaluacion se convierte en un
+spec `status=failed` persistido (mismo patron que fases 24-25), nunca en una
+excepcion sin persistir.
+
+**Persistencia.** Alembic `0019_detection_training_environment_specs.py`
+crea `detection_training_environment_specs` y
+`detection_training_environment_issues`, con FKs a `detection_training_runs`,
+`detection_training_readiness_reports`, `annotation_bundle_runs` y
+`dataset_releases`; CHECKs de `decision`/`status`/`severity`; indices de
+consulta con prefijos abreviados `ix_dte_specs_*`/`ix_dte_issues_*` (para
+mantenerse bajo el limite de 63 caracteres de PostgreSQL, la misma lección
+de la Fase 25); y JSONB para config y las siete politicas/resumenes.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/detection-training-environment-specs` | Genera una especificacion de entorno |
+| GET | `/api/v1/ml/detection-training-environment-specs` | Lista specs |
+| GET | `/api/v1/ml/detection-training-environment-specs/{id}` | Detalle del spec |
+| GET | `/api/v1/ml/detection-training-environment-specs/{id}/issues` | Issues del spec |
+| GET | `/api/v1/ml/detection-training-runs/{id}/environment-specs` | Specs por run |
+| GET | `/api/v1/ml/detection-training-readiness-reports/{id}/environment-specs` | Specs por readiness report |
+| GET | `/api/v1/ml/annotation-bundles/{id}/detection-training-environment-specs` | Specs por bundle |
+| GET | `/api/v1/datasets/releases/{id}/detection-training-environment-specs` | Specs por release |
+
+Fase 26 no entrena YOLO ni ningun modelo, no instala `ultralytics`, no
+importa `torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no
+descarga pesos ni datasets externos, no ejecuta entrenamiento en CI, no
+requiere GPU obligatoria, no crea archivos de pesos, no agrega
+frontend/autenticacion/taxonomia/diagnostico, no integra
+MLflow/TensorBoard/W&B y no reemplaza `MockInferenceEngine`. Un spec
+`environment_ready` no certifica que exista un entorno de entrenamiento
+real provisionado — solo que los gates tecnicos configurados pasaron.

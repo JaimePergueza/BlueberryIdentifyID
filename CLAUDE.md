@@ -461,3 +461,61 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   PyTorch, TensorFlow, CNN, ViT, deep learning real, descargar pesos o
   datasets externos, frontend, autenticacion, taxonomia, diagnostico,
   MLflow/TensorBoard/W&B, GPU obligatoria y reemplazar `MockInferenceEngine`.
+
+## 23. Training Environment Specification (Fase 26)
+
+- `DetectionTrainingEnvironmentSpec` especifica/evalua el entorno donde
+  correria un futuro entrenamiento real para un `DetectionTrainingRun` ya
+  con `DetectionTrainingReadinessReport` (Fase 25); `is_environment_ready=true`
+  nunca significa que se aprovisiono un entorno real, que se instalo
+  `ultralytics`/`torch`, ni que se ejecuto entrenamiento.
+  `DetectionTrainingEnvironmentIssue` guarda hallazgos `error`/`warning`/`info`
+  con codigos fijos (`python_version_mismatch`, `ultralytics_not_installed`,
+  `gpu_not_available`, `external_weights_not_allowed`,
+  `ci_training_not_allowed`, `output_dir_not_specified`,
+  `no_training_executed`, `environment_check_safe_only`, etc.); ninguna de
+  las dos entidades guarda binarios, pesos, imagenes ni labels completos.
+- `DetectionTrainingEnvironmentDecision` tiene exactamente siete valores
+  (`environment_ready`, `needs_manual_setup`,
+  `blocked_by_missing_requirements`, `blocked_by_policy`,
+  `blocked_by_unsupported_platform`, `blocked_by_storage_policy`,
+  `blocked_by_dependency_policy`); `DetectionTrainingEnvironmentStatus` tiene
+  `ready`/`warning`/`blocked`/`failed`. Igual que en Fase 25, un spec puede
+  quedar `status=warning` con `is_environment_ready=true`.
+- `DetectionTrainingEnvironmentEvaluator` (`application/services/`) solo usa
+  chequeos seguros y no invasivos: `sys.version_info` para Python,
+  `platform.system()` para SO, `importlib.util.find_spec(...)` para
+  detectar disponibilidad de `ultralytics`/`torch` **sin importarlos**,
+  `pathlib` para existencia/ubicacion de `artifact_output_dir` **sin
+  escribir archivos por defecto**, y `os.environ` solo para detectar
+  variables de CI (`CI`, `GITHUB_ACTIONS`) de forma informativa. Nunca llama
+  `subprocess`, nunca consulta GPU/CUDA real, nunca instala ni descarga
+  nada. `require_gpu=true`/`require_cuda=true` siempre bloquean
+  (`blocked_by_missing_requirements`) porque no existe forma segura de
+  confirmarlos sin comandos externos — nunca lo intenta.
+- **`allow_ci_training=true` es siempre un error bloqueante**
+  (`ci_training_not_allowed`, `blocked_by_policy`) porque CI nunca debe
+  entrenar. Detectar que la evaluacion misma corre dentro de un entorno CI
+  (`CI`/`GITHUB_ACTIONS` presentes) solo genera un **warning** informativo
+  con el mismo codigo — nunca bloquea por si solo — porque ejecutar esta
+  evaluacion desde un job de CI (como este propio pipeline de tests) no
+  implica que un futuro entrenamiento real vaya a correr ahi.
+- `CreateDetectionTrainingEnvironmentSpecUseCase` exige que el
+  `DetectionTrainingReadinessReport` referenciado pertenezca al
+  `DetectionTrainingRun` referenciado; si no,
+  `DetectionTrainingEnvironmentNotAllowedError` (409). Nunca modifica
+  `DetectionTrainingRun`, `DetectionTrainingReadinessReport` ni
+  `AnnotationBundleRun`. Persiste spec + issues en una unica transaccion via
+  `UnitOfWorkPort`; un fallo interno de evaluacion se convierte en un spec
+  `status=failed` persistido, nunca en una excepcion sin persistir.
+- Endpoints bajo `/api/v1/ml/detection-training-environment-specs`,
+  `/api/v1/ml/detection-training-runs/{id}/environment-specs`,
+  `/api/v1/ml/detection-training-readiness-reports/{id}/environment-specs`,
+  `/api/v1/ml/annotation-bundles/{id}/detection-training-environment-specs`
+  y `/api/v1/datasets/releases/{id}/detection-training-environment-specs`,
+  con `X-Request-ID`.
+- Sigue prohibido entrenar YOLO, instalar `ultralytics`, importar `torch`,
+  PyTorch, TensorFlow, CNN, ViT, deep learning real, descargar pesos o
+  datasets externos, ejecutar entrenamiento en CI, requerir GPU obligatoria,
+  crear pesos `.pt`/`.onnx`/`.h5`, frontend, autenticacion, taxonomia,
+  diagnostico, MLflow/TensorBoard/W&B y reemplazar `MockInferenceEngine`.

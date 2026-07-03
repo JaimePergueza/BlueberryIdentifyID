@@ -1670,3 +1670,90 @@ MLflow/TensorBoard/W&B, does not use Celery, and does not replace
 `MockInferenceEngine`. A `ready_for_training` report never certifies
 scientific validity or a trained model — only that the configured technical
 gates passed.
+
+## 35. Training environment specification (Fase 26)
+
+Fase 26 defines, validates, and persists a specification of the environment
+a future real detection-training attempt would need, given a
+`DetectionTrainingRun` that already has a `DetectionTrainingReadinessReport`
+(Fase 25). It never installs dependencies, never imports
+`ultralytics`/`torch`, and never trains anything.
+
+- `DetectionTrainingEnvironmentConfig`
+  (`ml/configs/detection_training_environment_config.py`) has 22 fields:
+  optional `target_python_version`/`target_os`, `allow_cpu_training=true`,
+  `require_gpu`/`require_cuda=false` with an optional
+  `target_cuda_version`, `require_ultralytics`/`require_torch=false` with
+  optional target versions, `allow_dependency_installation=false`,
+  a weights policy triplet (`allow_external_weights=false`,
+  `pretrained_weights_policy="none"`, `pretrained_weights_path`), an
+  artifact-storage policy (`artifact_output_dir`,
+  `allow_artifacts_outside_repo=true`/`allow_artifacts_inside_repo=false`,
+  `max_expected_artifact_size_mb`), an execution policy
+  (`allow_ci_training=false`, `allow_local_training=true`,
+  `require_manual_confirmation=true`), and `strict_mode`/`notes`. No
+  `require_*` flag ever triggers a real install, import, or download — it
+  only changes which issues the evaluator reports.
+- `DetectionTrainingEnvironmentSpec` persists `decision` (one of
+  `environment_ready`, `needs_manual_setup`,
+  `blocked_by_missing_requirements`, `blocked_by_policy`,
+  `blocked_by_unsupported_platform`, `blocked_by_storage_policy`,
+  `blocked_by_dependency_policy`), `status`
+  (`ready`/`warning`/`blocked`/`failed`), `is_environment_ready`, and seven
+  JSON policy/summary fields (`detected_environment`, `dependency_policy`,
+  `hardware_policy`, `artifact_policy`, `execution_policy`,
+  `setup_instructions`, `safe_check_summary`, plus
+  `risk_summary`/`recommendation_summary`). Like Fase 25, a spec can be
+  `status=warning` with `is_environment_ready=true`.
+  `DetectionTrainingEnvironmentIssue` stores severity-tagged findings with
+  fixed codes; neither entity stores images, weights, or full label sets.
+- `DetectionTrainingEnvironmentEvaluator` (`application/services/`) only
+  uses safe, non-invasive checks: `sys.version_info`, `platform.system()`,
+  `importlib.util.find_spec(...)` to detect `ultralytics`/`torch`
+  availability **without importing them**, `pathlib` for
+  `artifact_output_dir` existence/location **without writing files by
+  default**, and `os.environ` only to detect CI variables (`CI`,
+  `GITHUB_ACTIONS`) informationally. It never calls `subprocess`, never
+  queries real GPU/CUDA, never installs or downloads anything, and never
+  modifies project files. `require_gpu=true`/`require_cuda=true` always
+  block (`blocked_by_missing_requirements`) — there is no safe way to
+  confirm those without external commands. If the referenced
+  `DetectionTrainingReadinessReport` is `blocked`/`failed`, or its
+  `decision` isn't `ready_for_training`, the spec is blocked
+  (`readiness_not_ready`) before anything else is evaluated.
+  `allow_ci_training=true` is always a blocking error
+  (`blocked_by_policy`); detecting that the evaluation itself is running
+  inside a CI job only produces a non-blocking **warning** with the same
+  code — this keeps the project's own GitHub Actions test run from
+  breaking, since running this evaluation from a CI job does not by itself
+  mean a future real training step would run there.
+- `CreateDetectionTrainingEnvironmentSpecUseCase` looks up the
+  `DetectionTrainingRun` and `DetectionTrainingReadinessReport` (404 if
+  missing), verifies the readiness report belongs to the run (otherwise
+  409 `detection_training_environment_not_allowed`), looks up the
+  associated `AnnotationBundleRun`, runs the evaluator, and persists the
+  spec plus issues in one `UnitOfWorkPort` transaction. It never modifies
+  `DetectionTrainingRun`, `DetectionTrainingReadinessReport`, or
+  `AnnotationBundleRun`. An internal evaluation failure becomes a
+  persisted `status=failed` spec, never an unpersisted exception.
+
+Endpoints:
+
+- `POST /api/v1/ml/detection-training-environment-specs`
+- `GET /api/v1/ml/detection-training-environment-specs`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}/issues`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/environment-specs`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/environment-specs`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-environment-specs`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-environment-specs`
+
+This phase does not train YOLO or any model, does not install
+`ultralytics`, does not import `torch`, does not use
+PyTorch/TensorFlow/CNN/ViT/real deep learning, does not download external
+weights or datasets, does not run training in CI, does not require a GPU,
+does not create weight files, does not add a
+frontend/authentication/taxonomy/diagnosis claim, does not integrate
+MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`. An
+`environment_ready` spec never certifies that a real training environment
+was provisioned — only that the configured technical gates passed.
