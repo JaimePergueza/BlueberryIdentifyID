@@ -1347,3 +1347,40 @@ replacement for `MockInferenceEngine` based only on this landscape review.
 Recommended next direction from the review: a constrained classical Petri
 colony segmentation prototype, because it can use current Petri imagery and
 does not require bounding-box annotations or deep-learning infrastructure.
+
+## 28. Classical Petri segmentation prototype (Fase 19)
+
+Fase 19 adds the persisted classical Petri segmentation layer:
+
+- `PetriSegmentationConfig` controls a single allowed algorithm,
+  `classical_threshold`, with `otsu`, `adaptive`, or `manual` thresholding,
+  optional blur/morphology, area/circularity/border filters, `max_regions`,
+  and version `petri_classical_v1`.
+- `ClassicalPetriSegmenter` consumes a `TrainingManifest`, reads only
+  `petri_image_path`, and ignores `micro_image_path`.
+- `PetriSegmentationRun` stores release/audit reference, status
+  (`completed`, `partial`, `failed`), config, counts, and summary.
+- `PetriSegmentationRegion` stores one geometric candidate region: area,
+  perimeter, centroid, bounding box, circularity, solidity, mean intensity,
+  split, and references to `DatasetItem`/`DatasetSplitItem`.
+
+Dependency note: this phase adds `opencv-python-headless>=4.9,<4.11`.
+OpenCV 4.13 was avoided because it requires `numpy>=2`, while this project
+intentionally keeps `numpy<2.0`. OpenCV is used only for classical processing
+(grayscale/color conversion, blur, thresholding, morphology, contours,
+bounding boxes, geometry). Do not use OpenCV DNN, YOLO, pretrained models,
+PyTorch, TensorFlow, CNN, ViT, or deep learning here.
+
+Endpoints:
+
+- `POST /api/v1/ml/petri-segmentations`
+- `GET /api/v1/ml/petri-segmentations`
+- `GET /api/v1/ml/petri-segmentations/{segmentation_run_id}`
+- `GET /api/v1/ml/petri-segmentations/{segmentation_run_id}/regions`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/petri-segmentations`
+- `GET /api/v1/ml/image-audits/{image_audit_run_id}/petri-segmentations`
+
+A "candidate region" is only a geometric segment from a classical image
+pipeline. It is not a confirmed colony, not a microbiological diagnosis, not
+taxonomy, and not model performance. The original images are never modified;
+masks and image bytes are not stored in the database.

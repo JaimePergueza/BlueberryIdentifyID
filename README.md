@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 18)
+## MVP status (as of Fase 19)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -27,7 +27,7 @@ splits under three leakage-prevention strategies (`by_sample`, `by_lot`,
 `ml/`, a persisted technical image-file audit for a release's Petri/micro
 images, and a persisted non-deep feature-extraction layer over those same
 audited images — all behind a versioned FastAPI, backed by SQLAlchemy models
-and Alembic migrations. 461 automated tests (402 SQLite/eager-based + 59
+and Alembic migrations. 491 automated tests (427 SQLite/eager-based + 64
 PostgreSQL-only); Fase 17 also adds persisted comparison reports over completed
 baseline `TrainingRun` metrics. The CI workflow runs the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
@@ -113,6 +113,15 @@ DIBaS, Petri colony detection work, clinical bacterial datasets, and unresolved
 CSI-Microbes/SinfNet leads. It is a technical adoption map only: no external
 code, dataset, model, dependency, endpoint, migration, frontend, taxonomy,
 PyTorch, TensorFlow, YOLO, CNN, ViT, or deep learning was integrated.
+
+**Classical Petri segmentation prototype (Fase 19):**
+`PetriSegmentationRun` and `PetriSegmentationRegion` persist
+OpenCV-headless classical threshold/morphology/contour results for Petri
+images only. `ClassicalPetriSegmenter` reports geometric candidate regions
+(area, perimeter, centroid, bounding box, circularity, solidity, mean
+intensity) and never processes micro images, trains, uses OpenCV DNN/YOLO, or
+confirms real colonies, taxonomy, genus/species, diagnosis, or model
+performance.
 
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original
@@ -212,6 +221,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Majority-class baseline:** `POST /api/v1/ml/training-runs/baseline` runs the label-only comparison baseline. It requires a matching non-failed preflight, revalidates the release manifest, uses train labels only to select the majority class, persists one prediction per split item, and reports real baseline metrics from those predictions. It does not read image bytes, train neural networks, use PyTorch, or alter the mock inference engine.
 - **Classical tabular baseline:** `POST /api/v1/ml/training-runs/classical-baseline` requires a matching non-failed preflight and a completed `ImageFeatureExtractionRun` for the same `DatasetRelease`, builds a tabular matrix from `ImageFeatureVector`, fits logistic regression on train only, predicts train/validation/test, and persists real metrics plus predictions. It uses scikit-learn for classical tabular ML only; no PyTorch/TensorFlow/deep learning, raw image tensors, model serialization, external datasets, or taxonomy.
 - **Training run comparisons:** `POST /api/v1/ml/training-run-comparisons` compares completed baseline runs for one `DatasetRelease` using persisted accuracy/support metrics only. Selection is preliminary and traceable; no training, model artifact, new prediction, raw image access, PyTorch/TensorFlow/deep learning, external dataset, or taxonomy is involved.
+- **Classical Petri segmentation:** `POST /api/v1/ml/petri-segmentations` runs an OpenCV-headless classical candidate-region segmentation over Petri images in a `DatasetRelease`. It stores only geometry for candidate regions; no masks, image bytes, YOLO, OpenCV DNN, deep learning, taxonomy, diagnosis, or real-colony confirmation.
 - **Technical image dataset audit:** `POST /api/v1/ml/image-audits` opens each Petri/micro image file referenced by a `DatasetRelease` with Pillow (existence, corruption, format, dimensions, color mode, declared-vs-real file size) and persists the result. It is a technical file check, not the Fase 12 manifest preflight and not a scientific/microbiological evaluation; it never creates tensors or uses PyTorch/TensorFlow.
 - **Non-deep image feature extraction:** `POST /api/v1/ml/image-feature-extractions` requires a non-failed `ImageDatasetAuditRun` for the same `DatasetRelease`, then computes geometry/intensity/color/sharpness/texture/histogram features per Petri/micro image with Pillow + numpy and persists one `ImageFeatureVector` per image. It never trains a model, never uses PyTorch/TensorFlow, and never assigns taxonomy.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
@@ -291,6 +301,15 @@ Image feature extraction endpoints (Fase 15 — non-deep technical features, no 
 - `GET /api/v1/ml/image-feature-extractions/{feature_extraction_run_id}/vectors` lists feature vectors; optional `modality=petri|micro` and `split=train|validation|test` filters.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/image-feature-extractions` lists extraction runs for that release.
 - `GET /api/v1/ml/image-audits/{image_audit_run_id}/feature-extractions` lists extraction runs for that audit.
+
+Petri segmentation endpoints (Fase 19 - classical candidate regions, no deep learning):
+
+- `POST /api/v1/ml/petri-segmentations` runs classical Petri segmentation for a DatasetRelease.
+- `GET /api/v1/ml/petri-segmentations` lists segmentation runs; optional `dataset_release_id` or `image_audit_run_id`.
+- `GET /api/v1/ml/petri-segmentations/{segmentation_run_id}` returns one run with regions.
+- `GET /api/v1/ml/petri-segmentations/{segmentation_run_id}/regions` lists candidate regions; optional `split=train|validation|test`.
+- `GET /api/v1/datasets/releases/{dataset_release_id}/petri-segmentations` lists runs for a release.
+- `GET /api/v1/ml/image-audits/{image_audit_run_id}/petri-segmentations` lists runs for an image audit.
 
 Async processing endpoints:
 

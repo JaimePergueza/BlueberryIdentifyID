@@ -47,6 +47,8 @@ from blueberry_microid.application.exceptions import (
     ModelVersionNotFoundError,
     NotFoundError,
     PetriImageNotFoundError,
+    PetriSegmentationNotAllowedError,
+    PetriSegmentationRunNotFoundError,
     PredictionNotFoundError,
     SampleNotFoundError,
     TrainingPreflightRunNotFoundError,
@@ -98,6 +100,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "image_dataset_audit_run_not_found"
     if isinstance(exc, ImageFeatureExtractionRunNotFoundError):
         return 404, "image_feature_extraction_run_not_found"
+    if isinstance(exc, PetriSegmentationRunNotFoundError):
+        return 404, "petri_segmentation_run_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -125,6 +129,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "training_run_comparison_not_allowed"
     if isinstance(exc, ImageFeatureExtractionNotAllowedError):
         return 409, "image_feature_extraction_not_allowed"
+    if isinstance(exc, PetriSegmentationNotAllowedError):
+        return 409, "petri_segmentation_not_allowed"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
     if isinstance(exc, ConflictError):

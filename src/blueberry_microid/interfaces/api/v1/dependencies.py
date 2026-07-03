@@ -39,6 +39,10 @@ from blueberry_microid.application.ports.inference_engine import InferenceEngine
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.petri_segmentation_region_repository import (
+    PetriSegmentationRegionRepositoryPort,
+)
+from blueberry_microid.application.ports.petri_segmentation_run_repository import PetriSegmentationRunRepositoryPort
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
@@ -130,6 +134,18 @@ from blueberry_microid.application.use_cases.micro_image.register_micro_image im
 from blueberry_microid.application.use_cases.model_version.create_model_version import CreateModelVersionUseCase
 from blueberry_microid.application.use_cases.model_version.list_model_versions import ListModelVersionsUseCase
 from blueberry_microid.application.use_cases.petri_image.register_petri_image import RegisterPetriImageUseCase
+from blueberry_microid.application.use_cases.petri_segmentation.create_petri_segmentation_run import (
+    CreatePetriSegmentationRunUseCase,
+)
+from blueberry_microid.application.use_cases.petri_segmentation.get_petri_segmentation_run import (
+    GetPetriSegmentationRunUseCase,
+)
+from blueberry_microid.application.use_cases.petri_segmentation.list_petri_segmentation_regions import (
+    ListPetriSegmentationRegionsUseCase,
+)
+from blueberry_microid.application.use_cases.petri_segmentation.list_petri_segmentation_runs import (
+    ListPetriSegmentationRunsUseCase,
+)
 from blueberry_microid.application.use_cases.review.get_final_human_review import GetFinalHumanReviewUseCase
 from blueberry_microid.application.use_cases.review.list_human_reviews import ListHumanReviewsUseCase
 from blueberry_microid.application.use_cases.review.submit_human_review import SubmitHumanReviewUseCase
@@ -178,6 +194,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_model_version_r
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_image_repository import (
     SqlAlchemyPetriImageRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_segmentation_region_repository import (
+    SqlAlchemyPetriSegmentationRegionRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_segmentation_run_repository import (
+    SqlAlchemyPetriSegmentationRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_prediction_repository import (
     SqlAlchemyPredictionRepository,
 )
@@ -206,6 +228,7 @@ from blueberry_microid.infrastructure.storage.pillow_image_validator import Pill
 from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
+from blueberry_microid.ml.preprocessing.classical_petri_segmenter import ClassicalPetriSegmenter
 from blueberry_microid.ml.preprocessing.image_feature_extractor import ImageFeatureExtractor
 from blueberry_microid.ml.training.classical_tabular_baseline import ClassicalTabularBaselineTrainer
 from blueberry_microid.ml.training.feature_matrix_builder import FeatureMatrixBuilder
@@ -385,6 +408,18 @@ def get_image_feature_vector_repository(
     return SqlAlchemyImageFeatureVectorRepository(session)
 
 
+def get_petri_segmentation_run_repository(
+    session: Session = Depends(get_db_session),
+) -> PetriSegmentationRunRepositoryPort:
+    return SqlAlchemyPetriSegmentationRunRepository(session)
+
+
+def get_petri_segmentation_region_repository(
+    session: Session = Depends(get_db_session),
+) -> PetriSegmentationRegionRepositoryPort:
+    return SqlAlchemyPetriSegmentationRegionRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -406,6 +441,10 @@ def get_image_dataset_auditor() -> ImageDatasetAuditor:
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
     return ImageFeatureExtractor()
+
+
+def get_classical_petri_segmenter() -> ClassicalPetriSegmenter:
+    return ClassicalPetriSegmenter()
 
 
 def get_majority_class_baseline_trainer() -> MajorityClassBaselineTrainer:
@@ -889,3 +928,41 @@ def get_list_image_feature_vectors_use_case(
     feature_vector_repository: ImageFeatureVectorRepositoryPort = Depends(get_image_feature_vector_repository),
 ) -> ListImageFeatureVectorsUseCase:
     return ListImageFeatureVectorsUseCase(extraction_run_repository, feature_vector_repository)
+
+
+def get_create_petri_segmentation_run_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort = Depends(
+        get_image_dataset_audit_run_repository
+    ),
+    manifest_exporter: DatasetReleaseManifestExporter = Depends(get_dataset_release_manifest_exporter),
+    segmenter: ClassicalPetriSegmenter = Depends(get_classical_petri_segmenter),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreatePetriSegmentationRunUseCase:
+    return CreatePetriSegmentationRunUseCase(
+        dataset_release_repository,
+        image_dataset_audit_run_repository,
+        manifest_exporter,
+        segmenter,
+        unit_of_work,
+    )
+
+
+def get_get_petri_segmentation_run_use_case(
+    run_repository: PetriSegmentationRunRepositoryPort = Depends(get_petri_segmentation_run_repository),
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+) -> GetPetriSegmentationRunUseCase:
+    return GetPetriSegmentationRunUseCase(run_repository, region_repository)
+
+
+def get_list_petri_segmentation_runs_use_case(
+    run_repository: PetriSegmentationRunRepositoryPort = Depends(get_petri_segmentation_run_repository),
+) -> ListPetriSegmentationRunsUseCase:
+    return ListPetriSegmentationRunsUseCase(run_repository)
+
+
+def get_list_petri_segmentation_regions_use_case(
+    run_repository: PetriSegmentationRunRepositoryPort = Depends(get_petri_segmentation_run_repository),
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+) -> ListPetriSegmentationRegionsUseCase:
+    return ListPetriSegmentationRegionsUseCase(run_repository, region_repository)

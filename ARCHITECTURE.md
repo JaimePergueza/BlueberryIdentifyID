@@ -1211,3 +1211,52 @@ migraciones, base de datos, workflow CI, `MockInferenceEngine` ni logica de
 negocio. Sigue sin agregar PyTorch, TensorFlow, YOLO, CNN, ViT, deep learning,
 dataset externo, frontend, autenticacion, taxonomia, MLflow, TensorBoard o
 Weights & Biases.
+
+## 35. Fase 19 - prototipo clasico de segmentacion Petri
+
+Objetivo: detectar y persistir regiones candidatas geometricas en imagenes
+Petri de un `DatasetRelease`, antes de cualquier YOLO/deep learning y sin
+afirmar colonias reales ni taxonomia.
+
+**Dependencia.** Se agrega `opencv-python-headless>=4.9,<4.11`, no la variante
+con GUI. El rango evita OpenCV 4.13 porque exige `numpy>=2`, incompatible con
+la restriccion existente `numpy<2.0`. OpenCV se usa solo para vision clasica:
+lectura auxiliar, gris/color, blur, thresholding, morfologia, contornos,
+bounding boxes y mediciones geometricas. No se usan OpenCV DNN, YOLO, pesos ni
+modelos preentrenados.
+
+**Config.** `PetriSegmentationConfig` permite solo
+`algorithm=classical_threshold`; threshold `otsu`/`adaptive`/`manual`; filtros
+por area, circularidad y borde; morfologia; `max_regions`; y version
+`petri_classical_v1`. `save_debug_masks=true` se rechaza en esta fase para no
+persistir mascaras ni rutas de artefactos no definidos.
+
+**Servicio.** `ClassicalPetriSegmenter` consume `TrainingManifest` y procesa
+solo `TrainingManifestItem.petri_image_path`. Ignora `micro_image_path`, no
+modifica archivos, continua si una imagen falla y clasifica el run como
+`completed`, `partial` o `failed`.
+
+**Persistencia.** Migracion `0012_petri_segmentation.py` crea
+`petri_segmentation_runs` y `petri_segmentation_regions`. `PetriSegmentationRun`
+guarda release, audit opcional, status, config, conteos y summary.
+`PetriSegmentationRegion` guarda una region candidata por contorno filtrado:
+area, perimetro, centroide, bounding box, circularidad, solidez, intensidad
+media, split y referencias a `DatasetItem`/`DatasetSplitItem`. Indice unico:
+`(segmentation_run_id, dataset_split_item_id, region_index)`.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/petri-segmentations` | Ejecuta segmentacion Petri clasica para un DatasetRelease |
+| GET | `/api/v1/ml/petri-segmentations` | Lista runs, con filtros opcionales |
+| GET | `/api/v1/ml/petri-segmentations/{id}` | Obtiene un run con regiones |
+| GET | `/api/v1/ml/petri-segmentations/{id}/regions` | Lista regiones candidatas, filtro opcional por split |
+| GET | `/api/v1/datasets/releases/{id}/petri-segmentations` | Historial por release |
+| GET | `/api/v1/ml/image-audits/{id}/petri-segmentations` | Historial por audit |
+
+**Limites.** Una region candidata es solo un segmento geometrico aproximado,
+no una colonia confirmada. Fase 19 no entrena modelos, no calcula metricas
+microbiologicas, no usa PyTorch/TensorFlow/YOLO/CNN/ViT/deep learning, no
+descarga datasets externos, no agrega frontend/autenticacion/taxonomia y no
+reemplaza `MockInferenceEngine`.

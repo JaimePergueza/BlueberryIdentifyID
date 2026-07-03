@@ -18,6 +18,8 @@ from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureV
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
+from blueberry_microid.domain.entities.petri_segmentation_region import PetriSegmentationRegion
+from blueberry_microid.domain.entities.petri_segmentation_run import PetriSegmentationRun
 from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.domain.entities.training_preflight_issue import TrainingPreflightIssue
@@ -34,6 +36,7 @@ from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import Im
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
 from blueberry_microid.domain.enums.image_feature_extraction_status import ImageFeatureExtractionStatus
 from blueberry_microid.domain.enums.image_modality import ImageModality
+from blueberry_microid.domain.enums.petri_segmentation_status import PetriSegmentationStatus
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 from blueberry_microid.domain.enums.training_preflight_issue_severity import TrainingPreflightIssueSeverity
@@ -53,6 +56,8 @@ from blueberry_microid.infrastructure.db.models.image_feature_vector import Imag
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
+from blueberry_microid.infrastructure.db.models.petri_segmentation_region import PetriSegmentationRegionModel
+from blueberry_microid.infrastructure.db.models.petri_segmentation_run import PetriSegmentationRunModel
 from blueberry_microid.infrastructure.db.models.prediction import PredictionModel
 from blueberry_microid.infrastructure.db.models.sample import SampleModel
 from blueberry_microid.infrastructure.db.models.training_preflight_issue import TrainingPreflightIssueModel
@@ -435,6 +440,55 @@ def image_feature_vector_to_entity(model: ImageFeatureVectorModel) -> ImageFeatu
         features=model.features,
         preprocessing=model.preprocessing,
         extraction_version=model.extraction_version,
+        id=model.id,
+        created_at=model.created_at,
+    )
+
+
+def petri_segmentation_run_to_entity(model: PetriSegmentationRunModel) -> PetriSegmentationRun:
+    return PetriSegmentationRun(
+        dataset_release_id=model.dataset_release_id,
+        image_audit_run_id=model.image_audit_run_id,
+        status=PetriSegmentationStatus(model.status),
+        is_completed=model.is_completed,
+        config=model.config,
+        total_items=model.total_items,
+        processed_petri_images=model.processed_petri_images,
+        failed_petri_images=model.failed_petri_images,
+        total_regions_detected=model.total_regions_detected,
+        mean_regions_per_image=model.mean_regions_per_image,
+        summary=model.summary,
+        started_at=model.started_at,
+        id=model.id,
+        completed_at=model.completed_at,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def petri_segmentation_region_to_entity(model: PetriSegmentationRegionModel) -> PetriSegmentationRegion:
+    return PetriSegmentationRegion(
+        segmentation_run_id=model.segmentation_run_id,
+        dataset_release_id=model.dataset_release_id,
+        dataset_item_id=model.dataset_item_id,
+        dataset_split_item_id=model.dataset_split_item_id,
+        split=DatasetSplit(model.split),
+        petri_image_path=model.petri_image_path,
+        region_index=model.region_index,
+        area_px=model.area_px,
+        perimeter_px=model.perimeter_px,
+        centroid_x=model.centroid_x,
+        centroid_y=model.centroid_y,
+        bbox_x=model.bbox_x,
+        bbox_y=model.bbox_y,
+        bbox_width=model.bbox_width,
+        bbox_height=model.bbox_height,
+        circularity=model.circularity,
+        solidity=model.solidity,
+        mean_intensity=model.mean_intensity,
+        region_features=model.region_features,
         id=model.id,
         created_at=model.created_at,
     )

@@ -246,3 +246,20 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   segmentacion/conteo de colonias en Petri, antes de YOLO/deep learning,
   porque el proyecto aun no tiene anotaciones de objetos ni dataset propio
   suficiente para modelos profundos.
+
+## 16. Segmentacion clasica Petri (Fase 19)
+
+- `ClassicalPetriSegmenter` procesa solo `petri_image_path` de un
+  `TrainingManifest`; nunca toca `micro_image_path`.
+- OpenCV esta permitido solo como `opencv-python-headless` y solo para vision
+  clasica: conversion de color/gris, blur, thresholding, morfologia,
+  contornos/componentes, bounding boxes y mediciones geometricas. Prohibido
+  OpenCV DNN, YOLO, modelos preentrenados, PyTorch, TensorFlow, CNN, ViT y
+  deep learning.
+- `PetriSegmentationRun` y `PetriSegmentationRegion` guardan resultados
+  tecnicos persistentes. Una "region candidata" no es una colonia confirmada,
+  no es una prediccion microbiologica y nunca debe presentarse como
+  diagnostico.
+- No guardar mascaras ni binarios de imagen en base de datos. No modificar
+  imagenes originales. No agregar taxonomia, frontend, autenticacion,
+  datasets externos, entrenamiento ni reemplazo de `MockInferenceEngine`.

@@ -30,6 +30,8 @@ from blueberry_microid.infrastructure.db.models import (
     MicroImageModel,
     ModelVersionModel,
     PetriImageModel,
+    PetriSegmentationRegionModel,
+    PetriSegmentationRunModel,
     PredictionModel,
     SampleModel,
     TrainingPreflightIssueModel,
@@ -64,6 +66,8 @@ _SQLITE_TABLES = [
     ImageDatasetAuditIssueModel.__table__,
     ImageFeatureExtractionRunModel.__table__,
     ImageFeatureVectorModel.__table__,
+    PetriSegmentationRunModel.__table__,
+    PetriSegmentationRegionModel.__table__,
 ]
 
 

@@ -68,6 +68,10 @@ class ImageFeatureExtractionRunNotFoundError(NotFoundError):
     """Raised when a requested ImageFeatureExtractionRun does not exist."""
 
 
+class PetriSegmentationRunNotFoundError(NotFoundError):
+    """Raised when a requested PetriSegmentationRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -135,6 +139,12 @@ class ImageFeatureExtractionNotAllowedError(ConflictError):
     belongs to a different DatasetRelease, or has a status the requested
     ImageFeatureExtractionConfig does not accept (failed audits are never
     accepted, regardless of config)."""
+
+
+class PetriSegmentationNotAllowedError(ConflictError):
+    """Raised when a PetriSegmentationRun cannot be created from current
+    state: the optional image audit is missing, belongs to a different release,
+    or has failed."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

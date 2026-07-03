@@ -18,6 +18,10 @@ from blueberry_microid.application.ports.image_feature_extraction_run_repository
     ImageFeatureExtractionRunRepositoryPort,
 )
 from blueberry_microid.application.ports.image_feature_vector_repository import ImageFeatureVectorRepositoryPort
+from blueberry_microid.application.ports.petri_segmentation_region_repository import (
+    PetriSegmentationRegionRepositoryPort,
+)
+from blueberry_microid.application.ports.petri_segmentation_run_repository import PetriSegmentationRunRepositoryPort
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
@@ -56,6 +60,8 @@ class UnitOfWorkPort(ABC):
     image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort
     image_feature_extraction_run_repository: ImageFeatureExtractionRunRepositoryPort
     image_feature_vector_repository: ImageFeatureVectorRepositoryPort
+    petri_segmentation_region_repository: PetriSegmentationRegionRepositoryPort
+    petri_segmentation_run_repository: PetriSegmentationRunRepositoryPort
     prediction_repository: PredictionRepositoryPort
     training_preflight_issue_repository: TrainingPreflightIssueRepositoryPort
     training_preflight_run_repository: TrainingPreflightRunRepositoryPort
