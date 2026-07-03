@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 23)
+## MVP status (as of Fase 24)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -34,7 +34,12 @@ segmentation, human review of regions, and supervised annotation export
 manifests. Fase 22 adds persisted annotation bundle runs/files that package
 those exports into dry-run plans or filesystem bundles. Fase 23 adds a
 persisted supervised annotation quality gate that checks bundle readiness
-before any future training workflow. The CI workflow runs
+before any future training workflow. Fase 24 adds a persisted object
+detection training dry-run: `DetectionTrainingRun`/`DetectionTrainingIssue`
+plan a future YOLO training attempt (algorithm/mode contract, prerequisite
+validation against an already-passed quality gate, a `command_preview` that
+is never executed, and planned-only output paths) without training, without
+installing `ultralytics`, and without importing `torch`. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
@@ -361,6 +366,16 @@ Annotation quality gate endpoints (Fase 23 - bundle readiness validation, no tra
 - `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/issues`
 - `GET /api/v1/datasets/releases/{dataset_release_id}/annotation-quality-gates`
 - `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/quality-gates`
+
+Detection training dry-run endpoints (Fase 24 - planning only, no YOLO training):
+
+- `POST /api/v1/ml/detection-training-runs`
+- `GET /api/v1/ml/detection-training-runs`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/issues`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-runs`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-runs`
+- `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/detection-training-runs`
 
 Async processing endpoints:
 

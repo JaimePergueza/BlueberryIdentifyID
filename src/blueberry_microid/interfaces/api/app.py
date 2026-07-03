@@ -20,6 +20,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     annotation_bundles,
     annotation_quality_gates,
     datasets,
+    detection_training,
     human_reviews,
     image_audits,
     image_features,
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(petri_segmentations.router, prefix=API_V1_PREFIX)
     app.include_router(petri_region_reviews.router, prefix=API_V1_PREFIX)
     app.include_router(petri_annotation_exports.router, prefix=API_V1_PREFIX)
+    app.include_router(detection_training.router, prefix=API_V1_PREFIX)
     app.include_router(tasks.router, prefix=API_V1_PREFIX)
 
     register_exception_handlers(app)

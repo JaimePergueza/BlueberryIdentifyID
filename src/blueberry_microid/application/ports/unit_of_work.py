@@ -12,6 +12,10 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
     AnnotationQualityGateRunRepositoryPort,
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.detection_training_issue_repository import (
+    DetectionTrainingIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_run_repository import DetectionTrainingRunRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
@@ -74,6 +78,8 @@ class UnitOfWorkPort(ABC):
     dataset_release_repository: DatasetReleaseRepositoryPort
     dataset_snapshot_repository: DatasetSnapshotRepositoryPort
     dataset_split_item_repository: DatasetSplitItemRepositoryPort
+    detection_training_issue_repository: DetectionTrainingIssueRepositoryPort
+    detection_training_run_repository: DetectionTrainingRunRepositoryPort
     human_review_repository: HumanReviewRepositoryPort
     image_dataset_audit_issue_repository: ImageDatasetAuditIssueRepositoryPort
     image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort

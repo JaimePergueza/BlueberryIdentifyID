@@ -26,6 +26,8 @@ from blueberry_microid.infrastructure.db.models import (
     DatasetReleaseModel,
     DatasetSnapshotModel,
     DatasetSplitItemModel,
+    DetectionTrainingIssueModel,
+    DetectionTrainingRunModel,
     HumanReviewModel,
     ImageDatasetAuditIssueModel,
     ImageDatasetAuditRunModel,
@@ -82,6 +84,8 @@ _SQLITE_TABLES = [
     AnnotationBundleFileModel.__table__,
     AnnotationQualityGateRunModel.__table__,
     AnnotationQualityGateIssueModel.__table__,
+    DetectionTrainingRunModel.__table__,
+    DetectionTrainingIssueModel.__table__,
 ]
 
 

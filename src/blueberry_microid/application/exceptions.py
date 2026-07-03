@@ -92,6 +92,10 @@ class AnnotationQualityGateRunNotFoundError(NotFoundError):
     """Raised when a requested AnnotationQualityGateRun does not exist."""
 
 
+class DetectionTrainingRunNotFoundError(NotFoundError):
+    """Raised when a requested DetectionTrainingRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -181,6 +185,12 @@ class AnnotationBundleNotAllowedError(ConflictError):
 
 class AnnotationQualityGateNotAllowedError(ConflictError):
     """Raised when a supervised annotation quality gate cannot be created safely."""
+
+
+class DetectionTrainingNotAllowedError(ConflictError):
+    """Raised when a DetectionTrainingRun cannot be planned safely: the
+    referenced AnnotationQualityGateRun does not belong to the referenced
+    AnnotationBundleRun."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

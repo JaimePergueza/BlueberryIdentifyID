@@ -14,6 +14,8 @@ from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
+from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
+from blueberry_microid.domain.entities.detection_training_run import DetectionTrainingRun
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.image_dataset_audit_issue import ImageDatasetAuditIssue
 from blueberry_microid.domain.entities.image_dataset_audit_run import ImageDatasetAuditRun
@@ -45,6 +47,10 @@ from blueberry_microid.domain.enums.annotation_quality_gate_status import Annota
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
+from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
+from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
+from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
+from blueberry_microid.domain.enums.detection_training_status import DetectionTrainingStatus
 from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import ImageDatasetAuditIssueSeverity
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
 from blueberry_microid.domain.enums.image_feature_extraction_status import ImageFeatureExtractionStatus
@@ -69,6 +75,8 @@ from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemM
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
+from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
+from blueberry_microid.infrastructure.db.models.detection_training_run import DetectionTrainingRunModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_run import ImageDatasetAuditRunModel
@@ -667,6 +675,46 @@ def annotation_quality_gate_issue_to_entity(model: AnnotationQualityGateIssueMod
         split=model.split,
         image_path=model.image_path,
         annotation_ref=model.annotation_ref,
+        details=model.details,
+        created_at=model.created_at,
+    )
+
+
+def detection_training_run_to_entity(model: DetectionTrainingRunModel) -> DetectionTrainingRun:
+    return DetectionTrainingRun(
+        annotation_bundle_run_id=model.annotation_bundle_run_id,
+        dataset_release_id=model.dataset_release_id,
+        petri_annotation_export_run_id=model.petri_annotation_export_run_id,
+        algorithm=DetectionTrainingAlgorithm(model.algorithm),
+        mode=DetectionTrainingMode(model.mode),
+        status=DetectionTrainingStatus(model.status),
+        is_runnable=model.is_runnable,
+        config=model.config,
+        training_plan=model.training_plan,
+        command_preview=model.command_preview,
+        dataset_summary=model.dataset_summary,
+        quality_gate_summary=model.quality_gate_summary,
+        expected_outputs=model.expected_outputs,
+        issue_count=model.issue_count,
+        warning_count=model.warning_count,
+        error_count=model.error_count,
+        id=model.id,
+        annotation_quality_gate_run_id=model.annotation_quality_gate_run_id,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def detection_training_issue_to_entity(model: DetectionTrainingIssueModel) -> DetectionTrainingIssue:
+    return DetectionTrainingIssue(
+        detection_training_run_id=model.detection_training_run_id,
+        severity=DetectionTrainingIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
         details=model.details,
         created_at=model.created_at,
     )

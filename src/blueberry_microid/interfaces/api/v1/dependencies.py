@@ -28,6 +28,11 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
+from blueberry_microid.application.ports.detection_training_issue_repository import (
+    DetectionTrainingIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_run_repository import DetectionTrainingRunRepositoryPort
+from blueberry_microid.application.ports.object_detection_trainer import ObjectDetectionTrainerPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
@@ -106,6 +111,18 @@ from blueberry_microid.application.use_cases.annotation_quality_gate.list_annota
 )
 from blueberry_microid.application.use_cases.annotation_quality_gate.list_annotation_quality_gate_runs import (
     ListAnnotationQualityGateRunsUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training.create_detection_training_run import (
+    CreateDetectionTrainingRunUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training.get_detection_training_run import (
+    GetDetectionTrainingRunUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training.list_detection_training_issues import (
+    ListDetectionTrainingIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training.list_detection_training_runs import (
+    ListDetectionTrainingRunsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -252,6 +269,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapsho
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_item_repository import (
     SqlAlchemyDatasetSplitItemRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_issue_repository import (
+    SqlAlchemyDetectionTrainingIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_run_repository import (
+    SqlAlchemyDetectionTrainingRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_human_review_repository import (
     SqlAlchemyHumanReviewRepository,
 )
@@ -324,6 +347,7 @@ from blueberry_microid.ml.preprocessing.image_feature_extractor import ImageFeat
 from blueberry_microid.ml.training.classical_tabular_baseline import ClassicalTabularBaselineTrainer
 from blueberry_microid.ml.training.feature_matrix_builder import FeatureMatrixBuilder
 from blueberry_microid.ml.training.majority_class_baseline import MajorityClassBaselineTrainer
+from blueberry_microid.ml.training.yolo_dry_run_trainer import YoloDryRunTrainer
 from blueberry_microid.ml.validation.image_dataset_auditor import ImageDatasetAuditor
 from blueberry_microid.ml.validation.image_path_validator import ImagePathValidator
 from blueberry_microid.ml.validation.manifest_validator import ManifestValidator
@@ -553,6 +577,18 @@ def get_annotation_quality_gate_issue_repository(
     return SqlAlchemyAnnotationQualityGateIssueRepository(session)
 
 
+def get_detection_training_run_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingRunRepositoryPort:
+    return SqlAlchemyDetectionTrainingRunRepository(session)
+
+
+def get_detection_training_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingIssueRepositoryPort:
+    return SqlAlchemyDetectionTrainingIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -586,6 +622,10 @@ def get_annotation_bundle_writer() -> AnnotationBundleWriter:
 
 def get_annotation_quality_gate_validator() -> AnnotationQualityGateValidator:
     return AnnotationQualityGateValidator()
+
+
+def get_yolo_dry_run_trainer() -> ObjectDetectionTrainerPort:
+    return YoloDryRunTrainer()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1263,3 +1303,40 @@ def get_list_annotation_quality_gate_issues_use_case(
     ),
 ) -> ListAnnotationQualityGateIssuesUseCase:
     return ListAnnotationQualityGateIssuesUseCase(run_repository, issue_repository)
+
+
+def get_create_detection_training_run_use_case(
+    bundle_run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+    bundle_file_repository: AnnotationBundleFileRepositoryPort = Depends(get_annotation_bundle_file_repository),
+    quality_gate_run_repository: AnnotationQualityGateRunRepositoryPort = Depends(
+        get_annotation_quality_gate_run_repository
+    ),
+    trainer: ObjectDetectionTrainerPort = Depends(get_yolo_dry_run_trainer),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDetectionTrainingRunUseCase:
+    return CreateDetectionTrainingRunUseCase(
+        bundle_run_repository,
+        bundle_file_repository,
+        quality_gate_run_repository,
+        trainer,
+        unit_of_work,
+    )
+
+
+def get_get_detection_training_run_use_case(
+    run_repository: DetectionTrainingRunRepositoryPort = Depends(get_detection_training_run_repository),
+) -> GetDetectionTrainingRunUseCase:
+    return GetDetectionTrainingRunUseCase(run_repository)
+
+
+def get_list_detection_training_runs_use_case(
+    run_repository: DetectionTrainingRunRepositoryPort = Depends(get_detection_training_run_repository),
+) -> ListDetectionTrainingRunsUseCase:
+    return ListDetectionTrainingRunsUseCase(run_repository)
+
+
+def get_list_detection_training_issues_use_case(
+    run_repository: DetectionTrainingRunRepositoryPort = Depends(get_detection_training_run_repository),
+    issue_repository: DetectionTrainingIssueRepositoryPort = Depends(get_detection_training_issue_repository),
+) -> ListDetectionTrainingIssuesUseCase:
+    return ListDetectionTrainingIssuesUseCase(run_repository, issue_repository)

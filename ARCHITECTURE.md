@@ -1489,3 +1489,84 @@ taxonomia ni performance de modelo. Fase 23 no implementa YOLO como modelo,
 no entrena YOLO ni ningun modelo, no usa PyTorch/TensorFlow/CNN/ViT/deep
 learning, no descarga datasets externos, no agrega frontend/autenticacion/
 taxonomia y no reemplaza `MockInferenceEngine`.
+
+## 40. Fase 24 - Object Detection Training Contract & YOLO Dry-Run
+
+Objetivo: preparar la arquitectura para un futuro entrenamiento real de
+deteccion de objetos, sin entrenar nada todavia. Esta fase es una capa de
+planificacion (dry-run), no una capa de entrenamiento.
+
+**Entidades.** `DetectionTrainingRun` persiste un plan de entrenamiento:
+referencias a `AnnotationBundleRun`, `AnnotationQualityGateRun` (opcional a
+nivel de esquema pero requerido en el flujo de creacion), `DatasetRelease` y
+`PetriAnnotationExportRun`; `algorithm` (solo `yolo_dry_run`), `mode` (solo
+`dry_run`), `status` (`planned`/`blocked`/`failed`), `is_runnable`, y JSON de
+`config`, `training_plan`, `command_preview`, `dataset_summary`,
+`quality_gate_summary` y `expected_outputs`. `status=planned` certifica solo
+que un plan reproducible fue generado a partir de un quality gate ya
+aprobado — nunca implica que exista un modelo entrenado o pesos reales.
+`DetectionTrainingIssue` persiste hallazgos de la planificacion con severidad
+`error`/`warning`/`info` y codigos tecnicos (`quality_gate_missing`,
+`quality_gate_not_passed`, `bundle_not_completed`, `dataset_yaml_missing`,
+`yolo_labels_missing`, `coco_annotations_missing`, `unsupported_algorithm`,
+`unsupported_mode`, `external_weights_not_allowed`,
+`external_weights_requested`, `invalid_config`, `no_training_executed`,
+`taxonomy_not_allowed`). Ninguna de las dos entidades guarda pesos, imagenes
+ni labels completos.
+
+**Config.** `DetectionTrainingConfig` (`ml/configs/detection_training_config.py`)
+fija `device="cpu"` y `allow_external_weights=false` por defecto; no requiere
+GPU, no valida GPU, y `pretrained_weights_path` nunca se descarga ni se
+valida remotamente. Si `allow_external_weights=true`, el trainer solo agrega
+un warning `external_weights_requested` — nunca descarga nada.
+
+**Puerto y trainer.** `ObjectDetectionTrainerPort.plan_training(bundle_run,
+bundle_files, quality_gate_run, config) -> DetectionTrainingPlan` es un
+contrato de solo planificacion: prohibido `subprocess`, prohibido importar
+`ultralytics`/`torch`, prohibido escribir pesos o descargar cualquier cosa.
+`YoloDryRunTrainer` (`ml/training/yolo_dry_run_trainer.py`) es la unica
+implementacion: valida `algorithm`/`mode` soportados, que
+`AnnotationBundleRun.status=completed`, que
+`AnnotationQualityGateRun.status=passed` cuando
+`require_quality_gate_passed=true`, y que existan `dataset.yaml`/labels YOLO
+segun la config. Si todo es valido construye `command_preview` (JSON con un
+comando `yolo detect train ...` de ejemplo, nunca ejecutado) y
+`expected_outputs` (`weights_path_planned`, `metrics_path_planned`,
+`predictions_path_planned`, `run_dir_planned` — rutas planeadas, nunca
+creadas en disco) y agrega un issue informativo `no_training_executed`.
+
+**Caso de uso.** `CreateDetectionTrainingRunUseCase` busca el
+`AnnotationBundleRun` y el `AnnotationQualityGateRun` solicitados, verifica
+que el segundo pertenezca al primero (si no,
+`DetectionTrainingNotAllowedError` -> 409), ejecuta `YoloDryRunTrainer` y
+persiste `DetectionTrainingRun` + `DetectionTrainingIssue`s en una unica
+transaccion via `UnitOfWorkPort`. Nunca modifica `AnnotationBundleRun` ni
+`AnnotationQualityGateRun`. `status=blocked` si faltan prerequisitos (con
+issues explicando el motivo), `status=planned` si todo es valido,
+`status=failed` solo ante un error interno de planificacion.
+
+**Persistencia.** Alembic `0017_detection_training_runs.py` crea
+`detection_training_runs` y `detection_training_issues`, con FKs a
+`annotation_bundle_runs`, `annotation_quality_gate_runs`, `dataset_releases`
+y `petri_annotation_export_runs`; CHECKs de `algorithm`/`mode`/`status`/
+`severity`; indices de consulta; y JSONB para config, plan, preview,
+resumenes y expected outputs.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/detection-training-runs` | Crea un dry-run de entrenamiento de deteccion |
+| GET | `/api/v1/ml/detection-training-runs` | Lista runs |
+| GET | `/api/v1/ml/detection-training-runs/{id}` | Detalle del run |
+| GET | `/api/v1/ml/detection-training-runs/{id}/issues` | Issues del run |
+| GET | `/api/v1/datasets/releases/{id}/detection-training-runs` | Runs por release |
+| GET | `/api/v1/ml/annotation-bundles/{id}/detection-training-runs` | Runs por bundle |
+| GET | `/api/v1/ml/annotation-quality-gates/{id}/detection-training-runs` | Runs por quality gate |
+
+Fase 24 no entrena YOLO ni ningun modelo, no instala `ultralytics`, no
+importa `torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no
+descarga pesos externos ni datasets externos, no requiere GPU, no crea
+archivos de pesos (`.pt`/`.onnx`/`.h5`), no agrega frontend/autenticacion/
+taxonomia/diagnostico, no integra MLflow/TensorBoard/W&B y no reemplaza
+`MockInferenceEngine`.

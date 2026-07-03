@@ -1549,3 +1549,59 @@ does not imply scientific sufficiency, microbiological diagnosis, taxonomy,
 or model performance. This phase does not implement or train YOLO, does not
 use PyTorch/TensorFlow/CNN/ViT/deep learning, does not download datasets, and
 does not replace `MockInferenceEngine`.
+
+## 33. Object detection training dry-run (Fase 24)
+
+Fase 24 prepares the architecture for a future real object-detection
+training phase — it never trains anything. It is a planning-only layer:
+`status=planned` never means a model was trained.
+
+- `DetectionTrainingConfig` (`ml/configs/detection_training_config.py`)
+  defaults to `algorithm=yolo_dry_run`, `mode=dry_run`, `device="cpu"`, and
+  `allow_external_weights=false`. It does not require or check a GPU, and
+  `pretrained_weights_path` is never downloaded or validated remotely. If
+  `allow_external_weights=true`, only a warning is recorded — nothing is
+  fetched.
+- `DetectionTrainingRun` persists a training plan: references to the
+  `AnnotationBundleRun`, `AnnotationQualityGateRun`, `DatasetRelease`, and
+  `PetriAnnotationExportRun` involved; `status` (`planned`, `blocked`,
+  `failed`); `is_runnable`; and JSON `config`, `training_plan`,
+  `command_preview`, `dataset_summary`, `quality_gate_summary`, and
+  `expected_outputs`.
+- `DetectionTrainingIssue` stores planning-time findings only — severity
+  `error`/`warning`/`info`, a code (e.g. `quality_gate_not_passed`,
+  `dataset_yaml_missing`, `yolo_labels_missing`, `no_training_executed`,
+  `external_weights_requested`), and a message. No weights, images, or full
+  label sets are ever stored.
+- `ObjectDetectionTrainerPort.plan_training(...)` is a planning-only
+  contract: implementations must never call `subprocess`, never import
+  `ultralytics` or `torch`, never write model weights, and never download
+  anything. `YoloDryRunTrainer` is the only implementation: it validates the
+  requested algorithm/mode, that the bundle is `completed`, that the quality
+  gate is `passed` (when required), and that `dataset.yaml`/YOLO label files
+  exist, then builds a `command_preview` (a JSON description of the YOLO
+  command that *would* run, never executed) and `expected_outputs` (planned
+  paths for weights/metrics/predictions, never created on disk).
+- `CreateDetectionTrainingRunUseCase` requires the referenced
+  `AnnotationQualityGateRun` to belong to the referenced
+  `AnnotationBundleRun` (otherwise 409 `detection_training_not_allowed`).
+  It never modifies the bundle or quality gate, and persists `planned` when
+  everything checks out, `blocked` when prerequisites are missing, or
+  `failed` only on an internal planning error.
+
+Endpoints:
+
+- `POST /api/v1/ml/detection-training-runs`
+- `GET /api/v1/ml/detection-training-runs`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/issues`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-runs`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-runs`
+- `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/detection-training-runs`
+
+This phase does not train YOLO or any model, does not install `ultralytics`,
+does not import `torch`, does not use PyTorch/TensorFlow/CNN/ViT/real deep
+learning, does not download external weights or datasets, does not require a
+GPU, does not create weight files (`.pt`/`.onnx`/`.h5`), does not add a
+frontend/authentication/taxonomy/diagnosis claim, does not integrate
+MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`.

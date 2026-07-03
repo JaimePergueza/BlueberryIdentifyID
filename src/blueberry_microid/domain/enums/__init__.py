@@ -8,6 +8,10 @@ from blueberry_microid.domain.enums.annotation_quality_gate_status import Annota
 from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
+from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
+from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
+from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
+from blueberry_microid.domain.enums.detection_training_status import DetectionTrainingStatus
 from blueberry_microid.domain.enums.model_type import ModelType
 from blueberry_microid.domain.enums.petri_annotation_bbox_source import PetriAnnotationBboxSource
 from blueberry_microid.domain.enums.petri_annotation_export_decision_filter import PetriAnnotationExportDecisionFilter
@@ -30,6 +34,10 @@ __all__ = [
     "BaselineModelType",
     "ComparisonPrimaryMetric",
     "ComparisonSelectionPolicy",
+    "DetectionTrainingAlgorithm",
+    "DetectionTrainingIssueSeverity",
+    "DetectionTrainingMode",
+    "DetectionTrainingStatus",
     "ModelType",
     "PetriAnnotationBboxSource",
     "PetriAnnotationExportDecisionFilter",

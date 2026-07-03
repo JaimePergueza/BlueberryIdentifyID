@@ -29,6 +29,10 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
+from blueberry_microid.application.ports.detection_training_issue_repository import (
+    DetectionTrainingIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_run_repository import DetectionTrainingRunRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
 from blueberry_microid.application.ports.dataset_split_item_repository import DatasetSplitItemRepositoryPort
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
@@ -81,6 +85,8 @@ from blueberry_microid.domain.entities.annotation_quality_gate_run import Annota
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
+from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
+from blueberry_microid.domain.entities.detection_training_run import DetectionTrainingRun
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.image_dataset_audit_issue import ImageDatasetAuditIssue
@@ -750,6 +756,83 @@ class InMemoryAnnotationQualityGateIssueRepository(AnnotationQualityGateIssueRep
         self._by_id = copy.deepcopy(state)
 
 
+class InMemoryDetectionTrainingRunRepository(DetectionTrainingRunRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DetectionTrainingRun] = {}
+
+    def add(self, run: DetectionTrainingRun) -> DetectionTrainingRun:
+        self._by_id[run.id] = run
+        return run
+
+    def get_by_id(self, run_id: UUID) -> Optional[DetectionTrainingRun]:
+        return self._by_id.get(run_id)
+
+    def list_all(self) -> list[DetectionTrainingRun]:
+        return sorted(self._by_id.values(), key=lambda run: (run.created_at, run.id))
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[DetectionTrainingRun]:
+        return [run for run in self.list_all() if run.dataset_release_id == dataset_release_id]
+
+    def list_by_annotation_bundle_run_id(self, annotation_bundle_run_id: UUID) -> list[DetectionTrainingRun]:
+        return [run for run in self.list_all() if run.annotation_bundle_run_id == annotation_bundle_run_id]
+
+    def list_by_annotation_quality_gate_run_id(
+        self, annotation_quality_gate_run_id: UUID
+    ) -> list[DetectionTrainingRun]:
+        return [
+            run
+            for run in self.list_all()
+            if run.annotation_quality_gate_run_id == annotation_quality_gate_run_id
+        ]
+
+    def snapshot_state(self) -> dict[UUID, DetectionTrainingRun]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, DetectionTrainingRun]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryDetectionTrainingIssueRepository(DetectionTrainingIssueRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DetectionTrainingIssue] = {}
+
+    def add_many(self, issues: list[DetectionTrainingIssue]) -> list[DetectionTrainingIssue]:
+        for issue in issues:
+            self._by_id[issue.id] = issue
+        return issues
+
+    def list_by_detection_training_run_id(self, detection_training_run_id: UUID) -> list[DetectionTrainingIssue]:
+        return sorted(
+            [issue for issue in self._by_id.values() if issue.detection_training_run_id == detection_training_run_id],
+            key=lambda issue: (issue.severity.value, issue.code, issue.created_at, issue.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, DetectionTrainingIssue]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, DetectionTrainingIssue]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class FailingAddDetectionTrainingIssueRepository(DetectionTrainingIssueRepositoryPort):
+    """Delegates reads but always fails when adding new issues."""
+
+    def __init__(self, delegate: DetectionTrainingIssueRepositoryPort) -> None:
+        self._delegate = delegate
+
+    def add_many(self, issues: list[DetectionTrainingIssue]) -> list[DetectionTrainingIssue]:
+        raise RuntimeError("simulated detection training issue insert failure")
+
+    def list_by_detection_training_run_id(self, detection_training_run_id: UUID) -> list[DetectionTrainingIssue]:
+        return self._delegate.list_by_detection_training_run_id(detection_training_run_id)
+
+    def snapshot_state(self):
+        return self._delegate.snapshot_state()
+
+    def restore_state(self, state) -> None:
+        self._delegate.restore_state(state)
+
+
 class InMemoryTrainingRunRepository(TrainingRunRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, TrainingRun] = {}
@@ -988,6 +1071,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         annotation_bundle_file_repository: Optional[AnnotationBundleFileRepositoryPort] = None,
         annotation_quality_gate_run_repository: Optional[AnnotationQualityGateRunRepositoryPort] = None,
         annotation_quality_gate_issue_repository: Optional[AnnotationQualityGateIssueRepositoryPort] = None,
+        detection_training_run_repository: Optional["DetectionTrainingRunRepositoryPort"] = None,
+        detection_training_issue_repository: Optional["DetectionTrainingIssueRepositoryPort"] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
@@ -1015,6 +1100,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.annotation_bundle_file_repository = annotation_bundle_file_repository
         self.annotation_quality_gate_run_repository = annotation_quality_gate_run_repository
         self.annotation_quality_gate_issue_repository = annotation_quality_gate_issue_repository
+        self.detection_training_run_repository = detection_training_run_repository
+        self.detection_training_issue_repository = detection_training_issue_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
@@ -1037,6 +1124,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._annotation_bundle_file_snapshot = None
         self._annotation_quality_gate_run_snapshot = None
         self._annotation_quality_gate_issue_snapshot = None
+        self._detection_training_run_snapshot = None
+        self._detection_training_issue_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
@@ -1090,6 +1179,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._annotation_quality_gate_issue_snapshot = (
                 self.annotation_quality_gate_issue_repository.snapshot_state()
             )
+        if hasattr(self.detection_training_run_repository, "snapshot_state"):
+            self._detection_training_run_snapshot = self.detection_training_run_repository.snapshot_state()
+        if hasattr(self.detection_training_issue_repository, "snapshot_state"):
+            self._detection_training_issue_snapshot = self.detection_training_issue_repository.snapshot_state()
         return self
 
     def __exit__(
@@ -1140,6 +1233,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self.annotation_quality_gate_run_repository.restore_state(self._annotation_quality_gate_run_snapshot)
         if exc_type is not None and self._annotation_quality_gate_issue_snapshot is not None:
             self.annotation_quality_gate_issue_repository.restore_state(self._annotation_quality_gate_issue_snapshot)
+        if exc_type is not None and self._detection_training_run_snapshot is not None:
+            self.detection_training_run_repository.restore_state(self._detection_training_run_snapshot)
+        if exc_type is not None and self._detection_training_issue_snapshot is not None:
+            self.detection_training_issue_repository.restore_state(self._detection_training_issue_snapshot)
         return None
 
     def commit(self) -> None:

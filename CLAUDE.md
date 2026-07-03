@@ -364,3 +364,47 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - Sigue prohibido YOLO como modelo, entrenar YOLO, PyTorch, TensorFlow, CNN,
   ViT, deep learning, datasets externos, frontend, autenticacion, taxonomia,
   diagnostico, MLflow/TensorBoard/W&B y reemplazar `MockInferenceEngine`.
+
+## 21. Object Detection Training Contract & YOLO Dry-Run (Fase 24)
+
+- `DetectionTrainingRun` es solo un plan persistido de un futuro intento de
+  entrenamiento de detector; `status=planned` nunca significa que existe un
+  modelo entrenado, pesos reales ni que se ejecuto YOLO. No se entrena
+  nada en esta fase.
+- `DetectionTrainingIssue` guarda hallazgos de la planificacion (`error`,
+  `warning`, `info`) con codigos como `quality_gate_not_passed`,
+  `dataset_yaml_missing`, `yolo_labels_missing`, `no_training_executed`,
+  `external_weights_requested`. Nunca guarda pesos, imagenes ni labels
+  completos.
+- `ObjectDetectionTrainerPort.plan_training()` es un contrato de solo
+  planificacion: nunca ejecuta subprocess, nunca importa `ultralytics` ni
+  `torch`, nunca descarga nada y nunca escribe pesos. `YoloDryRunTrainer` es
+  la unica implementacion: valida que `AnnotationBundleRun.status=completed`
+  y (si `require_quality_gate_passed=true`) que `AnnotationQualityGateRun.status=passed`,
+  valida presencia de `dataset.yaml` y de labels YOLO segun
+  `DetectionTrainingConfig`, y genera `command_preview` (un JSON con el
+  comando YOLO que se ejecutaria, nunca ejecutado) y `expected_outputs`
+  (rutas planeadas de pesos/metricas/predicciones, nunca creadas en disco).
+- `CreateDetectionTrainingRunUseCase` exige que el `AnnotationQualityGateRun`
+  referenciado pertenezca al `AnnotationBundleRun` referenciado; si no,
+  `DetectionTrainingNotAllowedError` (409). Nunca modifica
+  `AnnotationBundleRun` ni `AnnotationQualityGateRun`. Persiste
+  `status=planned` si todo es valido, `status=blocked` si faltan
+  prerequisitos (con issues explicando por que), `status=failed` solo ante
+  un error interno de planificacion.
+- `DetectionTrainingAlgorithm` solo admite `yolo_dry_run` y
+  `DetectionTrainingMode` solo admite `dry_run` en esta fase — no se agregan
+  `yolo_train` ni modos reales todavia.
+- `allow_external_weights=true` nunca descarga nada: solo registra la
+  intencion en `DetectionTrainingConfig` y agrega un warning
+  `external_weights_requested`.
+- Endpoints bajo `/api/v1/ml/detection-training-runs`,
+  `/api/v1/datasets/releases/{id}/detection-training-runs`,
+  `/api/v1/ml/annotation-bundles/{id}/detection-training-runs` y
+  `/api/v1/ml/annotation-quality-gates/{id}/detection-training-runs`, con
+  `X-Request-ID`.
+- Sigue prohibido entrenar YOLO, instalar `ultralytics`, importar `torch`,
+  PyTorch, TensorFlow, CNN, ViT, deep learning real, descargar pesos
+  externos, datasets externos, frontend, autenticacion, taxonomia,
+  diagnostico, MLflow/TensorBoard/W&B, GPU obligatoria y reemplazar
+  `MockInferenceEngine`.
