@@ -14,6 +14,12 @@ from blueberry_microid.infrastructure.db.models.dataset_release import DatasetRe
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
 from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
+from blueberry_microid.infrastructure.db.models.detection_training_readiness_issue import (
+    DetectionTrainingReadinessIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_readiness_report import (
+    DetectionTrainingReadinessReportModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_run import DetectionTrainingRunModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
@@ -49,6 +55,8 @@ __all__ = [
     "DatasetSnapshotModel",
     "DatasetSplitItemModel",
     "DetectionTrainingIssueModel",
+    "DetectionTrainingReadinessIssueModel",
+    "DetectionTrainingReadinessReportModel",
     "DetectionTrainingRunModel",
     "HumanReviewModel",
     "ImageDatasetAuditIssueModel",

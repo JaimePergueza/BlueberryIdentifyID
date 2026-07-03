@@ -32,6 +32,7 @@ from blueberry_microid.application.exceptions import (
     DatasetSnapshotNotFoundError,
     DatasetSplitMetadataError,
     DetectionTrainingNotAllowedError,
+    DetectionTrainingReadinessReportNotFoundError,
     DetectionTrainingRunNotFoundError,
     DuplicateDatasetItemError,
     DuplicateDatasetSnapshotError,
@@ -103,6 +104,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "annotation_quality_gate_run_not_found"
     if isinstance(exc, DetectionTrainingRunNotFoundError):
         return 404, "detection_training_run_not_found"
+    if isinstance(exc, DetectionTrainingReadinessReportNotFoundError):
+        return 404, "detection_training_readiness_report_not_found"
     if isinstance(exc, HumanReviewNotFoundError):
         return 404, "human_review_not_found"
     if isinstance(exc, DatasetSnapshotNotFoundError):

@@ -408,3 +408,56 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   externos, datasets externos, frontend, autenticacion, taxonomia,
   diagnostico, MLflow/TensorBoard/W&B, GPU obligatoria y reemplazar
   `MockInferenceEngine`.
+
+## 22. Detection Training Readiness Report (Fase 25)
+
+- `DetectionTrainingReadinessReport` evalua si un `DetectionTrainingRun`
+  dry-run (Fase 24) esta tecnicamente listo para una futura fase de
+  entrenamiento real; nunca entrena nada, nunca ejecuta YOLO y
+  `is_ready=true` nunca significa validez cientifica ni modelo entrenado —
+  solo que los gates tecnicos configurados pasaron. `DetectionTrainingReadinessIssue`
+  guarda hallazgos (`error`/`warning`/`info`) con codigos fijos (p. ej.
+  `detection_training_not_planned`, `quality_gate_not_passed`,
+  `insufficient_train_images`, `ultralytics_not_installed`,
+  `no_training_executed`); nunca guarda imagenes, pesos ni labels completos.
+- `DetectionTrainingReadinessDecision` tiene exactamente seis valores
+  (`ready_for_training`, `needs_more_annotations`, `blocked_by_quality`,
+  `blocked_by_environment`, `blocked_by_contract`,
+  `blocked_by_configuration`); `DetectionTrainingReadinessStatus` tiene
+  `ready`/`warning`/`blocked`/`failed`. A diferencia de `DetectionTrainingRun`
+  (Fase 24), un reporte puede quedar `status=warning` con `is_ready=true`:
+  warnings no bloqueantes (p. ej. `copy_images_disabled`,
+  `training_executor_missing` cuando no es requerido) no impiden la
+  disponibilidad tecnica.
+- `DetectionTrainingReadinessEvaluator` (`application/services/`) es puramente
+  una inspeccion de metadata ya persistida: nunca importa `ultralytics` ni
+  `torch`, nunca llama `subprocess`, nunca consulta GPU real y nunca modifica
+  archivos. Para `require_ultralytics_installed`/`require_torch_installed`/
+  `require_gpu`, la regla es literal: si el config los exige, el evaluador
+  bloquea siempre con `blocked_by_environment` porque no existe forma segura
+  de confirmarlos sin instalar/importar esas dependencias — nunca lo intenta.
+  Cuando coexisten varias categorias de error bloqueante, la prioridad de
+  decision es contrato > calidad > entorno > configuracion > datos.
+- `DetectionTrainingReadinessConfig` (`ml/configs/`) trae minimos de datos por
+  split (`min_train_images`, etc.) con default `require_minimum_data=true`;
+  si no existe `AnnotationQualityGateRun` asociado, el evaluador no puede
+  determinar conteos por split y emite un unico issue generico
+  (`insufficient_total_images`, severidad `error` si `strict_mode=true` si no
+  `warning`) en vez de inventar conteos.
+- `CreateDetectionTrainingReadinessReportUseCase` nunca modifica
+  `DetectionTrainingRun`, `AnnotationBundleRun` ni `AnnotationQualityGateRun`;
+  revalida su existencia, ejecuta el evaluador y persiste reporte + issues en
+  una unica transaccion via `UnitOfWorkPort`. Un fallo interno de evaluacion
+  se convierte en un reporte `status=failed`/`decision=blocked_by_contract`
+  persistido (mismo patron que `CreateDetectionTrainingRunUseCase`), nunca en
+  una excepcion sin persistir.
+- Endpoints bajo `/api/v1/ml/detection-training-readiness-reports`,
+  `/api/v1/ml/detection-training-runs/{id}/readiness-reports`,
+  `/api/v1/datasets/releases/{id}/detection-training-readiness-reports`,
+  `/api/v1/ml/annotation-bundles/{id}/detection-training-readiness-reports` y
+  `/api/v1/ml/annotation-quality-gates/{id}/detection-training-readiness-reports`,
+  con `X-Request-ID`.
+- Sigue prohibido entrenar YOLO, instalar `ultralytics`, importar `torch`,
+  PyTorch, TensorFlow, CNN, ViT, deep learning real, descargar pesos o
+  datasets externos, frontend, autenticacion, taxonomia, diagnostico,
+  MLflow/TensorBoard/W&B, GPU obligatoria y reemplazar `MockInferenceEngine`.

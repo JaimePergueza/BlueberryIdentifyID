@@ -1605,3 +1605,68 @@ learning, does not download external weights or datasets, does not require a
 GPU, does not create weight files (`.pt`/`.onnx`/`.h5`), does not add a
 frontend/authentication/taxonomy/diagnosis claim, does not integrate
 MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`.
+
+## 34. Detection training readiness report (Fase 25)
+
+Fase 25 evaluates whether a dry-run `DetectionTrainingRun` (Fase 24) is
+technically ready to move to a future real training phase. It never trains
+anything, never installs `ultralytics`, and never imports `torch`.
+
+- `DetectionTrainingReadinessConfig` (`ml/configs/detection_training_readiness_config.py`)
+  has 22 fields: `require_*` booleans for each technical gate (planning
+  state, bundle completed, quality gate passed, `dataset.yaml`, YOLO labels,
+  minimum data), eight per-split minimums, `warn_if_copy_images_disabled`,
+  environment flags (`require_training_executor`,
+  `require_ultralytics_installed`, `require_torch_installed`, `require_gpu`,
+  `allow_cpu_training_future`), an external-weights policy pair, and
+  `strict_mode`. By default no environment dependency is required.
+- `DetectionTrainingReadinessReport` persists `decision` (one of
+  `ready_for_training`, `needs_more_annotations`, `blocked_by_quality`,
+  `blocked_by_environment`, `blocked_by_contract`,
+  `blocked_by_configuration`), `status` (`ready`/`warning`/`blocked`/`failed`),
+  `is_ready`, and seven JSON summaries (`data_summary`, `split_summary`,
+  `quality_summary`, `environment_summary`, `contract_summary`,
+  `risk_summary`, `recommendation_summary`). Unlike `DetectionTrainingRun`, a
+  report can be `status=warning` with `is_ready=true` — non-blocking
+  warnings (e.g. `copy_images_disabled`) do not prevent readiness.
+  `DetectionTrainingReadinessIssue` stores severity-tagged findings with
+  fixed codes; neither entity stores images, weights, or full label sets.
+- `DetectionTrainingReadinessEvaluator` (`application/services/`) only
+  inspects already-persisted metadata across seven sections (dry-run state,
+  bundle, quality gate, minimum data, contract, environment, categories). It
+  never calls `subprocess`, never imports `ultralytics`/`torch`, never
+  queries a real GPU, and never modifies files. When
+  `require_ultralytics_installed`/`require_torch_installed`/`require_gpu` is
+  requested, the evaluator always blocks — there is no safe way to confirm
+  those without installing/importing them, so it never tries. When several
+  blocking categories co-occur, the decision priority is contract > quality
+  > environment > configuration > data.
+- `CreateDetectionTrainingReadinessReportUseCase` looks up the
+  `DetectionTrainingRun` (404 if missing), its issues, the associated
+  `AnnotationBundleRun`/files, and the `AnnotationQualityGateRun`/issues (if
+  any), runs the evaluator, and persists the report plus issues in one
+  `UnitOfWorkPort` transaction. It never modifies `DetectionTrainingRun`,
+  `AnnotationBundleRun`, or `AnnotationQualityGateRun`. An internal
+  evaluation failure becomes a persisted `status=failed`/
+  `decision=blocked_by_contract` report, never an unpersisted exception.
+
+Endpoints:
+
+- `POST /api/v1/ml/detection-training-readiness-reports`
+- `GET /api/v1/ml/detection-training-readiness-reports`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/issues`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/readiness-reports`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-readiness-reports`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-readiness-reports`
+- `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/detection-training-readiness-reports`
+
+This phase does not train YOLO or any model, does not install `ultralytics`,
+does not import `torch`, does not use PyTorch/TensorFlow/CNN/ViT/real deep
+learning, does not download external weights or datasets, does not require a
+GPU, does not create weight files, does not add a
+frontend/authentication/taxonomy/diagnosis claim, does not integrate
+MLflow/TensorBoard/W&B, does not use Celery, and does not replace
+`MockInferenceEngine`. A `ready_for_training` report never certifies
+scientific validity or a trained model — only that the configured technical
+gates passed.

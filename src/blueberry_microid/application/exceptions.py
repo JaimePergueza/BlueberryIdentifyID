@@ -96,6 +96,10 @@ class DetectionTrainingRunNotFoundError(NotFoundError):
     """Raised when a requested DetectionTrainingRun does not exist."""
 
 
+class DetectionTrainingReadinessReportNotFoundError(NotFoundError):
+    """Raised when a requested DetectionTrainingReadinessReport does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 

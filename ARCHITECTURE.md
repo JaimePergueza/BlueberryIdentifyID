@@ -1570,3 +1570,110 @@ descarga pesos externos ni datasets externos, no requiere GPU, no crea
 archivos de pesos (`.pt`/`.onnx`/`.h5`), no agrega frontend/autenticacion/
 taxonomia/diagnostico, no integra MLflow/TensorBoard/W&B y no reemplaza
 `MockInferenceEngine`.
+
+## 41. Fase 25 - Detection Training Readiness Report
+
+Objetivo: dado un `DetectionTrainingRun` dry-run (Fase 24) ya persistido,
+generar un reporte tecnico auditable que responda si esta listo para pasar a
+una futura fase de entrenamiento real — sin entrenar nada, sin instalar
+`ultralytics`/`torch`, sin requerir GPU.
+
+**Entidades.** `DetectionTrainingReadinessReport` referencia
+`DetectionTrainingRun`, `AnnotationBundleRun`, `AnnotationQualityGateRun`
+(opcional), `DatasetRelease` y `PetriAnnotationExportRun`; guarda `decision`
+(`DetectionTrainingReadinessDecision`: `ready_for_training`,
+`needs_more_annotations`, `blocked_by_quality`, `blocked_by_environment`,
+`blocked_by_contract`, `blocked_by_configuration`), `status`
+(`DetectionTrainingReadinessStatus`: `ready`/`warning`/`blocked`/`failed`),
+`is_ready`, y siete resumenes JSON (`data_summary`, `split_summary`,
+`quality_summary`, `environment_summary`, `contract_summary`,
+`risk_summary`, `recommendation_summary`). A diferencia de
+`DetectionTrainingRun`, el invariante de la entidad permite
+`status=warning` con `is_ready=true` — un warning no bloqueante (p. ej.
+`copy_images_disabled`) no impide continuar. `DetectionTrainingReadinessIssue`
+guarda hallazgos con severidad `error`/`warning`/`info` y codigos fijos
+(`detection_training_not_planned`, `bundle_not_completed`,
+`quality_gate_missing`, `quality_gate_not_passed`,
+`insufficient_total_images`, `insufficient_total_annotations`,
+`insufficient_{train,validation,test}_images`,
+`insufficient_{train,validation,test}_annotations`, `yolo_labels_missing`,
+`dataset_yaml_missing`, `copy_images_disabled`,
+`external_weights_policy_missing`, `ultralytics_not_installed`,
+`torch_not_installed`, `gpu_not_configured`, `training_executor_missing`,
+`command_preview_not_executable`, `expected_outputs_are_planned_only`,
+`taxonomy_not_allowed`, `no_training_executed`). Ninguna de las dos guarda
+imagenes, pesos ni labels completos.
+
+**Config.** `DetectionTrainingReadinessConfig`
+(`ml/configs/detection_training_readiness_config.py`) trae 22 campos:
+booleanos `require_*` para cada gate tecnico (planificacion, bundle
+completado, quality gate aprobado, `dataset.yaml`, labels YOLO, datos
+minimos), ocho minimos numericos por split (`min_train_images`,
+`min_validation_annotations`, etc., todos validados `>= 0`),
+`warn_if_copy_images_disabled`, flags de entorno
+(`require_training_executor`, `require_ultralytics_installed`,
+`require_torch_installed`, `require_gpu`, `allow_cpu_training_future`),
+politica de pesos externos (`require_external_weights_policy`,
+`allow_external_weights`) y `strict_mode`. Por defecto `require_ultralytics_installed`,
+`require_torch_installed` y `require_gpu` son `false` — la Fase 25 no exige
+ninguna dependencia real de entrenamiento salvo que se pida explicitamente.
+
+**Evaluador.** `DetectionTrainingReadinessEvaluator`
+(`application/services/detection_training_readiness_evaluator.py`) es
+puramente una inspeccion de metadata ya persistida en siete secciones (A.
+estado del dry-run, B. bundle, C. quality gate, D. datos minimos, E.
+contrato, F. entorno, G. categorias). Nunca llama `subprocess`, nunca importa
+`ultralytics`/`torch`, nunca consulta GPU real, nunca modifica archivos ni
+descarga nada. Para `require_ultralytics_installed`/`require_torch_installed`/
+`require_gpu`, la regla es literal: si el config los exige, el evaluador
+bloquea siempre (`ultralytics_not_installed`/`torch_not_installed`/
+`gpu_not_configured`, severidad `error`) porque no existe forma segura de
+confirmarlos sin instalar/importar esas dependencias — nunca lo intenta. Si
+no existe `AnnotationQualityGateRun` asociado, no puede determinar conteos
+por split y emite un unico issue generico (`insufficient_total_images`,
+severidad `error` si `strict_mode=true` si no `warning`) en vez de inventar
+conteos. `status` es `blocked` si hay algun error, `warning` si solo hay
+warnings, `ready` en otro caso; `is_ready` es `status in {ready, warning} and
+decision == ready_for_training`. Cuando coexisten varias categorias de error
+bloqueante, la prioridad de decision es
+contrato > calidad > entorno > configuracion > datos.
+
+**Caso de uso.** `CreateDetectionTrainingReadinessReportUseCase` busca el
+`DetectionTrainingRun` (404 si no existe), sus `DetectionTrainingIssue`s, el
+`AnnotationBundleRun` y sus archivos, el `AnnotationQualityGateRun` (si
+existe) y sus issues; ejecuta el evaluador y persiste
+`DetectionTrainingReadinessReport` + `DetectionTrainingReadinessIssue`s en
+una unica transaccion via `UnitOfWorkPort`. Nunca modifica
+`DetectionTrainingRun`, `AnnotationBundleRun` ni `AnnotationQualityGateRun`.
+Un fallo interno de evaluacion se convierte en un reporte
+`status=failed`/`decision=blocked_by_contract` persistido (mismo patron que
+`CreateDetectionTrainingRunUseCase` en Fase 24), nunca en una excepcion sin
+persistir.
+
+**Persistencia.** Alembic `0018_detection_training_readiness_reports.py` crea
+`detection_training_readiness_reports` y `detection_training_readiness_issues`,
+con FKs a `detection_training_runs`, `annotation_bundle_runs`,
+`annotation_quality_gate_runs` (nullable), `dataset_releases` y
+`petri_annotation_export_runs`; CHECKs de `decision`/`status`/`severity`;
+indices de consulta; y JSONB para config y los siete resumenes.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/detection-training-readiness-reports` | Genera un reporte de readiness |
+| GET | `/api/v1/ml/detection-training-readiness-reports` | Lista reportes |
+| GET | `/api/v1/ml/detection-training-readiness-reports/{id}` | Detalle del reporte |
+| GET | `/api/v1/ml/detection-training-readiness-reports/{id}/issues` | Issues del reporte |
+| GET | `/api/v1/ml/detection-training-runs/{id}/readiness-reports` | Reportes por run |
+| GET | `/api/v1/datasets/releases/{id}/detection-training-readiness-reports` | Reportes por release |
+| GET | `/api/v1/ml/annotation-bundles/{id}/detection-training-readiness-reports` | Reportes por bundle |
+| GET | `/api/v1/ml/annotation-quality-gates/{id}/detection-training-readiness-reports` | Reportes por quality gate |
+
+Fase 25 no entrena YOLO ni ningun modelo, no instala `ultralytics`, no
+importa `torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no
+descarga pesos ni datasets externos, no requiere GPU, no crea archivos de
+pesos, no agrega frontend/autenticacion/taxonomia/diagnostico, no integra
+MLflow/TensorBoard/W&B, no usa Celery y no reemplaza `MockInferenceEngine`.
+Un reporte `ready_for_training` no certifica validez cientifica ni modelo
+entrenado — solo que los gates tecnicos configurados pasaron.

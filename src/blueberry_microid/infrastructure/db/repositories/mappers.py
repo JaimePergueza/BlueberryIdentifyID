@@ -15,6 +15,8 @@ from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
 from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
+from blueberry_microid.domain.entities.detection_training_readiness_issue import DetectionTrainingReadinessIssue
+from blueberry_microid.domain.entities.detection_training_readiness_report import DetectionTrainingReadinessReport
 from blueberry_microid.domain.entities.detection_training_run import DetectionTrainingRun
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.image_dataset_audit_issue import ImageDatasetAuditIssue
@@ -50,6 +52,11 @@ from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
 from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
 from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
+from blueberry_microid.domain.enums.detection_training_readiness_decision import DetectionTrainingReadinessDecision
+from blueberry_microid.domain.enums.detection_training_readiness_issue_severity import (
+    DetectionTrainingReadinessIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_readiness_status import DetectionTrainingReadinessStatus
 from blueberry_microid.domain.enums.detection_training_status import DetectionTrainingStatus
 from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import ImageDatasetAuditIssueSeverity
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
@@ -76,6 +83,12 @@ from blueberry_microid.infrastructure.db.models.dataset_release import DatasetRe
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
 from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
+from blueberry_microid.infrastructure.db.models.detection_training_readiness_issue import (
+    DetectionTrainingReadinessIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_readiness_report import (
+    DetectionTrainingReadinessReportModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_run import DetectionTrainingRunModel
 from blueberry_microid.infrastructure.db.models.human_review import HumanReviewModel
 from blueberry_microid.infrastructure.db.models.image_dataset_audit_issue import ImageDatasetAuditIssueModel
@@ -712,6 +725,52 @@ def detection_training_issue_to_entity(model: DetectionTrainingIssueModel) -> De
     return DetectionTrainingIssue(
         detection_training_run_id=model.detection_training_run_id,
         severity=DetectionTrainingIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
+        details=model.details,
+        created_at=model.created_at,
+    )
+
+
+def detection_training_readiness_report_to_entity(
+    model: DetectionTrainingReadinessReportModel,
+) -> DetectionTrainingReadinessReport:
+    return DetectionTrainingReadinessReport(
+        detection_training_run_id=model.detection_training_run_id,
+        annotation_bundle_run_id=model.annotation_bundle_run_id,
+        dataset_release_id=model.dataset_release_id,
+        petri_annotation_export_run_id=model.petri_annotation_export_run_id,
+        decision=DetectionTrainingReadinessDecision(model.decision),
+        status=DetectionTrainingReadinessStatus(model.status),
+        is_ready=model.is_ready,
+        config=model.config,
+        data_summary=model.data_summary,
+        split_summary=model.split_summary,
+        quality_summary=model.quality_summary,
+        environment_summary=model.environment_summary,
+        contract_summary=model.contract_summary,
+        risk_summary=model.risk_summary,
+        recommendation_summary=model.recommendation_summary,
+        error_count=model.error_count,
+        warning_count=model.warning_count,
+        info_count=model.info_count,
+        id=model.id,
+        annotation_quality_gate_run_id=model.annotation_quality_gate_run_id,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def detection_training_readiness_issue_to_entity(
+    model: DetectionTrainingReadinessIssueModel,
+) -> DetectionTrainingReadinessIssue:
+    return DetectionTrainingReadinessIssue(
+        readiness_report_id=model.readiness_report_id,
+        severity=DetectionTrainingReadinessIssueSeverity(model.severity),
         code=model.code,
         message=model.message,
         id=model.id,
