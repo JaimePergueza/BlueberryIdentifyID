@@ -17,6 +17,8 @@ from sqlalchemy.pool import StaticPool
 from blueberry_microid.infrastructure.config.settings import Settings
 from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
+    AnnotationBundleFileModel,
+    AnnotationBundleRunModel,
     Base,
     DatasetItemModel,
     DatasetReleaseModel,
@@ -74,6 +76,8 @@ _SQLITE_TABLES = [
     PetriRegionReviewModel.__table__,
     PetriAnnotationExportRunModel.__table__,
     PetriAnnotationExportItemModel.__table__,
+    AnnotationBundleRunModel.__table__,
+    AnnotationBundleFileModel.__table__,
 ]
 
 

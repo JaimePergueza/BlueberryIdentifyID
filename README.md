@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 21)
+## MVP status (as of Fase 22)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -31,7 +31,9 @@ and Alembic migrations. 556 automated tests (477 SQLite/eager-based + 79
 PostgreSQL-only); Fase 17 also adds persisted comparison reports over completed
 baseline `TrainingRun` metrics, and Fases 19-21 add classical Petri candidate
 segmentation, human review of regions, and supervised annotation export
-manifests. The CI workflow runs the fast suite on SQLite, applies
+manifests. Fase 22 adds persisted annotation bundle runs/files that package
+those exports into dry-run plans or filesystem bundles. The CI workflow runs
+the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
 every push/PR to `main`.
@@ -239,6 +241,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Training run comparisons:** `POST /api/v1/ml/training-run-comparisons` compares completed baseline runs for one `DatasetRelease` using persisted accuracy/support metrics only. Selection is preliminary and traceable; no training, model artifact, new prediction, raw image access, PyTorch/TensorFlow/deep learning, external dataset, or taxonomy is involved.
 - **Classical Petri segmentation:** `POST /api/v1/ml/petri-segmentations` runs an OpenCV-headless classical candidate-region segmentation over Petri images in a `DatasetRelease`. It stores only geometry for candidate regions; no masks, image bytes, YOLO, OpenCV DNN, deep learning, taxonomy, diagnosis, or real-colony confirmation.
 - **Supervised Petri annotation exports:** `POST /api/v1/ml/petri-annotation-exports` exports final reviewed Petri candidate-region annotations as Blueberry manifest, COCO-style JSON, or YOLO label-manifest JSON. It never trains YOLO or any model and never copies images by default.
+- **Annotation export bundles:** `POST /api/v1/ml/annotation-bundles` turns a persisted `PetriAnnotationExportRun` into a dry-run plan or filesystem bundle with README, Blueberry manifest, COCO JSON, YOLO label text files, `dataset.yaml`, and bundle `manifest.json`. YOLO means label syntax only. Images are externally referenced by default, not copied; no model training, model weights, PyTorch/TensorFlow/deep learning, external dataset, taxonomy, or frontend is introduced.
 - **Technical image dataset audit:** `POST /api/v1/ml/image-audits` opens each Petri/micro image file referenced by a `DatasetRelease` with Pillow (existence, corruption, format, dimensions, color mode, declared-vs-real file size) and persists the result. It is a technical file check, not the Fase 12 manifest preflight and not a scientific/microbiological evaluation; it never creates tensors or uses PyTorch/TensorFlow.
 - **Non-deep image feature extraction:** `POST /api/v1/ml/image-feature-extractions` requires a non-failed `ImageDatasetAuditRun` for the same `DatasetRelease`, then computes geometry/intensity/color/sharpness/texture/histogram features per Petri/micro image with Pillow + numpy and persists one `ImageFeatureVector` per image. It never trains a model, never uses PyTorch/TensorFlow, and never assigns taxonomy.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
@@ -337,6 +340,15 @@ Petri annotation export endpoints (Fase 21 - supervised annotation formats, no m
 - `GET /api/v1/ml/petri-annotation-exports/{export_run_id}/manifest`
 - `GET /api/v1/datasets/releases/{dataset_release_id}/petri-annotation-exports`
 - `GET /api/v1/ml/petri-segmentations/{petri_segmentation_run_id}/annotation-exports`
+
+Annotation bundle endpoints (Fase 22 - export bundle packaging, no training):
+
+- `POST /api/v1/ml/annotation-bundles`
+- `GET /api/v1/ml/annotation-bundles`
+- `GET /api/v1/ml/annotation-bundles/{bundle_run_id}`
+- `GET /api/v1/ml/annotation-bundles/{bundle_run_id}/files`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/annotation-bundles`
+- `GET /api/v1/ml/petri-annotation-exports/{export_run_id}/annotation-bundles`
 
 Async processing endpoints:
 

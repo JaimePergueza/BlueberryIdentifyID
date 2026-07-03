@@ -1398,3 +1398,46 @@ summary y payloads.
 Fase 21 no implementa YOLO como modelo, no entrena YOLO, no usa PyTorch,
 TensorFlow, CNN, ViT ni deep learning, no descarga datasets externos, no
 agrega frontend/autenticacion/taxonomia y no reemplaza `MockInferenceEngine`.
+
+## 38. Fase 22 - Annotation Export Bundle
+
+Objetivo: empaquetar una `PetriAnnotationExportRun` persistida en un bundle
+auditable y reproducible de anotaciones supervisadas, sin entrenar modelos.
+
+**Entidades.** `AnnotationBundleRun` representa el intento de bundle y queda
+vinculado a `PetriAnnotationExportRun`, `DatasetRelease` y
+`PetriSegmentationRun`. Guarda status (`dry_run`, `completed`, `failed`),
+config, `output_dir`, `dry_run`, conteos, `validation_summary`,
+`bundle_manifest`, `created_by`/`notes` y `error_message`.
+`AnnotationBundleFile` guarda metadatos de cada archivo planificado o escrito:
+rol, ruta absoluta, ruta relativa, content type, tamano, checksum y fecha. No
+guarda imagenes ni binarios.
+
+**Servicios.** `AnnotationBundleValidator` valida bboxes, splits, formatos
+derivados, presencia opcional de imagenes y terminos taxonomicos prohibidos
+en campos de label/nombre/categoria. `AnnotationBundleWriter` genera un
+bundle determinista con README, `annotations/blueberry_manifest.json`,
+`annotations/coco_annotations.json`, labels YOLO `.txt`, `dataset.yaml` y
+`manifest.json`. En `dry_run=true` solo planifica archivos; no escribe disco.
+`copy_images=true` se rechaza intencionalmente en esta fase.
+
+**Persistencia.** Alembic `0015_annotation_bundles.py` crea
+`annotation_bundle_runs` y `annotation_bundle_files`, con FKs a export run,
+dataset release y segmentation run; CHECKs de status/rol; indices de consulta;
+y JSONB para config, validation summary y bundle manifest.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/annotation-bundles` | Crea un bundle dry-run o real desde un export run |
+| GET | `/api/v1/ml/annotation-bundles` | Lista bundles |
+| GET | `/api/v1/ml/annotation-bundles/{bundle_run_id}` | Detalle del bundle |
+| GET | `/api/v1/ml/annotation-bundles/{bundle_run_id}/files` | Archivos planificados/escritos |
+| GET | `/api/v1/datasets/releases/{dataset_release_id}/annotation-bundles` | Bundles por release |
+| GET | `/api/v1/ml/petri-annotation-exports/{export_run_id}/annotation-bundles` | Bundles por export run |
+
+YOLO aqui significa solo sintaxis de archivo de labels. Fase 22 no entrena
+YOLO ni ningun modelo, no usa PyTorch/TensorFlow/CNN/ViT/deep learning, no
+descarga datasets externos, no copia imagenes por defecto, no agrega
+frontend/autenticacion/taxonomia y no reemplaza `MockInferenceEngine`.

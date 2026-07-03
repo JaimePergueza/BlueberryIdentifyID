@@ -28,6 +28,13 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 # CASCADE the order is not strictly required, but keeping it explicit
 # documents the dependency graph.
 _ALL_TABLES = (
+    "annotation_bundle_files",
+    "annotation_bundle_runs",
+    "petri_annotation_export_items",
+    "petri_annotation_export_runs",
+    "petri_region_reviews",
+    "petri_segmentation_regions",
+    "petri_segmentation_runs",
     "image_feature_vectors",
     "image_feature_extraction_runs",
     "image_dataset_audit_issues",

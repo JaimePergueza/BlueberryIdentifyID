@@ -7,6 +7,12 @@ from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_repository import (
     SqlAlchemyAnalysisRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bundle_file_repository import (
+    SqlAlchemyAnnotationBundleFileRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bundle_run_repository import (
+    SqlAlchemyAnnotationBundleRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
 )
@@ -98,6 +104,8 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
     def __enter__(self) -> "SqlAlchemyUnitOfWork":
         self.session = self._session_factory()
         self.analysis_run_repository = SqlAlchemyAnalysisRunRepository(self.session, auto_commit=False)
+        self.annotation_bundle_file_repository = SqlAlchemyAnnotationBundleFileRepository(self.session, auto_commit=False)
+        self.annotation_bundle_run_repository = SqlAlchemyAnnotationBundleRunRepository(self.session, auto_commit=False)
         self.dataset_item_repository = SqlAlchemyDatasetItemRepository(self.session, auto_commit=False)
         self.dataset_release_repository = SqlAlchemyDatasetReleaseRepository(self.session, auto_commit=False)
         self.dataset_snapshot_repository = SqlAlchemyDatasetSnapshotRepository(self.session, auto_commit=False)

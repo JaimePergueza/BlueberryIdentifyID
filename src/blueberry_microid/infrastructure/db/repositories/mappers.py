@@ -6,6 +6,8 @@ application layer.
 """
 
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
+from blueberry_microid.domain.entities.annotation_bundle_file import AnnotationBundleFile
+from blueberry_microid.domain.entities.annotation_bundle_run import AnnotationBundleRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
@@ -32,6 +34,8 @@ from blueberry_microid.domain.entities.training_run import TrainingRun
 from blueberry_microid.domain.entities.training_run_comparison import TrainingRunComparison
 from blueberry_microid.domain.entities.training_run_comparison_entry import TrainingRunComparisonEntry
 from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
+from blueberry_microid.domain.enums.annotation_bundle_file_role import AnnotationBundleFileRole
+from blueberry_microid.domain.enums.annotation_bundle_status import AnnotationBundleStatus
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
@@ -51,6 +55,8 @@ from blueberry_microid.domain.enums.training_preflight_status import TrainingPre
 from blueberry_microid.domain.enums.training_run_kind import TrainingRunKind
 from blueberry_microid.domain.enums.training_run_status import TrainingRunStatus
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
+from blueberry_microid.infrastructure.db.models.annotation_bundle_file import AnnotationBundleFileModel
+from blueberry_microid.infrastructure.db.models.annotation_bundle_run import AnnotationBundleRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
@@ -569,5 +575,44 @@ def petri_annotation_export_item_to_entity(model: PetriAnnotationExportItemModel
         bbox_source=PetriAnnotationBboxSource(model.bbox_source),
         export_payload=model.export_payload,
         id=model.id,
+        created_at=model.created_at,
+    )
+
+
+def annotation_bundle_run_to_entity(model: AnnotationBundleRunModel) -> AnnotationBundleRun:
+    return AnnotationBundleRun(
+        petri_annotation_export_run_id=model.petri_annotation_export_run_id,
+        dataset_release_id=model.dataset_release_id,
+        petri_segmentation_run_id=model.petri_segmentation_run_id,
+        status=AnnotationBundleStatus(model.status),
+        is_completed=model.is_completed,
+        config=model.config,
+        dry_run=model.dry_run,
+        file_count=model.file_count,
+        annotation_count=model.annotation_count,
+        image_count=model.image_count,
+        label_count=model.label_count,
+        validation_summary=model.validation_summary,
+        bundle_manifest=model.bundle_manifest,
+        id=model.id,
+        output_dir=model.output_dir,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def annotation_bundle_file_to_entity(model: AnnotationBundleFileModel) -> AnnotationBundleFile:
+    return AnnotationBundleFile(
+        bundle_run_id=model.bundle_run_id,
+        file_role=AnnotationBundleFileRole(model.file_role),
+        file_path=model.file_path,
+        relative_path=model.relative_path,
+        id=model.id,
+        content_type=model.content_type,
+        size_bytes=model.size_bytes,
+        checksum_sha256=model.checksum_sha256,
         created_at=model.created_at,
     )

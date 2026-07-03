@@ -84,6 +84,10 @@ class PetriAnnotationExportRunNotFoundError(NotFoundError):
     """Raised when a requested PetriAnnotationExportRun does not exist."""
 
 
+class AnnotationBundleRunNotFoundError(NotFoundError):
+    """Raised when a requested AnnotationBundleRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -165,6 +169,10 @@ class PetriSegmentationNotAllowedError(ConflictError):
 
 class PetriAnnotationExportNotAllowedError(ConflictError):
     """Raised when reviewed Petri annotations cannot be exported for a requested scope."""
+
+
+class AnnotationBundleNotAllowedError(ConflictError):
+    """Raised when a supervised annotation bundle cannot be created safely."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

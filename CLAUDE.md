@@ -316,3 +316,28 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   Celery, no entrenar modelos, no usar PyTorch/TensorFlow/CNN/ViT/deep
   learning, no descargar datasets externos, no agregar frontend/autenticacion
   y no reemplazar `MockInferenceEngine`.
+
+## 19. Annotation Export Bundle (Fase 22)
+
+- `AnnotationBundleRun` y `AnnotationBundleFile` empaquetan una
+  `PetriAnnotationExportRun` ya persistida en un bundle auditable para uso
+  futuro. No crean anotaciones nuevas y no modifican export runs, reviews,
+  segmentaciones ni imagenes originales.
+- `AnnotationBundleConfig.copy_images` debe seguir rechazado en esta fase.
+  El comportamiento por defecto es `dry_run=true`: planificar y persistir los
+  archivos esperados sin escribir en disco.
+- El writer solo puede generar archivos de texto/JSON/YAML: README,
+  `blueberry_manifest.json`, `coco_annotations.json`, labels YOLO `.txt`,
+  `dataset.yaml` y `manifest.json`. YOLO significa formato de labels, nunca
+  modelo, detector, pesos, entrenamiento ni dependencia.
+- El validator revisa geometria de bboxes, splits, formatos derivados,
+  existencia opcional de imagenes y terminos prohibidos en label/nombre/
+  categoria. Mantener la categoria generica `candidate_region`.
+- Endpoints bajo `/api/v1/ml/annotation-bundles`,
+  `/api/v1/datasets/releases/{id}/annotation-bundles` y
+  `/api/v1/ml/petri-annotation-exports/{id}/annotation-bundles`, con
+  `X-Request-ID`.
+- Sigue prohibido entrenar modelos, usar PyTorch/TensorFlow/CNN/ViT/deep
+  learning, copiar o descargar datasets externos, agregar frontend,
+  autenticacion, taxonomia, diagnostico, Celery en este flujo o reemplazar
+  `MockInferenceEngine`.

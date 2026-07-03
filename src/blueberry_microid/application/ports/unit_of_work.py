@@ -3,6 +3,8 @@ from types import TracebackType
 from typing import Optional
 
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
+from blueberry_microid.application.ports.annotation_bundle_file_repository import AnnotationBundleFileRepositoryPort
+from blueberry_microid.application.ports.annotation_bundle_run_repository import AnnotationBundleRunRepositoryPort
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
@@ -58,6 +60,8 @@ class UnitOfWorkPort(ABC):
     """
 
     analysis_run_repository: AnalysisRunRepositoryPort
+    annotation_bundle_file_repository: AnnotationBundleFileRepositoryPort
+    annotation_bundle_run_repository: AnnotationBundleRunRepositoryPort
     dataset_item_repository: DatasetItemRepositoryPort
     dataset_release_repository: DatasetReleaseRepositoryPort
     dataset_snapshot_repository: DatasetSnapshotRepositoryPort

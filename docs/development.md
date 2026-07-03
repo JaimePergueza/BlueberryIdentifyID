@@ -1462,3 +1462,45 @@ This phase does not copy images by default, does not write label files to
 disk, does not train YOLO or any other model, and does not add PyTorch,
 TensorFlow, CNN, ViT, deep learning, external datasets, frontend,
 authentication, taxonomy, MLflow, TensorBoard, or W&B.
+
+## 31. Annotation export bundles (Fase 22)
+
+Fase 22 packages a persisted `PetriAnnotationExportRun` into an auditable
+annotation bundle for future supervised training workflows. It still does
+not train anything.
+
+- `AnnotationBundleConfig` controls dry-run planning, output directory,
+  overwrite behavior, included formats (`blueberry_manifest`, COCO JSON,
+  YOLO label files, `dataset.yaml`, README), validation, and split
+  directory preservation. `copy_images=true` is intentionally rejected in
+  this phase.
+- `AnnotationBundleRun` stores the bundle attempt linked to
+  `PetriAnnotationExportRun`, `DatasetRelease`, and `PetriSegmentationRun`,
+  with status (`dry_run`, `completed`, `failed`), counts, config,
+  validation summary, bundle manifest, output directory, creator/notes, and
+  optional error message.
+- `AnnotationBundleFile` stores metadata for each planned or written file:
+  role, absolute path, relative path, content type, size, checksum, and
+  bundle reference. It never stores image bytes.
+- `AnnotationBundleValidator` checks persisted export data before writing:
+  bbox geometry, splits, optional image existence, supported format payloads,
+  and label/category/name fields for forbidden taxonomy-like terms.
+- `AnnotationBundleWriter` produces deterministic bundle content. Dry-run
+  mode persists the planned file list without writing. Real mode writes
+  text/JSON/YAML files only: README, Blueberry manifest, COCO annotations,
+  YOLO label `.txt` files, `dataset.yaml`, and `manifest.json`.
+
+Endpoints:
+
+- `POST /api/v1/ml/annotation-bundles`
+- `GET /api/v1/ml/annotation-bundles`
+- `GET /api/v1/ml/annotation-bundles/{bundle_run_id}`
+- `GET /api/v1/ml/annotation-bundles/{bundle_run_id}/files`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/annotation-bundles`
+- `GET /api/v1/ml/petri-annotation-exports/{export_run_id}/annotation-bundles`
+
+YOLO in this phase means only label text format. The bundle does not copy
+images by default, does not include binaries, does not train or evaluate a
+model, does not add PyTorch/TensorFlow/CNN/ViT/deep learning, does not
+download datasets, does not add frontend/authentication/taxonomy, and does
+not replace `MockInferenceEngine`.

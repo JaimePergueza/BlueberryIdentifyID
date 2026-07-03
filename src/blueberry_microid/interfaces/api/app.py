@@ -17,6 +17,7 @@ from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.interfaces.api.error_handlers import register_exception_handlers
 from blueberry_microid.interfaces.api.v1.routers import (
     analysis_runs,
+    annotation_bundles,
     datasets,
     human_reviews,
     image_audits,
@@ -84,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(petri_images.router, prefix=API_V1_PREFIX)
     app.include_router(micro_images.router, prefix=API_V1_PREFIX)
     app.include_router(analysis_runs.router, prefix=API_V1_PREFIX)
+    app.include_router(annotation_bundles.router, prefix=API_V1_PREFIX)
     app.include_router(human_reviews.router, prefix=API_V1_PREFIX)
     app.include_router(datasets.router, prefix=API_V1_PREFIX)
     app.include_router(ml_preflight.router, prefix=API_V1_PREFIX)

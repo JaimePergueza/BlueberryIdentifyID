@@ -21,6 +21,8 @@ from blueberry_microid.application.exceptions import (
     AnalysisRunFinalizationError,
     AnalysisRunNotFoundError,
     AnalysisRunNotReviewableError,
+    AnnotationBundleNotAllowedError,
+    AnnotationBundleRunNotFoundError,
     ApplicationError,
     BaselineTrainingNotAllowedError,
     ConflictError,
@@ -91,6 +93,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "model_version_not_found"
     if isinstance(exc, AnalysisRunNotFoundError):
         return 404, "analysis_run_not_found"
+    if isinstance(exc, AnnotationBundleRunNotFoundError):
+        return 404, "annotation_bundle_run_not_found"
     if isinstance(exc, HumanReviewNotFoundError):
         return 404, "human_review_not_found"
     if isinstance(exc, DatasetSnapshotNotFoundError):
@@ -148,6 +152,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "petri_annotation_export_not_allowed"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
+    if isinstance(exc, AnnotationBundleNotAllowedError):
+        return 409, "annotation_bundle_not_allowed"
     if isinstance(exc, ConflictError):
         return 409, "conflict"
 

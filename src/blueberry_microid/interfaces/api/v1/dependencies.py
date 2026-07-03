@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from celery import Celery
 
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
+from blueberry_microid.application.ports.annotation_bundle_file_repository import AnnotationBundleFileRepositoryPort
+from blueberry_microid.application.ports.annotation_bundle_run_repository import AnnotationBundleRunRepositoryPort
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
@@ -64,6 +66,8 @@ from blueberry_microid.application.ports.training_run_comparison_repository impo
 from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
+from blueberry_microid.application.services.annotation_bundle_validator import AnnotationBundleValidator
+from blueberry_microid.application.services.annotation_bundle_writer import AnnotationBundleWriter
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
 from blueberry_microid.application.services.dataset_splitter import DatasetSplitter
@@ -72,6 +76,18 @@ from blueberry_microid.application.services.petri_reviewed_annotation_manifest_e
 )
 from blueberry_microid.application.services.petri_annotation_exporter import PetriAnnotationExporter
 from blueberry_microid.application.services.training_run_comparator import TrainingRunComparator
+from blueberry_microid.application.use_cases.annotation_bundle.create_annotation_bundle_run import (
+    CreateAnnotationBundleRunUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_bundle.get_annotation_bundle_run import (
+    GetAnnotationBundleRunUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_bundle.list_annotation_bundle_files import (
+    ListAnnotationBundleFilesUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_bundle.list_annotation_bundle_runs import (
+    ListAnnotationBundleRunsUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
@@ -192,6 +208,12 @@ from blueberry_microid.application.use_cases.sample.get_sample import (
 from blueberry_microid.infrastructure.config.settings import Settings
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_repository import (
     SqlAlchemyAnalysisRunRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bundle_file_repository import (
+    SqlAlchemyAnnotationBundleFileRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bundle_run_repository import (
+    SqlAlchemyAnnotationBundleRunRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
@@ -482,6 +504,18 @@ def get_petri_annotation_export_item_repository(
     return SqlAlchemyPetriAnnotationExportItemRepository(session)
 
 
+def get_annotation_bundle_run_repository(
+    session: Session = Depends(get_db_session),
+) -> AnnotationBundleRunRepositoryPort:
+    return SqlAlchemyAnnotationBundleRunRepository(session)
+
+
+def get_annotation_bundle_file_repository(
+    session: Session = Depends(get_db_session),
+) -> AnnotationBundleFileRepositoryPort:
+    return SqlAlchemyAnnotationBundleFileRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -503,6 +537,14 @@ def get_image_dataset_auditor() -> ImageDatasetAuditor:
 
 def get_petri_annotation_exporter() -> PetriAnnotationExporter:
     return PetriAnnotationExporter()
+
+
+def get_annotation_bundle_validator() -> AnnotationBundleValidator:
+    return AnnotationBundleValidator()
+
+
+def get_annotation_bundle_writer() -> AnnotationBundleWriter:
+    return AnnotationBundleWriter()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1108,3 +1150,40 @@ def get_list_petri_annotation_export_items_use_case(
     item_repository: PetriAnnotationExportItemRepositoryPort = Depends(get_petri_annotation_export_item_repository),
 ) -> ListPetriAnnotationExportItemsUseCase:
     return ListPetriAnnotationExportItemsUseCase(run_repository, item_repository)
+
+
+def get_create_annotation_bundle_run_use_case(
+    export_run_repository: PetriAnnotationExportRunRepositoryPort = Depends(get_petri_annotation_export_run_repository),
+    export_item_repository: PetriAnnotationExportItemRepositoryPort = Depends(
+        get_petri_annotation_export_item_repository
+    ),
+    validator: AnnotationBundleValidator = Depends(get_annotation_bundle_validator),
+    writer: AnnotationBundleWriter = Depends(get_annotation_bundle_writer),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateAnnotationBundleRunUseCase:
+    return CreateAnnotationBundleRunUseCase(
+        export_run_repository,
+        export_item_repository,
+        validator,
+        writer,
+        unit_of_work,
+    )
+
+
+def get_get_annotation_bundle_run_use_case(
+    run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+) -> GetAnnotationBundleRunUseCase:
+    return GetAnnotationBundleRunUseCase(run_repository)
+
+
+def get_list_annotation_bundle_runs_use_case(
+    run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+) -> ListAnnotationBundleRunsUseCase:
+    return ListAnnotationBundleRunsUseCase(run_repository)
+
+
+def get_list_annotation_bundle_files_use_case(
+    run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+    file_repository: AnnotationBundleFileRepositoryPort = Depends(get_annotation_bundle_file_repository),
+) -> ListAnnotationBundleFilesUseCase:
+    return ListAnnotationBundleFilesUseCase(run_repository, file_repository)
