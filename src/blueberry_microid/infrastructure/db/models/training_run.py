@@ -20,7 +20,10 @@ class TrainingRunModel(Base):
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'running', 'completed', 'failed')", name="ck_training_runs_status"),
         CheckConstraint("run_kind IN ('baseline')", name="ck_training_runs_run_kind"),
-        CheckConstraint("baseline_model_type IN ('majority_class')", name="ck_training_runs_baseline_model_type"),
+        CheckConstraint(
+            "baseline_model_type IN ('majority_class', 'logistic_regression_tabular')",
+            name="ck_training_runs_baseline_model_type",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

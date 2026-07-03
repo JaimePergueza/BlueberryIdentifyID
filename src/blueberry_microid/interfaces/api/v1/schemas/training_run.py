@@ -11,6 +11,7 @@ from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.training_run_kind import TrainingRunKind
 from blueberry_microid.domain.enums.training_run_status import TrainingRunStatus
+from blueberry_microid.ml.configs.tabular_feature_training_config import TabularFeatureTrainingConfig
 from blueberry_microid.interfaces.api.v1.schemas.ml_preflight import TrainingConfigRequest
 
 
@@ -20,6 +21,36 @@ class CreateBaselineTrainingRunRequestBody(BaseModel):
     experiment_name: str
     training_config: TrainingConfigRequest
     baseline_model_type: BaselineModelType = BaselineModelType.MAJORITY_CLASS
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TabularFeatureTrainingConfigRequest(BaseModel):
+    feature_extraction_run_id: UUID
+    model_type: BaselineModelType = BaselineModelType.LOGISTIC_REGRESSION_TABULAR
+    use_petri_features: bool = True
+    use_micro_features: bool = True
+    fusion_strategy: str = "concatenate"
+    standardize_features: bool = True
+    max_iter: int = 500
+    random_seed: int = 42
+    min_train_items: int = 2
+    min_classes_train: int = 2
+    allow_inconclusive: bool = False
+    class_weight: Optional[str] = None
+    solver: Optional[str] = None
+    fail_on_missing_feature: bool = True
+
+    def to_config(self) -> TabularFeatureTrainingConfig:
+        return TabularFeatureTrainingConfig.from_dict(self.model_dump())
+
+
+class CreateClassicalBaselineTrainingRunRequestBody(BaseModel):
+    dataset_release_id: UUID
+    preflight_run_id: UUID
+    image_feature_extraction_run_id: UUID
+    experiment_name: str
+    tabular_training_config: TabularFeatureTrainingConfigRequest
     created_by: Optional[str] = None
     notes: Optional[str] = None
 

@@ -1064,3 +1064,72 @@ computador certificadas. (c) No existe todavia normalizacion/escalado de
 features entre imagenes de distinto tamano real — el resize es opcional y
 nunca se aplica por defecto. (d) Sigue sin existir entrenamiento real,
 PyTorch, TensorFlow, deep learning, dataset externo, frontend ni taxonomia.
+
+## 32. Fase 16 - baseline clasico tabular sobre ImageFeatureVector (implementada)
+
+Objetivo: entrenar un baseline clasico reproducible con features reales ya
+extraidas (`ImageFeatureVector`), sin deep learning, sin PyTorch/TensorFlow,
+sin cargar imagenes como tensores y sin reemplazar `MockInferenceEngine`.
+
+**Diagnostico.** `ImageFeatureVector.features` ya contiene `X`: escalares y
+histogramas pequenos de geometria/intensidad/color/nitidez/textura por
+modalidad Petri/micro. `DatasetSplitItem.ground_truth_label` ya contiene `y`,
+derivada de revision humana final por las fases de dataset curado; no se usa
+`Prediction` como ground truth. El split se respeta por
+`DatasetSplitItem.split` y por las referencias persistidas en cada vector.
+
+**Config.** `TabularFeatureTrainingConfig` selecciona
+`feature_extraction_run_id`, `model_type=logistic_regression_tabular`,
+modalidades (`petri_only`, `micro_only`, `concatenate`), estandarizacion,
+`max_iter`, `random_seed`, minimos de train/clases, `allow_inconclusive`,
+`class_weight`, `solver` y `fail_on_missing_feature`. Valida que al menos una
+modalidad sea usable y que no se pidan modelos profundos.
+
+**FeatureMatrixBuilder.** Vive en `ml/training/feature_matrix_builder.py`.
+Consume solo `ImageFeatureVector` + `DatasetSplitItem`; aplana JSON numerico
+de forma deterministica, expande listas numericas pequenas como columnas,
+prefija por modalidad (`petri__...`, `micro__...`), produce `X_train`,
+`X_validation`, `X_test`, labels por split y referencias a items. Si falta una
+modalidad requerida y `fail_on_missing_feature=true`, falla en vez de imputar
+silenciosamente. No abre archivos de imagen.
+
+**Trainer.** `ClassicalTabularBaselineTrainer` usa scikit-learn
+`LogisticRegression` (con `StandardScaler` opcional). Ajusta solo con train;
+validation/test se usan despues para prediccion y metricas. Metricas reales
+persistidas: `accuracy_overall`, `accuracy_by_split`, `support_by_split`,
+`label_distribution_by_split`, `confusion_matrix` y
+`confusion_matrix_by_split`. Precision/recall/F1 quedan fuera de alcance.
+
+**Persistencia.** Se reutilizan `TrainingRun` y `TrainingPrediction`. No se
+crean tablas nuevas para predicciones ni se serializa el modelo. Migracion
+`0010_classical_tabular_baseline.py` solo amplia el `CHECK`
+`ck_training_runs_baseline_model_type` para aceptar
+`logistic_regression_tabular`; el `baseline_state` guarda
+`feature_extraction_run_id`, `feature_names`, labels de clase, si hubo scaler,
+parametros basicos y conteo train.
+
+**Caso de uso.** `CreateClassicalBaselineTrainingRunUseCase` exige:
+`DatasetRelease` existente, `TrainingPreflightRun` no fallido y del mismo
+release, `ImageFeatureExtractionRun` `completed` y del mismo release, y
+features disponibles. Construye la matriz, entrena, persiste
+`TrainingRun completed` + `TrainingPrediction`s en una transaccion. Fallos de
+forma de datos entrenables (por ejemplo una sola clase en train) se persisten
+como `TrainingRun failed` sin predicciones.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/training-runs/classical-baseline` | Crea baseline logistic-regression tabular desde `ImageFeatureVector` |
+
+**Dependencia nueva.** `scikit-learn>=1.4,<2.0` se agrega a
+`pyproject.toml` solo para este baseline tabular clasico. No es PyTorch,
+TensorFlow ni deep learning.
+
+**Riesgos pendientes antes de Fase 17.** (a) Logistic regression puede ser
+inestable o poco informativa en datasets pequenos; sus metricas son reales
+pero no evidencia cientifica definitiva. (b) No se persiste un artefacto de
+modelo reproducible todavia; solo config/estado/metricas/predicciones. (c) La
+calidad de features depende de la consistencia de captura y preprocesamiento.
+(d) Sigue sin existir IA real de inferencia, deep learning, dataset externo,
+frontend, autenticacion ni taxonomia.

@@ -2,20 +2,28 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from blueberry_microid.application.dto.training_run_dto import CreateBaselineTrainingRunRequest
+from blueberry_microid.application.dto.training_run_dto import (
+    CreateBaselineTrainingRunRequest,
+    CreateClassicalBaselineTrainingRunRequest,
+)
 from blueberry_microid.application.use_cases.training.create_baseline_training_run import CreateBaselineTrainingRunUseCase
+from blueberry_microid.application.use_cases.training.create_classical_baseline_training_run import (
+    CreateClassicalBaselineTrainingRunUseCase,
+)
 from blueberry_microid.application.use_cases.training.get_training_run import GetTrainingRunUseCase
 from blueberry_microid.application.use_cases.training.list_training_predictions import ListTrainingPredictionsUseCase
 from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.interfaces.api.v1.dependencies import (
     get_create_baseline_training_run_use_case,
+    get_create_classical_baseline_training_run_use_case,
     get_get_training_run_use_case,
     get_list_training_predictions_use_case,
     get_list_training_runs_use_case,
 )
 from blueberry_microid.interfaces.api.v1.schemas.training_run import (
     CreateBaselineTrainingRunRequestBody,
+    CreateClassicalBaselineTrainingRunRequestBody,
     TrainingPredictionResponse,
     TrainingRunResponse,
 )
@@ -36,6 +44,27 @@ def create_baseline_training_run(
             experiment_name=payload.experiment_name,
             training_config=TrainingConfig.from_dict(payload.training_config.model_dump()),
             baseline_model_type=payload.baseline_model_type,
+            created_by=payload.created_by,
+            notes=payload.notes,
+        )
+    )
+    return TrainingRunResponse.model_validate(dto)
+
+
+@router.post("/classical-baseline", response_model=TrainingRunResponse, status_code=status.HTTP_201_CREATED)
+def create_classical_baseline_training_run(
+    payload: CreateClassicalBaselineTrainingRunRequestBody,
+    use_case: CreateClassicalBaselineTrainingRunUseCase = Depends(
+        get_create_classical_baseline_training_run_use_case
+    ),
+) -> TrainingRunResponse:
+    dto = use_case.execute(
+        CreateClassicalBaselineTrainingRunRequest(
+            dataset_release_id=payload.dataset_release_id,
+            preflight_run_id=payload.preflight_run_id,
+            image_feature_extraction_run_id=payload.image_feature_extraction_run_id,
+            experiment_name=payload.experiment_name,
+            tabular_training_config=payload.tabular_training_config.to_config(),
             created_by=payload.created_by,
             notes=payload.notes,
         )

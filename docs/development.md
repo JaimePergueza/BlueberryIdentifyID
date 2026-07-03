@@ -67,13 +67,19 @@ pip install -e ".[dev]"
 ```
 
 This installs the runtime dependencies (fastapi, uvicorn, sqlalchemy,
-alembic, pydantic, pydantic-settings, pillow, python-multipart, psycopg) and
+alembic, pydantic, pydantic-settings, pillow, numpy, scikit-learn,
+python-multipart, psycopg) and
 the `dev` extra (pytest, httpx) in one step, in editable mode, **inside the
 active `.venv`** — confirm the venv is active (prompt shows `(.venv)`, or
 `which python` / `where python` points inside `.venv`) before running this.
 `httpx` is a dev-only dependency: it's what `fastapi.testclient.TestClient`
 and `scripts/api_smoke_test.py` use, but the running API itself never
 imports it.
+
+`scikit-learn` is used only by the Fase 16 classical tabular baseline
+(`logistic_regression_tabular`) over already-persisted `ImageFeatureVector`
+rows. It is not PyTorch/TensorFlow, does not read image bytes, and is not used
+by `MockInferenceEngine`.
 
 ## 3. Environment variables
 
@@ -426,21 +432,21 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 15 this collects **432 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **379 passed, 53 skipped** (the 53 PostgreSQL-only tests
+As of Fase 16 this collects **448 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **394 passed, 54 skipped** (the 54 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
 |---|---|---|
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
-| `tests/unit/application/` | 146 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, majority-class baseline persistence/failure rules, `CreateImageDatasetAuditRunUseCase` persistence/rollback rules, and `CreateImageFeatureExtractionRunUseCase` audit-acceptance/persistence/rollback rules) — no database, no filesystem. |
+| `tests/unit/application/` | 150 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, `by_sample`/`by_lot`/`by_origin_lot` strategy rules, persisted ML preflight creation/rollback rules, majority-class baseline persistence/failure rules, classical tabular baseline gate/persistence/failure rules, `CreateImageDatasetAuditRunUseCase` persistence/rollback rules, and `CreateImageFeatureExtractionRunUseCase` audit-acceptance/persistence/rollback rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
-| `tests/unit/ml/` | 58 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, the Fase 13 majority-class baseline trainer, the Fase 14 `ImageDatasetAuditor` (passed/warning/failed by cause, per-modality distinction, distributions, determinism, no file mutation, no tensors), and the Fase 15 `ImageFeatureExtractor` (geometry/intensity/color/sharpness/texture/histogram correctness, per-modality separation, missing/corrupted-image handling, resize preprocessing, determinism, no large arrays) — no image decoding beyond Pillow + numpy array reads, no tensors, no PyTorch/TensorFlow, no neural model metrics. |
+| `tests/unit/ml/` | 67 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, the intentionally unimplemented `TrainerPort`, the Fase 13 majority-class baseline trainer, the Fase 14 `ImageDatasetAuditor` (passed/warning/failed by cause, per-modality distinction, distributions, determinism, no file mutation, no tensors), the Fase 15 `ImageFeatureExtractor` (geometry/intensity/color/sharpness/texture/histogram correctness, per-modality separation, missing/corrupted-image handling, resize preprocessing, determinism, no large arrays), and the Fase 16 `FeatureMatrixBuilder`/`ClassicalTabularBaselineTrainer` (deterministic tabular matrices, split preservation, real accuracy/confusion metrics, no precision/recall/F1) — no raw image tensors, no PyTorch/TensorFlow, no neural model metrics. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
-| `tests/api/` | 103 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, majority-class baseline API/history flow, the Fase 14 image-audit flow, and the Fase 15 image-feature-extraction flow (modality/split vector filters, release/audit history listings, rejecting a failed or cross-release audit, no taxonomy/model-metrics leakage). |
-| `tests/integration/postgres/` | 53 | **PostgreSQL-only** (Fase 6/8/9/10/12/13/14/15): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, image-dataset-audit tables, image-feature-extraction tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
+| `tests/api/` | 105 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, dataset release/split/manifest flow across all three split strategies, ML preflight persistence/history flow, majority-class and classical-tabular baseline API/history flow, the Fase 14 image-audit flow, and the Fase 15 image-feature-extraction flow (modality/split vector filters, release/audit history listings, rejecting a failed or cross-release audit, no taxonomy/model-metrics leakage). |
+| `tests/integration/postgres/` | 54 | **PostgreSQL-only** (Fase 6/8/9/10/12/13/14/15/16): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot/release tables, ML preflight tables, training run/prediction tables, classical baseline model-type constraint, image-dataset-audit tables, image-feature-extraction tables, UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 146 + 18 + 58 + 28 + 103 + 53 = **432**, matching `pytest --collect-only -q`.
+26 + 150 + 18 + 67 + 28 + 105 + 54 = **448**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
@@ -448,7 +454,7 @@ tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
 289 in Fase 10, 311 in Fase 11, 327 in Fase 12, 340 in Fase 13, 384 in
-Fase 14, and 432 in Fase 15.)
+Fase 14, 432 in Fase 15, and 448 in Fase 16.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -1229,3 +1235,50 @@ Endpoints:
 These features are purely technical measurements of the image files. They
 are not a microbiological finding, not a growth/contamination indicator, and
 not a step toward taxonomic identification.
+
+## 25. Classical tabular baseline over image features (Fase 16)
+
+Fase 16 adds the first baseline that actually uses the persisted
+`ImageFeatureVector` rows from Fase 15. It is still a classical/tabular
+experiment, not deep learning: no PyTorch, no TensorFlow, no CNN/ViT, no raw
+image tensors, no model artifact serialization, no external datasets, no
+frontend, and no taxonomy.
+
+`TabularFeatureTrainingConfig` selects the completed
+`ImageFeatureExtractionRun`, modality strategy (`petri_only`, `micro_only`,
+or `concatenate`), standardization, logistic-regression parameters, minimum
+train counts/classes, and whether inconclusive labels are allowed. At least
+one modality must be selected. `partial` or `failed` extractions are rejected
+by default.
+
+`FeatureMatrixBuilder` receives only persisted feature vectors plus
+`DatasetSplitItem`s. It flattens numeric feature JSON deterministically,
+expands small numeric histograms into columns, prefixes names by modality
+(for example `petri__intensity__mean_intensity`), keeps a stable sorted
+`feature_names` list, and builds `X_train`, `X_validation`, and `X_test`
+without mixing splits. Labels (`y`) come only from
+`DatasetSplitItem.ground_truth_label`, never from `Prediction`.
+
+`ClassicalTabularBaselineTrainer` fits scikit-learn
+`LogisticRegression` on train only. Validation/test are used only after fit
+to generate predictions and metrics. The persisted metrics are real
+calculations from `TrainingPrediction`: `accuracy_overall`,
+`accuracy_by_split`, `support_by_split`, `label_distribution_by_split`,
+`confusion_matrix`, and `confusion_matrix_by_split`. Precision, recall and F1
+remain out of scope.
+
+`CreateClassicalBaselineTrainingRunUseCase` requires: existing
+`DatasetRelease`; matching non-failed `TrainingPreflightRun`; completed
+`ImageFeatureExtractionRun` for that release; available feature vectors; and
+at least the configured number of train items/classes. A data-shape failure
+(for example one train class) is persisted as a `TrainingRun` with
+`status=failed` and no predictions; invalid gates return a controlled
+conflict. Successful runs persist the completed `TrainingRun` plus one
+`TrainingPrediction` per split item transactionally.
+
+Endpoint:
+
+- `POST /api/v1/ml/training-runs/classical-baseline`
+
+The older `POST /api/v1/ml/training-runs/baseline` majority-class endpoint
+remains as a label-only comparison baseline.

@@ -168,7 +168,7 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 4. No avanzar de fase sin validación del usuario si la tarea implica una decisión arquitectónica nueva.
 ## 10. Majority-class baseline experimental (Fase 13)
 
-- `TrainingRun` y `TrainingPrediction` persisten un baseline auditable, no un modelo de IA real. El unico `baseline_model_type` permitido es `majority_class`; `run_kind` sigue siendo `baseline`.
+- `TrainingRun` y `TrainingPrediction` persisten baselines auditables, no modelos de IA real. `baseline_model_type` permite `majority_class` y, desde Fase 16, `logistic_regression_tabular`; `run_kind` sigue siendo `baseline`.
 - El baseline solo puede usar labels revisadas del manifest/release: selecciona la clase mayoritaria del split `train` y predice esa misma etiqueta preliminar para `train`, `validation` y `test`. En empate, el desempate debe ser determinista y documentado.
 - Requiere un `TrainingPreflightRun` no fallido y perteneciente al mismo `DatasetRelease`; el manifest se revalida antes de persistir el experimento. Si la revalidacion falla, se persiste un `TrainingRun` con `status=failed` y sin predicciones.
 - Las metricas permitidas son solo las derivadas de las `TrainingPrediction` del baseline: accuracy overall, accuracy por split, soporte por split, distribucion de etiquetas por split y matriz de confusion. Sigue prohibido precision, recall y F1.
@@ -197,3 +197,13 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - Un `DatasetItem` genera hasta dos `ImageFeatureVector` (uno por modalidad); el indice unico `(feature_extraction_run_id, dataset_split_item_id, modality)` en base de datos es el que hace cumplir ese "hasta dos, nunca duplicados".
 - Las features son solo escalares y un histograma pequeno (N bins configurables, default 16) — nunca arrays de pixeles completos, nunca binarios de imagen.
 - Los endpoints viven bajo `/api/v1/ml/image-feature-extractions`, `/api/v1/datasets/releases/{id}/image-feature-extractions` y `/api/v1/ml/image-audits/{id}/feature-extractions`, y deben conservar `X-Request-ID`. Sigue prohibido taxonomia, metricas de clasificacion, entrenamiento real, PyTorch/TensorFlow/deep learning y Celery en esta capa.
+
+## 13. Baseline clasico tabular con features reales (Fase 16)
+
+- `logistic_regression_tabular` es un baseline clasico/tabular sobre `ImageFeatureVector`, no IA profunda. Usa scikit-learn solo para `LogisticRegression`/`StandardScaler`; no agrega PyTorch, TensorFlow, CNN, ViT, tensores de imagen, OpenCV, MLflow, TensorBoard ni W&B.
+- `FeatureMatrixBuilder` solo consume `ImageFeatureVector` persistidos y `DatasetSplitItem`. Aplana features numericas JSON de forma deterministica, prefija por modalidad (`petri__...`, `micro__...`), expande histogramas pequenos y respeta estrictamente `train`/`validation`/`test`.
+- El `y` del entrenamiento sale solo de `DatasetSplitItem.ground_truth_label`, derivado de revision humana final. Nunca usar `Prediction` como ground truth ni inferir especies/generos.
+- `ClassicalTabularBaselineTrainer` ajusta solo con train; validation/test se usan solo para prediccion y metricas. Metricas permitidas: accuracy, soporte, distribuciones de labels y matrices de confusion. Precision, recall y F1 siguen fuera de alcance.
+- `CreateClassicalBaselineTrainingRunUseCase` requiere `DatasetRelease`, `TrainingPreflightRun` no fallido y `ImageFeatureExtractionRun` `completed` del mismo release. `partial`/`failed` no entrenan por defecto. Si train tiene una sola clase o faltan features requeridas, persistir fallo controlado o devolver conflicto documentado; nunca entrenar silenciosamente con datos invalidos.
+- Persistir en `TrainingRun`/`TrainingPrediction` existentes. No guardar pickle, arrays grandes, imagenes, secretos ni nuevos artefactos binarios.
+- Endpoint: `POST /api/v1/ml/training-runs/classical-baseline`; debe conservar `X-Request-ID` y no usar Celery.

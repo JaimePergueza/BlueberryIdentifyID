@@ -101,6 +101,9 @@ from blueberry_microid.application.use_cases.ml_preflight.list_training_prefligh
 from blueberry_microid.application.use_cases.training.create_baseline_training_run import (
     CreateBaselineTrainingRunUseCase,
 )
+from blueberry_microid.application.use_cases.training.create_classical_baseline_training_run import (
+    CreateClassicalBaselineTrainingRunUseCase,
+)
 from blueberry_microid.application.use_cases.training.get_training_run import GetTrainingRunUseCase
 from blueberry_microid.application.use_cases.training.list_training_predictions import ListTrainingPredictionsUseCase
 from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
@@ -179,6 +182,8 @@ from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analys
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
 from blueberry_microid.ml.preprocessing.image_feature_extractor import ImageFeatureExtractor
+from blueberry_microid.ml.training.classical_tabular_baseline import ClassicalTabularBaselineTrainer
+from blueberry_microid.ml.training.feature_matrix_builder import FeatureMatrixBuilder
 from blueberry_microid.ml.training.majority_class_baseline import MajorityClassBaselineTrainer
 from blueberry_microid.ml.validation.image_dataset_auditor import ImageDatasetAuditor
 from blueberry_microid.ml.validation.image_path_validator import ImagePathValidator
@@ -368,6 +373,14 @@ def get_image_feature_extractor() -> ImageFeatureExtractor:
 
 def get_majority_class_baseline_trainer() -> MajorityClassBaselineTrainer:
     return MajorityClassBaselineTrainer()
+
+
+def get_feature_matrix_builder() -> FeatureMatrixBuilder:
+    return FeatureMatrixBuilder()
+
+
+def get_classical_tabular_baseline_trainer() -> ClassicalTabularBaselineTrainer:
+    return ClassicalTabularBaselineTrainer()
 
 
 # --- inference engine --------------------------------------------------------
@@ -668,6 +681,30 @@ def get_create_baseline_training_run_use_case(
         dataset_item_repository,
         manifest_exporter,
         manifest_validator,
+        trainer,
+        unit_of_work,
+    )
+
+
+def get_create_classical_baseline_training_run_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    preflight_run_repository: TrainingPreflightRunRepositoryPort = Depends(get_training_preflight_run_repository),
+    image_feature_extraction_run_repository: ImageFeatureExtractionRunRepositoryPort = Depends(
+        get_image_feature_extraction_run_repository
+    ),
+    image_feature_vector_repository: ImageFeatureVectorRepositoryPort = Depends(get_image_feature_vector_repository),
+    dataset_split_item_repository: DatasetSplitItemRepositoryPort = Depends(get_dataset_split_item_repository),
+    feature_matrix_builder: FeatureMatrixBuilder = Depends(get_feature_matrix_builder),
+    trainer: ClassicalTabularBaselineTrainer = Depends(get_classical_tabular_baseline_trainer),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateClassicalBaselineTrainingRunUseCase:
+    return CreateClassicalBaselineTrainingRunUseCase(
+        dataset_release_repository,
+        preflight_run_repository,
+        image_feature_extraction_run_repository,
+        image_feature_vector_repository,
+        dataset_split_item_repository,
+        feature_matrix_builder,
         trainer,
         unit_of_work,
     )

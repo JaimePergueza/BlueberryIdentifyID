@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 15)
+## MVP status (as of Fase 16)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -27,7 +27,7 @@ splits under three leakage-prevention strategies (`by_sample`, `by_lot`,
 `ml/`, a persisted technical image-file audit for a release's Petri/micro
 images, and a persisted non-deep feature-extraction layer over those same
 audited images — all behind a versioned FastAPI, backed by SQLAlchemy models
-and Alembic migrations. 432 automated tests (379 SQLite/eager-based + 53
+and Alembic migrations. 448 automated tests (394 SQLite/eager-based + 54
 PostgreSQL-only); the CI workflow runs the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
@@ -55,7 +55,7 @@ scientific sufficiency, model performance, or approval to train.
 
 **Majority-class baseline training runs (Fase 13):** `TrainingRun` records a
 baseline experiment and `TrainingPrediction` records one prediction per
-`DatasetSplitItem`. The only implemented model type is `majority_class`: it
+`DatasetSplitItem`. The label-only model type is `majority_class`: it
 chooses the most frequent reviewed label in the train split, predicts that
 same broad visual label for train/validation/test, and calculates only metrics
 derived from those persisted predictions (`accuracy_overall`,
@@ -83,6 +83,17 @@ numbers from those same files — and never trains a model, never uses
 PyTorch/TensorFlow, and never assigns taxonomy. `numpy` was added as an
 explicit dependency for this phase (array arithmetic only, not a deep
 learning framework).
+
+**Classical tabular baseline (Fase 16):** `POST /api/v1/ml/training-runs/classical-baseline`
+trains `logistic_regression_tabular` with scikit-learn over persisted
+`ImageFeatureVector` rows only. `FeatureMatrixBuilder` flattens numeric Petri
+and/or micro feature JSON deterministically, preserves train/validation/test
+splits, and uses `DatasetSplitItem.ground_truth_label` as `y`; it never uses
+raw image bytes or `Prediction` as ground truth. `TrainingRun` stores config,
+feature names, basic model parameters, and real metrics derived from persisted
+`TrainingPrediction` rows: accuracy, support, label distributions, and
+confusion matrices. No model pickle, PyTorch, TensorFlow, CNN, ViT, deep
+learning, external dataset, frontend, authentication, or taxonomy was added.
 
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original
@@ -179,7 +190,8 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Human review audit flow:** after an `AnalysisRun` has a `Prediction`, an expert can submit reviews under `/api/v1/analysis-runs/{id}/reviews`. A new final review demotes any previous final review in the same transaction, while the original `Prediction` stays immutable for traceability. See `docs/development.md` § 12.
 - **Training manifest validation only:** `scripts/validate_training_manifest.py` validates the JSON manifest exported by a `DatasetRelease` against the Fase 11 contracts. It checks structure, split coverage, allowed preliminary labels, duplicate/leakage risks, and minimum counts; it does not open image bytes, train a model, calculate accuracy/precision/recall/F1, or use PyTorch.
 - **Persistent preflight validation:** `POST /api/v1/ml/preflight-runs` runs the same manifest validation and persists the report. Use the standalone CLI for quick local checks; use the API when the result must be auditable and queryable by `DatasetRelease`.
-- **Majority-class baseline:** `POST /api/v1/ml/training-runs/baseline` runs the only implemented experimental baseline. It requires a matching non-failed preflight, revalidates the release manifest, uses train labels only to select the majority class, persists one prediction per split item, and reports real baseline metrics from those predictions. It does not read image bytes, train neural networks, use PyTorch, or alter the mock inference engine.
+- **Majority-class baseline:** `POST /api/v1/ml/training-runs/baseline` runs the label-only comparison baseline. It requires a matching non-failed preflight, revalidates the release manifest, uses train labels only to select the majority class, persists one prediction per split item, and reports real baseline metrics from those predictions. It does not read image bytes, train neural networks, use PyTorch, or alter the mock inference engine.
+- **Classical tabular baseline:** `POST /api/v1/ml/training-runs/classical-baseline` requires a matching non-failed preflight and a completed `ImageFeatureExtractionRun` for the same `DatasetRelease`, builds a tabular matrix from `ImageFeatureVector`, fits logistic regression on train only, predicts train/validation/test, and persists real metrics plus predictions. It uses scikit-learn for classical tabular ML only; no PyTorch/TensorFlow/deep learning, raw image tensors, model serialization, external datasets, or taxonomy.
 - **Technical image dataset audit:** `POST /api/v1/ml/image-audits` opens each Petri/micro image file referenced by a `DatasetRelease` with Pillow (existence, corruption, format, dimensions, color mode, declared-vs-real file size) and persists the result. It is a technical file check, not the Fase 12 manifest preflight and not a scientific/microbiological evaluation; it never creates tensors or uses PyTorch/TensorFlow.
 - **Non-deep image feature extraction:** `POST /api/v1/ml/image-feature-extractions` requires a non-failed `ImageDatasetAuditRun` for the same `DatasetRelease`, then computes geometry/intensity/color/sharpness/texture/histogram features per Petri/micro image with Pillow + numpy and persists one `ImageFeatureVector` per image. It never trains a model, never uses PyTorch/TensorFlow, and never assigns taxonomy.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
@@ -227,9 +239,10 @@ ML preflight endpoints (Fase 12 — persistent validation reports, no training):
 - `GET /api/v1/ml/preflight-runs/{preflight_run_id}/issues` lists validation errors/warnings.
 - `GET /api/v1/ml/preflight-runs/{preflight_run_id}/training-runs` lists baseline training runs linked to that preflight.
 
-ML baseline endpoints (Fase 13 - majority-class baseline only, no image training):
+ML baseline endpoints (Fase 13/Fase 16 - majority-class plus classical tabular baselines):
 
 - `POST /api/v1/ml/training-runs/baseline` creates a majority-class baseline `TrainingRun`.
+- `POST /api/v1/ml/training-runs/classical-baseline` creates a logistic-regression tabular baseline from `ImageFeatureVector`.
 - `GET /api/v1/ml/training-runs` lists training runs.
 - `GET /api/v1/ml/training-runs/{training_run_id}` returns one training run.
 - `GET /api/v1/ml/training-runs/{training_run_id}/predictions` lists persisted baseline predictions; optional `split=train|validation|test`.

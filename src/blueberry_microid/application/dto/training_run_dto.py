@@ -12,6 +12,7 @@ from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.training_run_kind import TrainingRunKind
 from blueberry_microid.domain.enums.training_run_status import TrainingRunStatus
+from blueberry_microid.ml.configs.tabular_feature_training_config import TabularFeatureTrainingConfig
 from blueberry_microid.ml.configs.training_config import TrainingConfig
 
 
@@ -22,6 +23,17 @@ class CreateBaselineTrainingRunRequest:
     experiment_name: str
     training_config: TrainingConfig
     baseline_model_type: BaselineModelType = BaselineModelType.MAJORITY_CLASS
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@dataclass(frozen=True, slots=True)
+class CreateClassicalBaselineTrainingRunRequest:
+    dataset_release_id: UUID
+    preflight_run_id: UUID
+    image_feature_extraction_run_id: UUID
+    experiment_name: str
+    tabular_training_config: TabularFeatureTrainingConfig
     created_by: Optional[str] = None
     notes: Optional[str] = None
 

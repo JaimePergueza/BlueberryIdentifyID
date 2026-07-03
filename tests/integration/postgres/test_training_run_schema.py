@@ -115,6 +115,31 @@ def test_training_run_json_columns_round_trip_as_jsonb(pg_session):
     assert column_type == "jsonb"
 
 
+def test_training_run_accepts_logistic_regression_tabular_baseline_type(pg_session):
+    item = _create_dataset_item(pg_session, sample_code=f"S-PG-TRAINING-CLASSICAL-{uuid.uuid4()}")
+    release = _create_release(pg_session, item.dataset_snapshot_id)
+    preflight = _create_preflight_run(pg_session, dataset_release_id=release.id)
+    run = TrainingRunModel(
+        dataset_release_id=release.id,
+        preflight_run_id=preflight.id,
+        run_kind="baseline",
+        baseline_model_type="logistic_regression_tabular",
+        status="completed",
+        experiment_name="pg-classical-baseline",
+        config={"feature_extraction_run_id": str(uuid.uuid4())},
+        baseline_state={"feature_names": ["petri__intensity__mean_intensity"]},
+        metrics={"accuracy_overall": 1.0},
+        summary={"uses_image_feature_vectors": True, "uses_image_pixels": False},
+        started_at=datetime.now(timezone.utc),
+    )
+    pg_session.add(run)
+    pg_session.flush()
+
+    pg_session.refresh(run)
+    assert run.baseline_model_type == "logistic_regression_tabular"
+    assert run.baseline_state["feature_names"] == ["petri__intensity__mean_intensity"]
+
+
 def test_training_prediction_foreign_keys_are_enforced(pg_session):
     _run, split_item, dataset_item = _create_training_run_with_split_item(pg_session)
     prediction = TrainingPredictionModel(
