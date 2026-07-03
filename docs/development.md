@@ -1322,3 +1322,28 @@ This phase adds no PyTorch, TensorFlow, CNN, ViT, raw image tensors, new
 dataset, external tracker, frontend, authentication, taxonomy, model
 artifact, or new business prediction path. It also does not replace
 `MockInferenceEngine`.
+
+## 27. External microbiology CV landscape review (Fase 18)
+
+Fase 18 adds the documentation-only reference map:
+
+```text
+docs/references/microbiology_cv_landscape.md
+```
+
+Use it before proposing external computer-vision adoption. It classifies
+YOLOv5-style bacteria detection, MEMTrack, DIBaS, Petri colony detection
+work, clinical bacterial datasets, surveys/reviews, and unresolved
+CSI-Microbes/SinfNet leads by modality, compatibility, risk, and recommended
+use.
+
+The document does not authorize installing external dependencies or importing
+external data. Any future adoption still needs its own phase, license review,
+domain-gap review, tests, and explicit user approval. In particular, do not
+add YOLO, PyTorch, TensorFlow, CNN, ViT, deep learning, external datasets,
+frontend, authentication, taxonomy, MLflow, TensorBoard, W&B, or a
+replacement for `MockInferenceEngine` based only on this landscape review.
+
+Recommended next direction from the review: a constrained classical Petri
+colony segmentation prototype, because it can use current Petri imagery and
+does not require bounding-box annotations or deep-learning infrastructure.

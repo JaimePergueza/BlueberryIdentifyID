@@ -1185,3 +1185,29 @@ fuera de alcance hasta que se apruebe una fase especifica. (c) No existe aun
 promocion de modelo ni artefacto reproducible de modelo. (d) Sigue sin existir
 IA real de inferencia, deep learning, dataset externo, frontend, autenticacion
 ni taxonomia.
+
+## 34. Fase 18 - revision de referencias externas de vision microbiologica
+
+Fase 18 es documental. Crea
+`docs/references/microbiology_cv_landscape.md` como mapa tecnico-cientifico
+para decidir que fuentes externas podrian orientar fases futuras, sin adoptar
+codigo, datos, modelos ni dependencias.
+
+El documento clasifica referencias como CSI-Microbes Identification
+(referencia no resuelta), YOLOv5-style bacteria detection, MEMTrack, SinfNet
+(referencia no resuelta), DIBaS, surveys/revisiones, deteccion de colonias en
+Petri y clinical bacterial datasets. Para cada una separa utilidad en Petri,
+micro, video/tracking, dependencia de deep learning, necesidad de dataset
+externo, compatibilidad, riesgo principal y uso recomendado.
+
+Conclusion de arquitectura: no hay fuente externa apta para adopcion inmediata
+como codigo/modelo/dataset. La recomendacion para Fase 19 es un prototipo
+clasico de segmentacion de colonias en Petri, antes de YOLO/deep learning,
+porque el proyecto aun no tiene bounding boxes, mascaras ni dataset propio
+suficiente para object detection o modelos profundos.
+
+Fase 18 no modifica endpoints, casos de uso, entidades, repositorios,
+migraciones, base de datos, workflow CI, `MockInferenceEngine` ni logica de
+negocio. Sigue sin agregar PyTorch, TensorFlow, YOLO, CNN, ViT, deep learning,
+dataset externo, frontend, autenticacion, taxonomia, MLflow, TensorBoard o
+Weights & Biases.

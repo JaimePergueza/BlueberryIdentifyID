@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 17)
+## MVP status (as of Fase 18)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -105,6 +105,14 @@ low support, and may mark one candidate as a preliminary baseline. It does
 not train a new model, recalculate predictions, open image bytes, introduce
 new metrics, use PyTorch/TensorFlow/deep learning, or change
 `MockInferenceEngine`.
+
+**External microbiology CV landscape review (Fase 18):**
+`docs/references/microbiology_cv_landscape.md` documents external reference
+projects and datasets such as YOLOv5-style bacteria detection, MEMTrack,
+DIBaS, Petri colony detection work, clinical bacterial datasets, and unresolved
+CSI-Microbes/SinfNet leads. It is a technical adoption map only: no external
+code, dataset, model, dependency, endpoint, migration, frontend, taxonomy,
+PyTorch, TensorFlow, YOLO, CNN, ViT, or deep learning was integrated.
 
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original

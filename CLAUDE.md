@@ -227,3 +227,22 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - Sigue prohibido agregar PyTorch, TensorFlow, CNN, ViT, deep learning, raw
   image tensors, datasets externos, frontend, autenticacion, taxonomia,
   trackers externos o reemplazar `MockInferenceEngine` en esta capa.
+
+## 15. Revision de referencias externas (Fase 18)
+
+- `docs/references/microbiology_cv_landscape.md` es un mapa documental de
+  adopcion tecnica para proyectos/datasets externos de vision microbiologica.
+  No es codigo productivo, no cambia endpoints y no autoriza integraciones.
+- Las referencias externas se tratan como insumos de decision: Petri colony
+  detection puede orientar un futuro prototipo clasico; YOLOv5-style detection
+  requiere bounding boxes y una fase explicita; MEMTrack requiere video o
+  time-lapse; DIBaS/clinical datasets son benchmarks o literatura, no datos
+  para mezclar directamente con el dataset propio; CSI-Microbes/SinfNet quedan
+  como referencias no resueltas hasta verificar fuente primaria y licencia.
+- No copiar codigo externo, no descargar datasets externos, no ejecutar
+  notebooks externos, no agregar dependencias, no integrar modelos/pesos y no
+  afirmar taxonomia.
+- La recomendacion documentada para Fase 19 es un prototipo clasico de
+  segmentacion/conteo de colonias en Petri, antes de YOLO/deep learning,
+  porque el proyecto aun no tiene anotaciones de objetos ni dataset propio
+  suficiente para modelos profundos.
