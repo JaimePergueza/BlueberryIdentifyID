@@ -66,7 +66,13 @@ BlueberryMicroID/
 │   │   ├── micro_branch/            # Extracción de features de la imagen microscópica — todavía vacío
 │   │   ├── fusion/                   # Fusión tardía de features macro+micro — todavía vacío
 │   │   ├── inference_engine/          # MockInferenceEngine (Fase 4) — implementación del InferenceEnginePort
-│   │   └── model_registry/             # Metadata/versionado de modelos — todavía vacío
+│   │   ├── model_registry/             # Metadata/versionado de modelos — todavía vacío
+│   │   ├── contracts/                  # TrainingManifest / TrainingRunResult (Fase 11, sin entrenamiento)
+│   │   ├── configs/                    # TrainingConfig futuro (Fase 11)
+│   │   ├── data/                       # DatasetLoaderPort + loader JSON de manifests (Fase 11)
+│   │   ├── validation/                 # Validadores de manifest/rutas (Fase 11)
+│   │   ├── reports/                    # ManifestValidationReport (Fase 11)
+│   │   └── training/                   # TrainerPort, train() no implementado aún (Fase 11)
 │   │
 │   └── interfaces/
 │       ├── api/
@@ -638,3 +644,76 @@ Objetivo: la Fase 9 resolvía la fuga a nivel de `Sample` (`by_sample`), pero el
 **Tests nuevos (33).** Unitarios del splitter (12, `test_dataset_splitter_strategies.py`): `by_sample` idéntico al comportamiento por defecto, `by_lot`/`by_origin_lot` agrupan correctamente, fallos de metadata (lot_code ausente, origin ausente, ambos, o `sample_metadata` no provisto en absoluto), determinismo con mismo seed, partición distinta con seed distinto, ratios inválidos, insensibilidad al orden de entrada, sin duplicados. Casos de uso (10, `test_create_dataset_release_use_case_strategies.py`): creación con cada una de las tres estrategias, rechazo por metadata incompleta en `by_lot`/`by_origin_lot`, persistencia de `split_strategy`, corrección de `split_distribution`/`label_distribution`, no-commit cuando falla la creación de `DatasetSplitItem`s (vía un fake que lanza en `add_many`), snapshot/items no modificados. API (8, `test_dataset_release_strategies.py`): estrategia por defecto `by_sample`, flujos completos `by_lot`/`by_origin_lot`, 422 por metadata incompleta en ambas estrategias estrictas, manifest con `split_strategy`/`lot_code`/`origin`, `X-Request-ID` preservado, ausencia de taxonomía. PostgreSQL (3 nuevos sobre los 6 de la Fase 9, `test_dataset_release_schema.py`): el `CHECK` rechaza un valor desconocido, persistencia real de `split_strategy='by_lot'` y `='by_origin_lot'`. El job `postgres-migrations` de CI recoge estos tests automáticamente sin cambios al workflow.
 
 **Riesgos pendientes antes de Fase 11.** (a) Ninguna de las tres estrategias elimina el riesgo de fuga por completo — confusores como "mismo día de procesamiento" o "mismo técnico" no están modelados y requerirían una estrategia nueva y explícita si se necesitan. (b) Elegir una estrategia más estricta de lo que el dataset soporta puede vaciar particiones (`DatasetSplitter` ya registra un `WARNING`, pero no impide la operación). (c) Los 3 tests PostgreSQL nuevos de esta fase no se ejecutaron localmente (sin Docker) — dependen del job `postgres-migrations` en GitHub Actions. (d) Sigue sin existir entrenamiento real, IA real, PyTorch ni taxonomía — fuera de alcance por diseño.
+
+## 27. Fase 11 — contrato de manifest y validación previa a entrenamiento futuro (implementada)
+
+Objetivo: definir el borde de entrada para un entrenamiento futuro sin
+entrenar nada todavía. Esta fase no cambia la lógica de negocio, no toca
+`ProcessAnalysisRunUseCase`, no reemplaza `MockInferenceEngine`, no agrega
+PyTorch, no descarga datasets externos, no calcula métricas de modelo y no
+agrega taxonomía.
+
+**Estructura ML.** Se conservaron las carpetas existentes de `ml/`
+(`preprocessing`, `petri_branch`, `micro_branch`, `fusion`,
+`inference_engine`, `model_registry`) y se agregaron subpaquetes de contrato:
+`contracts`, `configs`, `validation`, `data`, `training` y `reports`. Esta
+estructura deja explícito dónde vivirá una implementación futura sin mezclarla
+con dominio, aplicación, API o tareas Celery.
+
+**Contrato de entrada.** `TrainingManifest` y `TrainingManifestItem` modelan
+el JSON exportado por `DatasetReleaseManifestExporter`: release/snapshot,
+nombre, versión, estrategia de split, seed, ratios, conteos, distribución de
+etiquetas/splits e items con `analysis_run_id`, `sample_id`, `sample_code`,
+rutas Petri/micro, `ground_truth_label`, `source_review_decision`,
+`prediction_label`, `final_review_id`, `lot_code` y `origin`. No contiene
+bytes de imagen ni secretos.
+
+**Configuración futura.** `TrainingConfig` registra intención de experimento
+(`experiment_name`, `output_dir`, `model_family`, `fusion_strategy`, batch,
+epochs, learning rate, seed, workers y umbrales mínimos). Es validación de
+configuración, no un runner. Los `model_family` permitidos son nombres de
+familias futuras y un `mock_baseline`; ninguno carga pesos ni instancia
+PyTorch.
+
+**Validación de manifest.** `ManifestValidator` produce
+`ManifestValidationReport` con errores, warnings, conteos, distribución por
+split/label, checks de fuga y recomendaciones. Reglas principales: todos los
+splits (`train`, `validation`, `test`) deben existir; Petri y micro path no
+pueden estar vacíos; las etiquetas siguen siendo solo las cinco categorías
+visuales preliminares; `inconclusive` se excluye salvo permiso explícito;
+duplicados de `analysis_run_id` o identidad de item son error; el mismo
+`sample_id` no puede aparecer en más de un split; `by_lot` y `by_origin_lot`
+se auditan con `lot_code`/`origin`; y los mínimos de tamaño son gates de
+preparación, no métricas de rendimiento.
+
+**Validación de rutas.** `ImagePathValidator` comprueba existencia de los
+archivos referenciados sin abrir, decodificar, copiar ni transformar imágenes.
+El validador no interpreta contenido visual y no afirma identificación
+microbiológica.
+
+**Carga y entrenamiento.** `DatasetLoaderPort` define `load_manifest`,
+`validate_manifest` e `iter_items`; `JsonManifestDatasetLoader` implementa
+solo lectura JSON determinista. `TrainerPort` centraliza la futura frontera de
+entrenamiento, pero `train()` lanza `TrainingNotImplementedError` de forma
+deliberada. `TrainingRunResult` existe como DTO de salida futura, sin métricas
+inventadas.
+
+**CLI.** `scripts/validate_training_manifest.py` carga un manifest JSON,
+opcionalmente un config JSON, imprime un `ManifestValidationReport` en JSON y
+sale `0` si es válido, `1` si hay errores de validación y `2` si no puede
+cargar manifest/config. No toca FastAPI, PostgreSQL, Redis, Celery ni imágenes.
+
+**Tests nuevos.** Unitarios de `ml/` cubren: manifiesto válido, splits vacíos,
+paths faltantes, etiquetas/splits inválidos, duplicados, inclusión/exclusión
+de `inconclusive`, requisito de split lot-aware, fuga por sample/lote/origen,
+umbrales mínimos, validación de rutas, loader JSON, `TrainerPort` sin
+implementación y códigos de salida del CLI. No hay tests de accuracy,
+precision, recall ni F1 porque no existe evaluación de modelo.
+
+**Riesgos pendientes antes de Fase 12.** (a) Aún no existe entrenamiento real:
+la siguiente fase debe decidir explícitamente si seguirá solo validando datos o
+si abrirá una implementación de entrenamiento. (b) Los mínimos de tamaño son
+controles de preparación, no criterios científicos suficientes. (c) La fuga por
+confusores no modelados (día, técnico, equipo, batch de medio) sigue pendiente.
+(d) Si una futura fase agrega PyTorch u otra dependencia ML, debe justificarla,
+probarla y mantener intacto el contrato de manifest validado aquí.

@@ -426,8 +426,8 @@ pytest -v
 `pyproject.toml` — but the explicit invocation above matches earlier phases'
 docs.)
 
-As of Fase 10 this collects **289 tests**. On a machine without PostgreSQL,
-`pytest -v` reports **264 passed, 25 skipped** (the 25 PostgreSQL-only tests
+As of Fase 11 this collects **311 tests**. On a machine without PostgreSQL,
+`pytest -v` reports **286 passed, 25 skipped** (the 25 PostgreSQL-only tests
 skip automatically — see § 15):
 
 | Folder | Count | What it covers |
@@ -435,18 +435,19 @@ skip automatically — see § 15):
 | `tests/unit/domain/` | 26 | Entities, value objects, domain invariants (incl. `AnalysisRun` state transitions) — no I/O. |
 | `tests/unit/application/` | 113 | Use cases with in-memory fakes (incl. `MockInferenceEngine`, `ProcessAnalysisRunUseCase` idempotency/claim/recovery scenarios, `SubmitHumanReviewUseCase` final-review rollback, curated dataset snapshot/manifest rules, and `DatasetSplitter`/`CreateDatasetReleaseUseCase` determinism, leakage-prevention, and `by_sample`/`by_lot`/`by_origin_lot` strategy rules) — no database, no filesystem. |
 | `tests/unit/infrastructure/` | 18 | `Settings`, Celery app/task configuration, and `PillowImageValidator`, in isolation. |
+| `tests/unit/ml/` | 22 | Fase 11 training-manifest contracts, manifest/path validators, JSON loader, CLI exit codes, and the intentionally unimplemented `TrainerPort` — no image decoding, tensors, PyTorch, or model metrics. |
 | `tests/integration/db/` | 28 | Real SQLAlchemy repositories against in-memory SQLite, incl. `claim_for_processing` atomicity, human-review final uniqueness, and real cross-repository transaction rollback. |
 | `tests/api/` | 79 | Full FastAPI app via `TestClient`, SQLite + temp storage, incl. idempotency at every non-`pending` status, async eager processing, human-review endpoints, dataset snapshot manifest flow, and dataset release/split/manifest flow across all three split strategies. |
 | `tests/integration/postgres/` | 25 | **PostgreSQL-only** (Fase 6/8/9/10): real migrations, JSONB, native ENUMs, partial unique index, CHECK/FK/unique constraints, dataset snapshot and dataset release tables (incl. the `split_strategy` CHECK constraint), UUID, and full API smoke flows. Auto-skipped unless `DATABASE_URL` points at PostgreSQL. |
 
-26 + 113 + 18 + 28 + 79 + 25 = **289**, matching `pytest --collect-only -q`.
+26 + 113 + 18 + 22 + 28 + 79 + 25 = **311**, matching `pytest --collect-only -q`.
 
 (A Fase 3 summary once reported `18 + 21 + 18 + 27 = 84`, which did not add
 up — a mislabeled integration-test count that should have read `13`; no
 tests were ever double-counted. `18 + 21 + 13 + 27 = 79` was the correct
 Fase-3 total; it grew to 102 in Fase 3.5, 136 in Fase 4, 160 in Fase 4.6,
 188 in Fase 5, 200 in Fase 6, 208 in Fase 7, 222 in Fase 8, 256 in Fase 9,
-and 289 in Fase 10.)
+289 in Fase 10, and 311 in Fase 11.)
 
 - `tests/unit/` never touches a database or the filesystem (in-memory doubles).
 - `tests/integration/db/` exercises the real SQLAlchemy repositories against
@@ -933,3 +934,70 @@ Choosing a stricter strategy than the data can support is also
 counterproductive: it can start starving the smaller splits, which
 `DatasetSplitter` already flags with a `WARNING` log line when a partition
 ends up empty (see Fase 9).
+
+## 20. ML training manifest contracts and validators (Fase 11)
+
+Fase 11 defines the contract a future training pipeline must satisfy before
+any model code exists. It does **not** train, evaluate, or load a model; it
+does not add PyTorch, tensors, external datasets, frontend, authentication, or
+taxonomy. `MockInferenceEngine` remains the only inference implementation.
+
+The contract starts from the deterministic manifest exported by
+`GET /api/v1/datasets/releases/{dataset_release_id}/manifest`. That manifest
+already carries reviewed ground truth, split assignment, Petri and microscopy
+paths, sample metadata, and the release strategy (`by_sample`, `by_lot`, or
+`by_origin_lot`). Fase 11 maps that JSON into:
+
+- `TrainingManifest` / `TrainingManifestItem`
+  (`ml/contracts/training_manifest.py`): immutable-ish dataclasses for the
+  release manifest shape, including split counts, label distribution, image
+  paths, review decision, prediction label, and sample metadata.
+- `TrainingConfig` (`ml/configs/training_config.py`): future experiment
+  settings and validation thresholds. It records intent only; it is not a
+  training runner.
+- `ManifestValidationReport` (`ml/reports/validation_report.py`): structured
+  errors, warnings, counts, leakage-check booleans, and recommendations.
+
+`ManifestValidator` checks the manifest before any future trainer may run:
+
+- all three splits (`train`, `validation`, `test`) must be present and non-empty;
+- every item needs non-empty Petri and microscopy paths;
+- labels are limited to the existing preliminary visual categories
+  (`no_evident_growth`, `suspicious_growth`, `probable_fungal_growth`,
+  `probable_bacterial_growth`, `inconclusive`);
+- `inconclusive` is rejected unless `TrainingConfig.allow_inconclusive=True`;
+- duplicate `analysis_run_id`s and duplicate item identities are errors;
+- a `sample_id` cannot appear in multiple splits;
+- `by_lot` and `by_origin_lot` manifests are checked for lot/origin leakage
+  using the metadata exported by Fase 10;
+- optional minimum total, per-split, and per-label counts are enforced as
+  readiness gates, not as performance metrics.
+
+`ImagePathValidator` only checks that referenced Petri/micro paths exist on
+disk. It does not open image bytes, decode files, copy images, or infer
+anything about the sample. This keeps validation safe for manifests that may
+contain large or sensitive image files.
+
+`DatasetLoaderPort` and `JsonManifestDatasetLoader` provide the first loader
+contract for future training code: load JSON, validate it, and iterate items by
+split. They intentionally return manifest items, not tensors or augmented image
+data. `TrainerPort` is a boundary for a future implementation; calling
+`train()` now raises `TrainingNotImplementedError` after making clear that real
+training is outside this phase.
+
+To validate a manifest manually:
+
+```bash
+python scripts/validate_training_manifest.py path/to/dataset_release_manifest.json
+```
+
+An optional JSON config can be supplied:
+
+```bash
+python scripts/validate_training_manifest.py path/to/manifest.json --config path/to/training_config.json
+```
+
+The command prints a JSON validation report and exits `0` only when the
+manifest is valid. It exits `1` for validation failures and `2` for load/config
+errors. It never calculates accuracy, precision, recall, F1, or any other
+model metric.

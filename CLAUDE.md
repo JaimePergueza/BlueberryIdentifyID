@@ -97,6 +97,16 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - El manifest de release (`DatasetReleaseManifestExporter`) incluye `split_strategy`, y por item `sample_id`, `lot_code` y `origin`, para que un auditor pueda confirmar desde el manifest solo qué unidad de agrupamiento (muestra, lote, u origen+lote) respetaron realmente los splits. Sigue sin incluir binarios, secretos, métricas de modelo ni taxonomía.
 - Una release existente de la Fase 9 con el valor libre `random_by_sample` se normaliza a `by_sample` en la migración de Alembic que añade el `CHECK` (Fase 10) — nunca se pierde ni se reinterpreta como otra estrategia.
 
+## 5.4. Contratos ML previos a entrenamiento (Fase 11)
+
+- `ml/contracts/`, `ml/configs/`, `ml/validation/`, `ml/data/`, `ml/training/` y `ml/reports/` existen para validar manifests de entrenamiento futuro, no para entrenar modelos. No agregues PyTorch, tensores, augmentations, dataloaders de imágenes reales ni loops de entrenamiento dentro de esta fase.
+- `TrainingManifest` debe mapear el manifest de `DatasetReleaseManifestExporter`: splits, rutas Petri/micro, ground truth revisado, decisión de revisión, predicción original y metadata de `Sample` (`lot_code`/`origin`). No copies imágenes, no abras bytes de imagen y no exportes secretos.
+- `ManifestValidator` es el gate antes de cualquier entrenamiento futuro: debe fallar por splits faltantes/vacíos, paths vacíos, etiquetas fuera de las cinco clases visuales preliminares, duplicados, fuga por `sample_id`, y fuga por lote/origen cuando el manifest declare `by_lot` o `by_origin_lot`. Los mínimos de tamaño son reglas de preparación, no métricas de modelo.
+- `ImagePathValidator` solo comprueba existencia de archivos referenciados. No debe decodificar con Pillow/OpenCV ni inferir nada del contenido visual.
+- `JsonManifestDatasetLoader` carga JSON y entrega `TrainingManifestItem`s; no debe devolver tensores ni leer imágenes. `TrainerPort.train()` debe seguir lanzando `TrainingNotImplementedError` hasta que una fase futura apruebe entrenamiento real explícitamente.
+- El CLI `scripts/validate_training_manifest.py` imprime un reporte JSON y devuelve códigos de salida (`0` válido, `1` inválido, `2` error de carga/config). No debe conectar a FastAPI, PostgreSQL, Redis o Celery.
+- Sigue prohibido afirmar taxonomía, especie/género, accuracy, precision, recall, F1 o cualquier resultado experimental que no exista.
+
 ## 6. Estándares de código Python
 
 - Type hints obligatorios en toda función/método público. `mypy`-friendly (evitar `Any` salvo justificación).
