@@ -9,6 +9,8 @@ from blueberry_microid.domain.entities.training_preflight_issue import TrainingP
 from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
 from blueberry_microid.domain.entities.training_prediction import TrainingPrediction
 from blueberry_microid.domain.entities.training_run import TrainingRun
+from blueberry_microid.domain.entities.training_run_comparison import TrainingRunComparison
+from blueberry_microid.domain.entities.training_run_comparison_entry import TrainingRunComparisonEntry
 
 __all__ = [
     "AnalysisRun",
@@ -22,4 +24,6 @@ __all__ = [
     "TrainingPreflightRun",
     "TrainingPrediction",
     "TrainingRun",
+    "TrainingRunComparison",
+    "TrainingRunComparisonEntry",
 ]

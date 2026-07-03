@@ -1282,3 +1282,43 @@ Endpoint:
 
 The older `POST /api/v1/ml/training-runs/baseline` majority-class endpoint
 remains as a label-only comparison baseline.
+
+## 26. Training run comparison reports (Fase 17)
+
+Fase 17 adds a persisted comparison layer for baseline candidates. It does
+not train anything: it only reads completed `TrainingRun` rows that already
+belong to the same `DatasetRelease` and already have persisted metrics from
+Fase 13 or Fase 16.
+
+`TrainingRunComparison` stores the release, name, primary metric
+(`accuracy` only), primary split (`validation` or `test`), selection policy,
+optional selected `TrainingRun`, a JSON summary, warnings, author, and notes.
+`TrainingRunComparisonEntry` stores one immutable metrics snapshot per run:
+rank, model type, accuracy by split, support by split, generalization gap,
+and the original metrics JSON. It references the source `TrainingRun`; it
+does not copy predictions or images.
+
+`TrainingRunComparator` rejects comparisons that would be misleading:
+fewer than two runs, mixed releases, non-completed runs, missing metrics,
+missing primary split accuracy, or missing primary split support. Ranking is
+descending by the selected accuracy split. `prefer_simpler_if_tie` uses the
+documented simplicity order (`majority_class` before
+`logistic_regression_tabular`); `no_auto_selection` still ranks entries but
+does not mark a candidate.
+
+Warnings are metadata, not failures. A low-support warning is recorded when
+the primary split has very few items, so the report can be audited without
+pretending that the comparison is scientifically strong.
+
+Endpoints:
+
+- `POST /api/v1/ml/training-run-comparisons`
+- `GET /api/v1/ml/training-run-comparisons`
+- `GET /api/v1/ml/training-run-comparisons/{comparison_id}`
+- `GET /api/v1/ml/training-run-comparisons/{comparison_id}/entries`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/training-run-comparisons`
+
+This phase adds no PyTorch, TensorFlow, CNN, ViT, raw image tensors, new
+dataset, external tracker, frontend, authentication, taxonomy, model
+artifact, or new business prediction path. It also does not replace
+`MockInferenceEngine`.

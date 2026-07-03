@@ -125,6 +125,10 @@ class BaselineTrainingNotAllowedError(ConflictError):
     """Raised when a baseline TrainingRun cannot be created from current state."""
 
 
+class TrainingRunComparisonNotAllowedError(ConflictError):
+    """Raised when persisted TrainingRuns cannot be compared safely."""
+
+
 class ImageFeatureExtractionNotAllowedError(ConflictError):
     """Raised when an ImageFeatureExtractionRun cannot be created from the
     current state: the referenced ImageDatasetAuditRun does not exist,

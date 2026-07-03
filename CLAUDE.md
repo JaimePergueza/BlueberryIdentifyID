@@ -207,3 +207,23 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - `CreateClassicalBaselineTrainingRunUseCase` requiere `DatasetRelease`, `TrainingPreflightRun` no fallido y `ImageFeatureExtractionRun` `completed` del mismo release. `partial`/`failed` no entrenan por defecto. Si train tiene una sola clase o faltan features requeridas, persistir fallo controlado o devolver conflicto documentado; nunca entrenar silenciosamente con datos invalidos.
 - Persistir en `TrainingRun`/`TrainingPrediction` existentes. No guardar pickle, arrays grandes, imagenes, secretos ni nuevos artefactos binarios.
 - Endpoint: `POST /api/v1/ml/training-runs/classical-baseline`; debe conservar `X-Request-ID` y no usar Celery.
+
+## 14. Comparacion de TrainingRuns (Fase 17)
+
+- `TrainingRunComparison` y `TrainingRunComparisonEntry` comparan runs ya
+  persistidos; no entrenan, no recalculan predicciones y no abren imagenes.
+- Solo se aceptan `TrainingRun` `completed` de la misma `DatasetRelease`, con
+  metricas persistidas suficientes (`accuracy_by_split` y `support_by_split`).
+- La unica metrica primaria soportada es `accuracy`, sobre split
+  `validation` o `test`. No agregar precision, recall, F1 ni metricas nuevas
+  sin fase explicita.
+- La seleccion de baseline candidato es preliminar y auditable. Empates
+  pueden resolverse por simplicidad (`majority_class` antes de
+  `logistic_regression_tabular`) si la politica lo pide; `no_auto_selection`
+  guarda ranking sin candidato.
+- Los endpoints viven bajo `/api/v1/ml/training-run-comparisons` y
+  `/api/v1/datasets/releases/{id}/training-run-comparisons`, conservan
+  `X-Request-ID`, y no usan Celery.
+- Sigue prohibido agregar PyTorch, TensorFlow, CNN, ViT, deep learning, raw
+  image tensors, datasets externos, frontend, autenticacion, taxonomia,
+  trackers externos o reemplazar `MockInferenceEngine` en esta capa.

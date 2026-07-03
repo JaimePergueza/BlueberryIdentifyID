@@ -24,7 +24,11 @@ from blueberry_microid.domain.entities.training_preflight_issue import TrainingP
 from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
 from blueberry_microid.domain.entities.training_prediction import TrainingPrediction
 from blueberry_microid.domain.entities.training_run import TrainingRun
+from blueberry_microid.domain.entities.training_run_comparison import TrainingRunComparison
+from blueberry_microid.domain.entities.training_run_comparison_entry import TrainingRunComparisonEntry
 from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
+from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
+from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import ImageDatasetAuditIssueSeverity
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
@@ -55,6 +59,8 @@ from blueberry_microid.infrastructure.db.models.training_preflight_issue import 
 from blueberry_microid.infrastructure.db.models.training_preflight_run import TrainingPreflightRunModel
 from blueberry_microid.infrastructure.db.models.training_prediction import TrainingPredictionModel
 from blueberry_microid.infrastructure.db.models.training_run import TrainingRunModel
+from blueberry_microid.infrastructure.db.models.training_run_comparison import TrainingRunComparisonModel
+from blueberry_microid.infrastructure.db.models.training_run_comparison_entry import TrainingRunComparisonEntryModel
 
 
 def sample_to_entity(model: SampleModel) -> Sample:
@@ -304,6 +310,48 @@ def training_prediction_to_entity(model: TrainingPredictionModel) -> TrainingPre
         ground_truth_label=PredictedLabel(model.ground_truth_label),
         predicted_label=PredictedLabel(model.predicted_label),
         is_correct=model.is_correct,
+        id=model.id,
+        created_at=model.created_at,
+    )
+
+
+def training_run_comparison_to_entity(model: TrainingRunComparisonModel) -> TrainingRunComparison:
+    return TrainingRunComparison(
+        dataset_release_id=model.dataset_release_id,
+        name=model.name,
+        primary_metric=ComparisonPrimaryMetric(model.primary_metric),
+        primary_split=DatasetSplit(model.primary_split),
+        selection_policy=ComparisonSelectionPolicy(model.selection_policy),
+        comparison_summary=model.comparison_summary,
+        id=model.id,
+        description=model.description,
+        selected_training_run_id=model.selected_training_run_id,
+        warnings=model.warnings,
+        created_at=model.created_at,
+        created_by=model.created_by,
+        notes=model.notes,
+    )
+
+
+def training_run_comparison_entry_to_entity(
+    model: TrainingRunComparisonEntryModel,
+) -> TrainingRunComparisonEntry:
+    return TrainingRunComparisonEntry(
+        comparison_id=model.comparison_id,
+        training_run_id=model.training_run_id,
+        rank=model.rank,
+        run_kind=TrainingRunKind(model.run_kind),
+        baseline_model_type=BaselineModelType(model.baseline_model_type),
+        primary_metric_value=model.primary_metric_value,
+        train_accuracy=model.train_accuracy,
+        validation_accuracy=model.validation_accuracy,
+        test_accuracy=model.test_accuracy,
+        generalization_gap=model.generalization_gap,
+        support_train=model.support_train,
+        support_validation=model.support_validation,
+        support_test=model.support_test,
+        metrics_snapshot=model.metrics_snapshot,
+        summary=model.summary,
         id=model.id,
         created_at=model.created_at,
     )

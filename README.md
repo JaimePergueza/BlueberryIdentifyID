@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 16)
+## MVP status (as of Fase 17)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -27,8 +27,9 @@ splits under three leakage-prevention strategies (`by_sample`, `by_lot`,
 `ml/`, a persisted technical image-file audit for a release's Petri/micro
 images, and a persisted non-deep feature-extraction layer over those same
 audited images — all behind a versioned FastAPI, backed by SQLAlchemy models
-and Alembic migrations. 448 automated tests (394 SQLite/eager-based + 54
-PostgreSQL-only); the CI workflow runs the fast suite on SQLite, applies
+and Alembic migrations. 461 automated tests (402 SQLite/eager-based + 59
+PostgreSQL-only); Fase 17 also adds persisted comparison reports over completed
+baseline `TrainingRun` metrics. The CI workflow runs the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
 every push/PR to `main`.
@@ -94,6 +95,16 @@ feature names, basic model parameters, and real metrics derived from persisted
 `TrainingPrediction` rows: accuracy, support, label distributions, and
 confusion matrices. No model pickle, PyTorch, TensorFlow, CNN, ViT, deep
 learning, external dataset, frontend, authentication, or taxonomy was added.
+
+**Training run comparison reports (Fase 17):** `TrainingRunComparison` and
+`TrainingRunComparisonEntry` freeze a reproducible comparison of already
+completed `TrainingRun` rows from the same `DatasetRelease`. The comparator
+reads persisted metrics only (`accuracy_by_split` and support), ranks by
+validation or test accuracy, records the selection policy, warnings such as
+low support, and may mark one candidate as a preliminary baseline. It does
+not train a new model, recalculate predictions, open image bytes, introduce
+new metrics, use PyTorch/TensorFlow/deep learning, or change
+`MockInferenceEngine`.
 
 **Curated datasets (Fase 8):** `DatasetSnapshot` freezes a reviewed dataset
 version and `DatasetItem` records traceable references to the original
@@ -192,6 +203,7 @@ See [docs/development.md](docs/development.md) for full details, including the e
 - **Persistent preflight validation:** `POST /api/v1/ml/preflight-runs` runs the same manifest validation and persists the report. Use the standalone CLI for quick local checks; use the API when the result must be auditable and queryable by `DatasetRelease`.
 - **Majority-class baseline:** `POST /api/v1/ml/training-runs/baseline` runs the label-only comparison baseline. It requires a matching non-failed preflight, revalidates the release manifest, uses train labels only to select the majority class, persists one prediction per split item, and reports real baseline metrics from those predictions. It does not read image bytes, train neural networks, use PyTorch, or alter the mock inference engine.
 - **Classical tabular baseline:** `POST /api/v1/ml/training-runs/classical-baseline` requires a matching non-failed preflight and a completed `ImageFeatureExtractionRun` for the same `DatasetRelease`, builds a tabular matrix from `ImageFeatureVector`, fits logistic regression on train only, predicts train/validation/test, and persists real metrics plus predictions. It uses scikit-learn for classical tabular ML only; no PyTorch/TensorFlow/deep learning, raw image tensors, model serialization, external datasets, or taxonomy.
+- **Training run comparisons:** `POST /api/v1/ml/training-run-comparisons` compares completed baseline runs for one `DatasetRelease` using persisted accuracy/support metrics only. Selection is preliminary and traceable; no training, model artifact, new prediction, raw image access, PyTorch/TensorFlow/deep learning, external dataset, or taxonomy is involved.
 - **Technical image dataset audit:** `POST /api/v1/ml/image-audits` opens each Petri/micro image file referenced by a `DatasetRelease` with Pillow (existence, corruption, format, dimensions, color mode, declared-vs-real file size) and persists the result. It is a technical file check, not the Fase 12 manifest preflight and not a scientific/microbiological evaluation; it never creates tensors or uses PyTorch/TensorFlow.
 - **Non-deep image feature extraction:** `POST /api/v1/ml/image-feature-extractions` requires a non-failed `ImageDatasetAuditRun` for the same `DatasetRelease`, then computes geometry/intensity/color/sharpness/texture/histogram features per Petri/micro image with Pillow + numpy and persists one `ImageFeatureVector` per image. It never trains a model, never uses PyTorch/TensorFlow, and never assigns taxonomy.
 - **Upload limits:** Petri/micro image uploads are capped by `MAX_UPLOAD_SIZE_MB` (default 20 MB, configurable via `.env`); oversized uploads get `413 Payload Too Large`.
@@ -229,6 +241,7 @@ Dataset release endpoints (Fase 9 — reproducible train/validation/test splits)
 - `GET /api/v1/datasets/releases/{dataset_release_id}/manifest` returns a deterministic JSON manifest including each item's split.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/preflight-runs` lists persisted ML preflight validations for that release.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/training-runs` lists baseline training runs for that release.
+- `GET /api/v1/datasets/releases/{dataset_release_id}/training-run-comparisons` lists persisted comparison reports for that release.
 - `GET /api/v1/datasets/releases/{dataset_release_id}/image-audits` lists technical image-file audits for that release.
 
 ML preflight endpoints (Fase 12 — persistent validation reports, no training):
@@ -246,6 +259,13 @@ ML baseline endpoints (Fase 13/Fase 16 - majority-class plus classical tabular b
 - `GET /api/v1/ml/training-runs` lists training runs.
 - `GET /api/v1/ml/training-runs/{training_run_id}` returns one training run.
 - `GET /api/v1/ml/training-runs/{training_run_id}/predictions` lists persisted baseline predictions; optional `split=train|validation|test`.
+
+ML training run comparison endpoints (Fase 17 - compare persisted metrics only):
+
+- `POST /api/v1/ml/training-run-comparisons` creates a comparison report from completed runs in one release.
+- `GET /api/v1/ml/training-run-comparisons` lists comparison reports; optional `dataset_release_id`.
+- `GET /api/v1/ml/training-run-comparisons/{comparison_id}` returns one report with entries.
+- `GET /api/v1/ml/training-run-comparisons/{comparison_id}/entries` lists ranked entries.
 
 Image dataset audit endpoints (Fase 14 — technical file audit, no training):
 

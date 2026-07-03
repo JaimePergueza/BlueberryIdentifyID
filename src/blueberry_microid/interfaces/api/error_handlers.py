@@ -50,6 +50,7 @@ from blueberry_microid.application.exceptions import (
     PredictionNotFoundError,
     SampleNotFoundError,
     TrainingPreflightRunNotFoundError,
+    TrainingRunComparisonNotAllowedError,
     TrainingRunNotFoundError,
 )
 from blueberry_microid.domain.exceptions.errors import (
@@ -120,6 +121,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "empty_dataset_snapshot"
     if isinstance(exc, BaselineTrainingNotAllowedError):
         return 409, "baseline_training_not_allowed"
+    if isinstance(exc, TrainingRunComparisonNotAllowedError):
+        return 409, "training_run_comparison_not_allowed"
     if isinstance(exc, ImageFeatureExtractionNotAllowedError):
         return 409, "image_feature_extraction_not_allowed"
     if isinstance(exc, AnalysisRunNotReviewableError):

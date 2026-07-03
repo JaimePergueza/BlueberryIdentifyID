@@ -27,6 +27,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     petri_images,
     samples,
     tasks,
+    training_run_comparisons,
     training_runs,
 )
 
@@ -84,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(datasets.router, prefix=API_V1_PREFIX)
     app.include_router(ml_preflight.router, prefix=API_V1_PREFIX)
     app.include_router(training_runs.router, prefix=API_V1_PREFIX)
+    app.include_router(training_run_comparisons.router, prefix=API_V1_PREFIX)
     app.include_router(image_audits.router, prefix=API_V1_PREFIX)
     app.include_router(image_features.router, prefix=API_V1_PREFIX)
     app.include_router(tasks.router, prefix=API_V1_PREFIX)

@@ -45,6 +45,12 @@ from blueberry_microid.application.ports.training_preflight_issue_repository imp
 )
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
 from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_comparison_entry_repository import (
+    TrainingRunComparisonEntryRepositoryPort,
+)
+from blueberry_microid.application.ports.training_run_comparison_repository import (
+    TrainingRunComparisonRepositoryPort,
+)
 from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
@@ -66,6 +72,8 @@ from blueberry_microid.domain.entities.training_preflight_issue import TrainingP
 from blueberry_microid.domain.entities.training_preflight_run import TrainingPreflightRun
 from blueberry_microid.domain.entities.training_prediction import TrainingPrediction
 from blueberry_microid.domain.entities.training_run import TrainingRun
+from blueberry_microid.domain.entities.training_run_comparison import TrainingRunComparison
+from blueberry_microid.domain.entities.training_run_comparison_entry import TrainingRunComparisonEntry
 from blueberry_microid.domain.enums.analysis_status import AnalysisStatus
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 
@@ -456,6 +464,64 @@ class InMemoryTrainingRunRepository(TrainingRunRepositoryPort):
         self._by_id = copy.deepcopy(state)
 
 
+class InMemoryTrainingRunComparisonRepository(TrainingRunComparisonRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, TrainingRunComparison] = {}
+
+    def add(self, comparison: TrainingRunComparison) -> TrainingRunComparison:
+        self._by_id[comparison.id] = comparison
+        return comparison
+
+    def get_by_id(self, comparison_id: UUID) -> Optional[TrainingRunComparison]:
+        return self._by_id.get(comparison_id)
+
+    def list_all(self) -> list[TrainingRunComparison]:
+        return sorted(self._by_id.values(), key=lambda comparison: (comparison.created_at, comparison.id))
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[TrainingRunComparison]:
+        return [
+            comparison
+            for comparison in self.list_all()
+            if comparison.dataset_release_id == dataset_release_id
+        ]
+
+    def snapshot_state(self) -> dict[UUID, TrainingRunComparison]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, TrainingRunComparison]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryTrainingRunComparisonEntryRepository(TrainingRunComparisonEntryRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, TrainingRunComparisonEntry] = {}
+
+    def add_many(self, entries: list[TrainingRunComparisonEntry]) -> list[TrainingRunComparisonEntry]:
+        seen = {
+            (entry.comparison_id, entry.training_run_id)
+            for entry in self._by_id.values()
+        }
+        for entry in entries:
+            key = (entry.comparison_id, entry.training_run_id)
+            if key in seen:
+                raise ValueError("duplicate training_run in comparison")
+            seen.add(key)
+            self._by_id[entry.id] = entry
+        return entries
+
+    def list_by_comparison_id(self, comparison_id: UUID) -> list[TrainingRunComparisonEntry]:
+        return sorted(
+            [entry for entry in self._by_id.values() if entry.comparison_id == comparison_id],
+            key=lambda entry: (entry.rank or 999999, entry.training_run_id, entry.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, TrainingRunComparisonEntry]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, TrainingRunComparisonEntry]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
 class InMemoryTrainingPredictionRepository(TrainingPredictionRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, TrainingPrediction] = {}
@@ -588,6 +654,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         training_preflight_issue_repository: Optional[TrainingPreflightIssueRepositoryPort] = None,
         training_run_repository: Optional[TrainingRunRepositoryPort] = None,
         training_prediction_repository: Optional[TrainingPredictionRepositoryPort] = None,
+        training_run_comparison_repository: Optional[TrainingRunComparisonRepositoryPort] = None,
+        training_run_comparison_entry_repository: Optional[TrainingRunComparisonEntryRepositoryPort] = None,
         image_dataset_audit_run_repository: Optional[ImageDatasetAuditRunRepositoryPort] = None,
         image_dataset_audit_issue_repository: Optional[ImageDatasetAuditIssueRepositoryPort] = None,
         image_feature_extraction_run_repository: Optional[ImageFeatureExtractionRunRepositoryPort] = None,
@@ -604,6 +672,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.training_preflight_issue_repository = training_preflight_issue_repository
         self.training_run_repository = training_run_repository
         self.training_prediction_repository = training_prediction_repository
+        self.training_run_comparison_repository = training_run_comparison_repository
+        self.training_run_comparison_entry_repository = training_run_comparison_entry_repository
         self.image_dataset_audit_run_repository = image_dataset_audit_run_repository
         self.image_dataset_audit_issue_repository = image_dataset_audit_issue_repository
         self.image_feature_extraction_run_repository = image_feature_extraction_run_repository
@@ -615,6 +685,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._training_preflight_issue_snapshot = None
         self._training_run_snapshot = None
         self._training_prediction_snapshot = None
+        self._training_run_comparison_snapshot = None
+        self._training_run_comparison_entry_snapshot = None
         self._image_dataset_audit_run_snapshot = None
         self._image_dataset_audit_issue_snapshot = None
         self._image_feature_extraction_run_snapshot = None
@@ -632,6 +704,12 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._training_run_snapshot = self.training_run_repository.snapshot_state()
         if hasattr(self.training_prediction_repository, "snapshot_state"):
             self._training_prediction_snapshot = self.training_prediction_repository.snapshot_state()
+        if hasattr(self.training_run_comparison_repository, "snapshot_state"):
+            self._training_run_comparison_snapshot = self.training_run_comparison_repository.snapshot_state()
+        if hasattr(self.training_run_comparison_entry_repository, "snapshot_state"):
+            self._training_run_comparison_entry_snapshot = (
+                self.training_run_comparison_entry_repository.snapshot_state()
+            )
         if hasattr(self.image_dataset_audit_run_repository, "snapshot_state"):
             self._image_dataset_audit_run_snapshot = self.image_dataset_audit_run_repository.snapshot_state()
         if hasattr(self.image_dataset_audit_issue_repository, "snapshot_state"):
@@ -660,6 +738,12 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self.training_run_repository.restore_state(self._training_run_snapshot)
         if exc_type is not None and self._training_prediction_snapshot is not None:
             self.training_prediction_repository.restore_state(self._training_prediction_snapshot)
+        if exc_type is not None and self._training_run_comparison_snapshot is not None:
+            self.training_run_comparison_repository.restore_state(self._training_run_comparison_snapshot)
+        if exc_type is not None and self._training_run_comparison_entry_snapshot is not None:
+            self.training_run_comparison_entry_repository.restore_state(
+                self._training_run_comparison_entry_snapshot
+            )
         if exc_type is not None and self._image_dataset_audit_run_snapshot is not None:
             self.image_dataset_audit_run_repository.restore_state(self._image_dataset_audit_run_snapshot)
         if exc_type is not None and self._image_dataset_audit_issue_snapshot is not None:

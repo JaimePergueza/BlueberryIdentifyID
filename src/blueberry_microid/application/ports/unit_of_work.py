@@ -22,6 +22,10 @@ from blueberry_microid.application.ports.prediction_repository import Prediction
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
 from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_comparison_entry_repository import (
+    TrainingRunComparisonEntryRepositoryPort,
+)
+from blueberry_microid.application.ports.training_run_comparison_repository import TrainingRunComparisonRepositoryPort
 from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 
 
@@ -56,6 +60,8 @@ class UnitOfWorkPort(ABC):
     training_preflight_issue_repository: TrainingPreflightIssueRepositoryPort
     training_preflight_run_repository: TrainingPreflightRunRepositoryPort
     training_prediction_repository: TrainingPredictionRepositoryPort
+    training_run_comparison_entry_repository: TrainingRunComparisonEntryRepositoryPort
+    training_run_comparison_repository: TrainingRunComparisonRepositoryPort
     training_run_repository: TrainingRunRepositoryPort
 
     @abstractmethod

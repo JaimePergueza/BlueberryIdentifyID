@@ -44,12 +44,19 @@ from blueberry_microid.application.ports.sample_repository import SampleReposito
 from blueberry_microid.application.ports.training_preflight_issue_repository import TrainingPreflightIssueRepositoryPort
 from blueberry_microid.application.ports.training_preflight_run_repository import TrainingPreflightRunRepositoryPort
 from blueberry_microid.application.ports.training_prediction_repository import TrainingPredictionRepositoryPort
+from blueberry_microid.application.ports.training_run_comparison_entry_repository import (
+    TrainingRunComparisonEntryRepositoryPort,
+)
+from blueberry_microid.application.ports.training_run_comparison_repository import (
+    TrainingRunComparisonRepositoryPort,
+)
 from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
 from blueberry_microid.application.services.dataset_splitter import DatasetSplitter
+from blueberry_microid.application.services.training_run_comparator import TrainingRunComparator
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
@@ -104,7 +111,19 @@ from blueberry_microid.application.use_cases.training.create_baseline_training_r
 from blueberry_microid.application.use_cases.training.create_classical_baseline_training_run import (
     CreateClassicalBaselineTrainingRunUseCase,
 )
+from blueberry_microid.application.use_cases.training.create_training_run_comparison import (
+    CreateTrainingRunComparisonUseCase,
+)
 from blueberry_microid.application.use_cases.training.get_training_run import GetTrainingRunUseCase
+from blueberry_microid.application.use_cases.training.get_training_run_comparison import (
+    GetTrainingRunComparisonUseCase,
+)
+from blueberry_microid.application.use_cases.training.list_training_run_comparison_entries import (
+    ListTrainingRunComparisonEntriesUseCase,
+)
+from blueberry_microid.application.use_cases.training.list_training_run_comparisons import (
+    ListTrainingRunComparisonsUseCase,
+)
 from blueberry_microid.application.use_cases.training.list_training_predictions import ListTrainingPredictionsUseCase
 from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
 from blueberry_microid.application.use_cases.micro_image.register_micro_image import RegisterMicroImageUseCase
@@ -171,6 +190,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prefli
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prediction_repository import (
     SqlAlchemyTrainingPredictionRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_comparison_entry_repository import (
+    SqlAlchemyTrainingRunComparisonEntryRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_comparison_repository import (
+    SqlAlchemyTrainingRunComparisonRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_repository import (
     SqlAlchemyTrainingRunRepository,
@@ -324,6 +349,18 @@ def get_training_prediction_repository(
     return SqlAlchemyTrainingPredictionRepository(session)
 
 
+def get_training_run_comparison_repository(
+    session: Session = Depends(get_db_session),
+) -> TrainingRunComparisonRepositoryPort:
+    return SqlAlchemyTrainingRunComparisonRepository(session)
+
+
+def get_training_run_comparison_entry_repository(
+    session: Session = Depends(get_db_session),
+) -> TrainingRunComparisonEntryRepositoryPort:
+    return SqlAlchemyTrainingRunComparisonEntryRepository(session)
+
+
 def get_image_dataset_audit_run_repository(
     session: Session = Depends(get_db_session),
 ) -> ImageDatasetAuditRunRepositoryPort:
@@ -381,6 +418,10 @@ def get_feature_matrix_builder() -> FeatureMatrixBuilder:
 
 def get_classical_tabular_baseline_trainer() -> ClassicalTabularBaselineTrainer:
     return ClassicalTabularBaselineTrainer()
+
+
+def get_training_run_comparator() -> TrainingRunComparator:
+    return TrainingRunComparator()
 
 
 # --- inference engine --------------------------------------------------------
@@ -727,6 +768,48 @@ def get_list_training_predictions_use_case(
     training_prediction_repository: TrainingPredictionRepositoryPort = Depends(get_training_prediction_repository),
 ) -> ListTrainingPredictionsUseCase:
     return ListTrainingPredictionsUseCase(training_run_repository, training_prediction_repository)
+
+
+def get_create_training_run_comparison_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    training_run_repository: TrainingRunRepositoryPort = Depends(get_training_run_repository),
+    comparator: TrainingRunComparator = Depends(get_training_run_comparator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateTrainingRunComparisonUseCase:
+    return CreateTrainingRunComparisonUseCase(
+        dataset_release_repository,
+        training_run_repository,
+        comparator,
+        unit_of_work,
+    )
+
+
+def get_get_training_run_comparison_use_case(
+    comparison_repository: TrainingRunComparisonRepositoryPort = Depends(get_training_run_comparison_repository),
+    entry_repository: TrainingRunComparisonEntryRepositoryPort = Depends(
+        get_training_run_comparison_entry_repository
+    ),
+) -> GetTrainingRunComparisonUseCase:
+    return GetTrainingRunComparisonUseCase(comparison_repository, entry_repository)
+
+
+def get_list_training_run_comparisons_use_case(
+    comparison_repository: TrainingRunComparisonRepositoryPort = Depends(get_training_run_comparison_repository),
+    entry_repository: TrainingRunComparisonEntryRepositoryPort = Depends(
+        get_training_run_comparison_entry_repository
+    ),
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+) -> ListTrainingRunComparisonsUseCase:
+    return ListTrainingRunComparisonsUseCase(comparison_repository, entry_repository, dataset_release_repository)
+
+
+def get_list_training_run_comparison_entries_use_case(
+    comparison_repository: TrainingRunComparisonRepositoryPort = Depends(get_training_run_comparison_repository),
+    entry_repository: TrainingRunComparisonEntryRepositoryPort = Depends(
+        get_training_run_comparison_entry_repository
+    ),
+) -> ListTrainingRunComparisonEntriesUseCase:
+    return ListTrainingRunComparisonEntriesUseCase(comparison_repository, entry_repository)
 
 
 def get_create_image_dataset_audit_run_use_case(

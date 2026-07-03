@@ -46,6 +46,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prefli
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_prediction_repository import (
     SqlAlchemyTrainingPredictionRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_comparison_entry_repository import (
+    SqlAlchemyTrainingRunComparisonEntryRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_comparison_repository import (
+    SqlAlchemyTrainingRunComparisonRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_repository import (
     SqlAlchemyTrainingRunRepository,
 )
@@ -102,6 +108,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.training_prediction_repository = SqlAlchemyTrainingPredictionRepository(self.session, auto_commit=False)
+        self.training_run_comparison_entry_repository = SqlAlchemyTrainingRunComparisonEntryRepository(
+            self.session, auto_commit=False
+        )
+        self.training_run_comparison_repository = SqlAlchemyTrainingRunComparisonRepository(
+            self.session, auto_commit=False
+        )
         self.training_run_repository = SqlAlchemyTrainingRunRepository(self.session, auto_commit=False)
         return self
 

@@ -1133,3 +1133,55 @@ modelo reproducible todavia; solo config/estado/metricas/predicciones. (c) La
 calidad de features depende de la consistencia de captura y preprocesamiento.
 (d) Sigue sin existir IA real de inferencia, deep learning, dataset externo,
 frontend, autenticacion ni taxonomia.
+
+## 33. Fase 17 - comparacion de TrainingRuns y baseline candidato (implementada)
+
+Objetivo: comparar `TrainingRun` ya persistidos para una misma
+`DatasetRelease` y registrar un candidato baseline preliminar, sin entrenar
+modelos nuevos, sin recalcular predicciones y sin tocar imagenes.
+
+**Diagnostico.** Fase 13 y Fase 16 ya persisten `TrainingRun.metrics` y
+`TrainingPrediction`. La comparacion se apoya solo en esas metricas
+persistidas (`accuracy_by_split` y `support_by_split`); no abre manifests,
+no lee imagenes, no entrena, no consulta datasets externos y no cambia
+`MockInferenceEngine`.
+
+**Entidades.** `TrainingRunComparison` registra release, nombre, metrica
+primaria (`accuracy`), split primario (`validation` o `test`), politica de
+seleccion, candidato seleccionado opcional, summary JSON, warnings, autor y
+notas. `TrainingRunComparisonEntry` registra una snapshot por run: rank,
+modelo baseline, accuracies por split, support por split, gap de
+generalizacion, snapshot de metricas y summary. Las filas conservan FK al
+`TrainingRun` original; no copian predicciones ni imagenes.
+
+**Reglas.** Solo se comparan al menos dos runs `completed` del mismo release.
+Se rechazan runs sin metricas, sin accuracy del split primario o sin soporte
+del split primario. El ranking es descendente por accuracy del split
+seleccionado. En empate, `prefer_simpler_if_tie` prioriza
+`majority_class` antes de `logistic_regression_tabular`; `no_auto_selection`
+no marca candidato aunque guarde el ranking. Los warnings de bajo soporte son
+advertencias auditables, no metricas nuevas ni aprobacion cientifica.
+
+**Persistencia.** Migracion `0011_training_run_comparisons.py` crea
+`training_run_comparisons` y `training_run_comparison_entries`, con FK a
+`dataset_releases`/`training_runs`, CHECKs de metrica/split/politica/modelo,
+JSONB para summary/warnings/snapshots, e indice unico
+`(comparison_id, training_run_id)` para evitar duplicados.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/training-run-comparisons` | Crea una comparacion desde TrainingRuns completados |
+| GET | `/api/v1/ml/training-run-comparisons` | Lista comparaciones, con filtro opcional `dataset_release_id` |
+| GET | `/api/v1/ml/training-run-comparisons/{id}` | Obtiene una comparacion con entries |
+| GET | `/api/v1/ml/training-run-comparisons/{id}/entries` | Lista entries rankeadas |
+| GET | `/api/v1/datasets/releases/{id}/training-run-comparisons` | Historial por release |
+
+**Riesgos pendientes antes de Fase 18.** (a) El candidato seleccionado es
+preliminar: depende del tamano y calidad del split usado. (b) Accuracy por si
+sola puede ocultar sesgos o clases minoritarias; precision/recall/F1 siguen
+fuera de alcance hasta que se apruebe una fase especifica. (c) No existe aun
+promocion de modelo ni artefacto reproducible de modelo. (d) Sigue sin existir
+IA real de inferencia, deep learning, dataset externo, frontend, autenticacion
+ni taxonomia.

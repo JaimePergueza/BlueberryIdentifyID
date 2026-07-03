@@ -23,6 +23,8 @@ from blueberry_microid.infrastructure.db.models.training_preflight_issue import 
 from blueberry_microid.infrastructure.db.models.training_preflight_run import TrainingPreflightRunModel
 from blueberry_microid.infrastructure.db.models.training_prediction import TrainingPredictionModel
 from blueberry_microid.infrastructure.db.models.training_run import TrainingRunModel
+from blueberry_microid.infrastructure.db.models.training_run_comparison import TrainingRunComparisonModel
+from blueberry_microid.infrastructure.db.models.training_run_comparison_entry import TrainingRunComparisonEntryModel
 
 __all__ = [
     "AnalysisRunModel",
@@ -45,4 +47,6 @@ __all__ = [
     "TrainingPreflightRunModel",
     "TrainingPredictionModel",
     "TrainingRunModel",
+    "TrainingRunComparisonModel",
+    "TrainingRunComparisonEntryModel",
 ]
