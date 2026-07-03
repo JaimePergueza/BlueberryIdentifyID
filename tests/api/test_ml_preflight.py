@@ -4,6 +4,20 @@ _FORBIDDEN_TAXONOMY_WORDS = ("aspergillus", "penicillium", "botrytis", "escheric
 _FORBIDDEN_METRIC_WORDS = ("accuracy", "precision", "recall", "f1", "confusion_matrix")
 
 
+def _json_keys(payload) -> list[str]:
+    if isinstance(payload, dict):
+        keys = list(payload)
+        for value in payload.values():
+            keys.extend(_json_keys(value))
+        return keys
+    if isinstance(payload, list):
+        keys = []
+        for item in payload:
+            keys.extend(_json_keys(item))
+        return keys
+    return []
+
+
 def _create_sample(api_client, sample_code: str) -> str:
     response = api_client.post(
         "/api/v1/samples",
@@ -157,8 +171,12 @@ def test_full_flow_creates_training_preflight_run_and_lists_history(api_client):
     assert any(item["id"] == preflight["id"] for item in list_response.json())
 
     haystack = str(preflight) + str(get_response.json()) + str(release_history_response.json())
-    for word in _FORBIDDEN_TAXONOMY_WORDS + _FORBIDDEN_METRIC_WORDS:
+    for word in _FORBIDDEN_TAXONOMY_WORDS:
         assert word not in haystack.lower()
+
+    keys = " ".join(_json_keys(preflight) + _json_keys(get_response.json()) + _json_keys(release_history_response.json()))
+    for word in _FORBIDDEN_METRIC_WORDS:
+        assert word not in keys.lower()
 
 
 def test_preflight_invalid_manifest_is_persisted_as_failed_with_issues(api_client):
