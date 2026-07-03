@@ -263,3 +263,35 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - No guardar mascaras ni binarios de imagen en base de datos. No modificar
   imagenes originales. No agregar taxonomia, frontend, autenticacion,
   datasets externos, entrenamiento ni reemplazo de `MockInferenceEngine`.
+
+## 17. Human Review de regiones Petri (Fase 20)
+
+- `PetriRegionReview` registra la revision humana de una `PetriSegmentationRegion`
+  candidata detectada por el segmentador clasico (Fase 19). Nunca modifica la
+  region original: una correccion de bounding box, si existe, vive solo en la
+  fila de la revision (`corrected_bbox_x/y/width/height`), nunca en
+  `PetriSegmentationRegionModel`.
+- `PetriRegionReviewDecision` define exactamente cuatro valores:
+  `candidate_valid`, `candidate_false_positive`, `candidate_uncertain`,
+  `needs_resegmentation`. Ninguno de los cuatro es una identificacion
+  taxonomica ni una confirmacion de colonia real — `candidate_valid` solo
+  significa que la region parece un candidato de anotacion util a futuro.
+- **"Revision final vigente"** sigue el mismo patron que `HumanReview` (Fase 5):
+  `is_final=True` marca la revision que actualmente aplica para una region; a
+  lo sumo una puede ser final por `petri_segmentation_region_id` a la vez,
+  aplicado con un indice unico parcial (`uq_petri_region_reviews_one_final_per_region`)
+  y por `SubmitPetriRegionReviewUseCase`, que despromueve la final anterior e
+  inserta la nueva final en un unico `UnitOfWork`.
+- `PetriReviewedAnnotationManifestExporter` exporta un manifest JSON
+  determinista de regiones revisadas (solo finales por defecto,
+  `include_non_final=True` agrega historicas) con `original_bbox`,
+  `corrected_bbox` opcional y `effective_bbox` (la corregida si existe, si no
+  la original). No es un formato de exportacion YOLO ni genera archivos de
+  labels — eso queda fuera de alcance hasta una fase futura explicita.
+- Los endpoints viven bajo `/api/v1/ml/petri-regions/{region_id}/reviews`,
+  `/api/v1/ml/petri-segmentations/{segmentation_run_id}/region-reviews`,
+  `/api/v1/datasets/releases/{dataset_release_id}/petri-region-reviews` y
+  `/api/v1/ml/petri-segmentations/{segmentation_run_id}/reviewed-annotations-manifest`,
+  y conservan `X-Request-ID`. Sigue prohibido YOLO, PyTorch, TensorFlow,
+  entrenamiento real, datasets externos, taxonomia y reemplazo de
+  `MockInferenceEngine` en esta capa.

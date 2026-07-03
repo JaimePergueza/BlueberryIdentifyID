@@ -15,6 +15,7 @@ from uuid import UUID
 from blueberry_microid.application.exceptions import (
     AnalysisRunNotFoundError,
     DuplicateFinalHumanReviewError,
+    DuplicateFinalPetriRegionReviewError,
     DuplicatePredictionError,
 )
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
@@ -38,6 +39,7 @@ from blueberry_microid.application.ports.inference_engine import InferenceEngine
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.petri_region_review_repository import PetriRegionReviewRepositoryPort
 from blueberry_microid.application.ports.petri_segmentation_region_repository import (
     PetriSegmentationRegionRepositoryPort,
 )
@@ -70,6 +72,7 @@ from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureV
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
+from blueberry_microid.domain.entities.petri_region_review import PetriRegionReview
 from blueberry_microid.domain.entities.petri_segmentation_region import PetriSegmentationRegion
 from blueberry_microid.domain.entities.petri_segmentation_run import PetriSegmentationRun
 from blueberry_microid.domain.entities.prediction import Prediction
@@ -479,6 +482,9 @@ class InMemoryPetriSegmentationRegionRepository(PetriSegmentationRegionRepositor
             self._by_id[region.id] = region
         return regions
 
+    def get_by_id(self, region_id: UUID) -> Optional[PetriSegmentationRegion]:
+        return self._by_id.get(region_id)
+
     def list_by_segmentation_run_id(self, segmentation_run_id: UUID) -> list[PetriSegmentationRegion]:
         return sorted(
             [region for region in self._by_id.values() if region.segmentation_run_id == segmentation_run_id],
@@ -498,6 +504,63 @@ class InMemoryPetriSegmentationRegionRepository(PetriSegmentationRegionRepositor
         return copy.deepcopy(self._by_id)
 
     def restore_state(self, state: dict[UUID, PetriSegmentationRegion]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryPetriRegionReviewRepository(PetriRegionReviewRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, PetriRegionReview] = {}
+
+    def add(self, review: PetriRegionReview) -> PetriRegionReview:
+        if review.is_final and any(
+            existing.petri_segmentation_region_id == review.petri_segmentation_region_id and existing.is_final
+            for existing in self._by_id.values()
+        ):
+            raise DuplicateFinalPetriRegionReviewError(
+                f"petri_segmentation_region '{review.petri_segmentation_region_id}' already has a final review"
+            )
+        self._by_id[review.id] = review
+        return review
+
+    def get_by_id(self, review_id: UUID) -> Optional[PetriRegionReview]:
+        return self._by_id.get(review_id)
+
+    def list_by_region_id(self, region_id: UUID) -> list[PetriRegionReview]:
+        return sorted(
+            [review for review in self._by_id.values() if review.petri_segmentation_region_id == region_id],
+            key=lambda review: (review.created_at, review.id),
+        )
+
+    def list_by_segmentation_run_id(self, segmentation_run_id: UUID) -> list[PetriRegionReview]:
+        return sorted(
+            [review for review in self._by_id.values() if review.petri_segmentation_run_id == segmentation_run_id],
+            key=lambda review: (review.created_at, review.id),
+        )
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[PetriRegionReview]:
+        return sorted(
+            [review for review in self._by_id.values() if review.dataset_release_id == dataset_release_id],
+            key=lambda review: (review.created_at, review.id),
+        )
+
+    def get_final_by_region_id(self, region_id: UUID) -> Optional[PetriRegionReview]:
+        return next(
+            (review for review in self.list_by_region_id(region_id) if review.is_final),
+            None,
+        )
+
+    def unset_final_for_region(self, region_id: UUID) -> int:
+        count = 0
+        for review in self._by_id.values():
+            if review.petri_segmentation_region_id == region_id and review.is_final:
+                review.is_final = False
+                count += 1
+        return count
+
+    def snapshot_state(self) -> dict[UUID, PetriRegionReview]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, PetriRegionReview]) -> None:
         self._by_id = copy.deepcopy(state)
 
 
@@ -732,6 +795,7 @@ class FakeUnitOfWork(UnitOfWorkPort):
         image_feature_vector_repository: Optional[ImageFeatureVectorRepositoryPort] = None,
         petri_segmentation_run_repository: Optional[PetriSegmentationRunRepositoryPort] = None,
         petri_segmentation_region_repository: Optional[PetriSegmentationRegionRepositoryPort] = None,
+        petri_region_review_repository: Optional[PetriRegionReviewRepositoryPort] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
@@ -752,6 +816,7 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.image_feature_vector_repository = image_feature_vector_repository
         self.petri_segmentation_run_repository = petri_segmentation_run_repository
         self.petri_segmentation_region_repository = petri_segmentation_region_repository
+        self.petri_region_review_repository = petri_region_review_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
@@ -767,6 +832,7 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._image_feature_vector_snapshot = None
         self._petri_segmentation_run_snapshot = None
         self._petri_segmentation_region_snapshot = None
+        self._petri_region_review_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
@@ -800,6 +866,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._petri_segmentation_run_snapshot = self.petri_segmentation_run_repository.snapshot_state()
         if hasattr(self.petri_segmentation_region_repository, "snapshot_state"):
             self._petri_segmentation_region_snapshot = self.petri_segmentation_region_repository.snapshot_state()
+        if hasattr(self.petri_region_review_repository, "snapshot_state"):
+            self._petri_region_review_snapshot = self.petri_region_review_repository.snapshot_state()
         return self
 
     def __exit__(
@@ -836,6 +904,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self.petri_segmentation_run_repository.restore_state(self._petri_segmentation_run_snapshot)
         if exc_type is not None and self._petri_segmentation_region_snapshot is not None:
             self.petri_segmentation_region_repository.restore_state(self._petri_segmentation_region_snapshot)
+        if exc_type is not None and self._petri_region_review_snapshot is not None:
+            self.petri_region_review_repository.restore_state(self._petri_region_review_snapshot)
         return None
 
     def commit(self) -> None:
@@ -901,6 +971,40 @@ class FailingAddHumanReviewRepository(HumanReviewRepositoryPort):
 
     def unset_final_reviews_for_analysis_run(self, analysis_run_id: UUID) -> int:
         return self._delegate.unset_final_reviews_for_analysis_run(analysis_run_id)
+
+    def snapshot_state(self):
+        return self._delegate.snapshot_state()
+
+    def restore_state(self, state) -> None:
+        self._delegate.restore_state(state)
+
+
+class FailingAddPetriRegionReviewRepository(PetriRegionReviewRepositoryPort):
+    """Delegates reads/updates but always fails when adding a new review."""
+
+    def __init__(self, delegate: PetriRegionReviewRepositoryPort) -> None:
+        self._delegate = delegate
+
+    def add(self, review: PetriRegionReview) -> PetriRegionReview:
+        raise RuntimeError("simulated petri region review insert failure")
+
+    def get_by_id(self, review_id: UUID) -> Optional[PetriRegionReview]:
+        return self._delegate.get_by_id(review_id)
+
+    def list_by_region_id(self, region_id: UUID) -> list[PetriRegionReview]:
+        return self._delegate.list_by_region_id(region_id)
+
+    def list_by_segmentation_run_id(self, segmentation_run_id: UUID) -> list[PetriRegionReview]:
+        return self._delegate.list_by_segmentation_run_id(segmentation_run_id)
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[PetriRegionReview]:
+        return self._delegate.list_by_dataset_release_id(dataset_release_id)
+
+    def get_final_by_region_id(self, region_id: UUID) -> Optional[PetriRegionReview]:
+        return self._delegate.get_final_by_region_id(region_id)
+
+    def unset_final_for_region(self, region_id: UUID) -> int:
+        return self._delegate.unset_final_for_region(region_id)
 
     def snapshot_state(self):
         return self._delegate.snapshot_state()

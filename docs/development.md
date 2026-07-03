@@ -1384,3 +1384,41 @@ A "candidate region" is only a geometric segment from a classical image
 pipeline. It is not a confirmed colony, not a microbiological diagnosis, not
 taxonomy, and not model performance. The original images are never modified;
 masks and image bytes are not stored in the database.
+
+## 29. Human review of Petri segmentation regions (Fase 20)
+
+Fase 20 adds a persistent human-review layer for the candidate regions
+produced by the Fase 19 classical segmenter, before any future use of those
+regions to train a real object detector (YOLO) or supervised segmentation
+model.
+
+- `PetriRegionReview` records a reviewer's decision about one
+  `PetriSegmentationRegion`. It never mutates the original region — a
+  corrected bounding box, if supplied, is stored only on the review row.
+- `PetriRegionReviewDecision` has exactly four values: `candidate_valid`,
+  `candidate_false_positive`, `candidate_uncertain`, `needs_resegmentation`.
+  None of them assert a confirmed colony or a taxonomic identification.
+- "Final review" follows the same pattern as `HumanReview` (Fase 5): at most
+  one `PetriRegionReview` per region can have `is_final=True` at a time,
+  enforced by a partial unique index and a demote-then-add transactional
+  sequence in `SubmitPetriRegionReviewUseCase`.
+- `PetriReviewedAnnotationManifestExporter` exports a deterministic JSON
+  manifest of reviewed regions for one `PetriSegmentationRun`: only final
+  reviews by default (`include_non_final=true` adds historical ones), with
+  `original_bbox`, an optional `corrected_bbox`, and an `effective_bbox`
+  (the corrected one if present, otherwise the original). There is no YOLO
+  export format or label files yet — that remains out of scope until an
+  explicit future phase.
+
+Endpoints:
+
+- `POST /api/v1/ml/petri-regions/{region_id}/reviews`
+- `GET /api/v1/ml/petri-regions/{region_id}/reviews`
+- `GET /api/v1/ml/petri-regions/{region_id}/reviews/final`
+- `GET /api/v1/ml/petri-segmentations/{segmentation_run_id}/region-reviews`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/petri-region-reviews`
+- `GET /api/v1/ml/petri-segmentations/{segmentation_run_id}/reviewed-annotations-manifest`
+
+No PyTorch, TensorFlow, YOLO, CNN, ViT, deep learning, real model training,
+external datasets, or taxonomy are introduced in this phase, and
+`MockInferenceEngine` is not replaced.

@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -49,6 +50,10 @@ class SqlAlchemyPetriSegmentationRegionRepository(PetriSegmentationRegionReposit
         for model in models:
             self._session.refresh(model)
         return [petri_segmentation_region_to_entity(model) for model in models]
+
+    def get_by_id(self, region_id: UUID) -> Optional[PetriSegmentationRegion]:
+        model = self._session.get(PetriSegmentationRegionModel, region_id)
+        return petri_segmentation_region_to_entity(model) if model is not None else None
 
     def list_by_segmentation_run_id(self, segmentation_run_id: UUID) -> list[PetriSegmentationRegion]:
         statement = (

@@ -1260,3 +1260,85 @@ no una colonia confirmada. Fase 19 no entrena modelos, no calcula metricas
 microbiologicas, no usa PyTorch/TensorFlow/YOLO/CNN/ViT/deep learning, no
 descarga datasets externos, no agrega frontend/autenticacion/taxonomia y no
 reemplaza `MockInferenceEngine`.
+
+## 36. Fase 20 - human review de regiones Petri
+
+Objetivo: registrar revision humana de las `PetriSegmentationRegion`
+candidatas (Fase 19) antes de usarlas para entrenar un futuro detector de
+objetos (YOLO) o un modelo de segmentacion supervisada.
+
+**Entidad.** `PetriRegionReview` (`domain/entities/petri_region_review.py`)
+referencia `petri_segmentation_region_id`, `petri_segmentation_run_id`,
+`dataset_release_id`, `dataset_item_id`, `dataset_split_item_id`,
+`decision` (`PetriRegionReviewDecision`), `reviewer_id`/`reviewer_name`
+opcionales, `confidence_score` opcional (valida `[0,1]` reutilizando el value
+object `ConfidenceScore`), `is_final` (default `True`),
+`corrected_bbox_x/y/width/height` opcionales (`width`/`height` deben ser
+positivos si se proveen) y `corrected_notes`/`review_notes`. Nunca modifica
+`PetriSegmentationRegion`: una correccion de bounding box vive solo en la
+revision.
+
+**Enum.** `PetriRegionReviewDecision` (`domain/enums/petri_region_review_decision.py`)
+define exactamente `candidate_valid`, `candidate_false_positive`,
+`candidate_uncertain`, `needs_resegmentation`. Ninguno implica taxonomia ni
+diagnostico confirmado.
+
+**Persistencia.** Migracion `0013_petri_region_reviews.py` crea
+`petri_region_reviews` con FKs a `petri_segmentation_regions`,
+`petri_segmentation_runs`, `dataset_releases`, `dataset_items` y
+`dataset_split_items`; `CHECK` sobre `decision`, `confidence_score` (`[0,1]`)
+y `corrected_bbox_width`/`corrected_bbox_height` (`> 0` si no son `NULL`); e
+indice unico parcial `uq_petri_region_reviews_one_final_per_region` sobre
+`petri_segmentation_region_id` donde `is_final = true` (mismo patron
+cross-dialecto que `uq_human_reviews_one_final_per_run`, Fase 2.5).
+
+**Puerto y repositorio.** `PetriRegionReviewRepositoryPort` expone `add`,
+`get_by_id`, `list_by_region_id`, `list_by_segmentation_run_id`,
+`list_by_dataset_release_id`, `get_final_by_region_id` y
+`unset_final_for_region` — sin logica de decision. `PetriSegmentationRegionRepositoryPort`
+se extendio con `get_by_id` (ausente hasta esta fase), necesario para que el
+caso de uso valide la region antes de crear la revision.
+
+**Caso de uso.** `SubmitPetriRegionReviewUseCase` busca la
+`PetriSegmentationRegion` (404 `petri_segmentation_region_not_found` si no
+existe), construye el `PetriRegionReview` (las validaciones de
+`confidence_score`/bbox viven en el `__post_init__` de la entidad) y, dentro
+de un unico `UnitOfWork`, si `is_final=True` despromueve la revision final
+anterior de la region (`unset_final_for_region`) antes de insertar la nueva
+— mismo patron "demote-then-add" que `SubmitHumanReviewUseCase` (Fase 5).
+Nunca modifica `PetriSegmentationRegion`, `PetriSegmentationRun` ni
+`DatasetRelease`.
+
+**Consultas.** `GetPetriRegionReviewUseCase` (por id),
+`GetFinalPetriRegionReviewUseCase` (revision final vigente de una region) y
+`ListPetriRegionReviewsUseCase` (`by_region`/`by_segmentation_run`/`by_dataset_release`,
+cada uno validando la existencia del recurso padre antes de listar).
+
+**Manifest de anotaciones revisadas.** `PetriReviewedAnnotationManifestExporter`
+(`application/services/petri_reviewed_annotation_manifest_exporter.py`)
+exporta, para un `PetriSegmentationRun`, un JSON determinista (orden por
+`petri_image_path`, `region_index`, id de revision) con `total_regions`,
+`reviewed_regions`, `final_reviewed_regions`, `decision_distribution` y una
+lista `annotations` — cada una con `original_bbox`, `corrected_bbox`
+opcional y `effective_bbox` (la corregida si existe, si no la original).
+Solo incluye revisiones finales por defecto; `include_non_final=true` agrega
+las historicas. No genera formato YOLO ni archivos de labels — eso queda
+fuera de alcance hasta una fase futura explicita. No incluye imagenes,
+mascaras ni taxonomia.
+
+**API.**
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| POST | `/api/v1/ml/petri-regions/{region_id}/reviews` | Registra una revision humana de una region candidata |
+| GET | `/api/v1/ml/petri-regions/{region_id}/reviews` | Historial de revisiones de una region |
+| GET | `/api/v1/ml/petri-regions/{region_id}/reviews/final` | Revision final vigente de una region |
+| GET | `/api/v1/ml/petri-segmentations/{segmentation_run_id}/region-reviews` | Revisiones por run de segmentacion |
+| GET | `/api/v1/datasets/releases/{dataset_release_id}/petri-region-reviews` | Revisiones por DatasetRelease |
+| GET | `/api/v1/ml/petri-segmentations/{segmentation_run_id}/reviewed-annotations-manifest` | Exporta el manifest de anotaciones revisadas |
+
+**Limites.** `candidate_valid` no implica colonia confirmada ni
+identificacion microbiologica. Fase 20 no entrena modelos, no usa
+PyTorch/TensorFlow/YOLO/CNN/ViT/deep learning, no descarga datasets
+externos, no agrega frontend/autenticacion/taxonomia, no usa Celery y no
+reemplaza `MockInferenceEngine`.

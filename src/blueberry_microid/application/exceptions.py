@@ -72,6 +72,14 @@ class PetriSegmentationRunNotFoundError(NotFoundError):
     """Raised when a requested PetriSegmentationRun does not exist."""
 
 
+class PetriSegmentationRegionNotFoundError(NotFoundError):
+    """Raised when a requested PetriSegmentationRegion does not exist."""
+
+
+class PetriRegionReviewNotFoundError(NotFoundError):
+    """Raised when a requested PetriRegionReview or final review does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -90,6 +98,10 @@ class DuplicatePredictionError(ConflictError):
 
 class DuplicateFinalHumanReviewError(ConflictError):
     """Raised when more than one final HumanReview is attempted for a run."""
+
+
+class DuplicateFinalPetriRegionReviewError(ConflictError):
+    """Raised when more than one final PetriRegionReview is attempted for a region."""
 
 
 class DuplicateDatasetSnapshotError(ConflictError):

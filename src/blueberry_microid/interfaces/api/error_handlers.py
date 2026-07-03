@@ -31,6 +31,7 @@ from blueberry_microid.application.exceptions import (
     DuplicateDatasetSnapshotError,
     DuplicateDatasetSplitItemError,
     DuplicateFinalHumanReviewError,
+    DuplicateFinalPetriRegionReviewError,
     DuplicateModelVersionError,
     DuplicatePredictionError,
     DuplicateSampleCodeError,
@@ -47,7 +48,9 @@ from blueberry_microid.application.exceptions import (
     ModelVersionNotFoundError,
     NotFoundError,
     PetriImageNotFoundError,
+    PetriRegionReviewNotFoundError,
     PetriSegmentationNotAllowedError,
+    PetriSegmentationRegionNotFoundError,
     PetriSegmentationRunNotFoundError,
     PredictionNotFoundError,
     SampleNotFoundError,
@@ -102,6 +105,10 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "image_feature_extraction_run_not_found"
     if isinstance(exc, PetriSegmentationRunNotFoundError):
         return 404, "petri_segmentation_run_not_found"
+    if isinstance(exc, PetriSegmentationRegionNotFoundError):
+        return 404, "petri_segmentation_region_not_found"
+    if isinstance(exc, PetriRegionReviewNotFoundError):
+        return 404, "petri_region_review_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -115,6 +122,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_prediction"
     if isinstance(exc, DuplicateFinalHumanReviewError):
         return 409, "duplicate_final_human_review"
+    if isinstance(exc, DuplicateFinalPetriRegionReviewError):
+        return 409, "duplicate_final_petri_region_review"
     if isinstance(exc, DuplicateDatasetSnapshotError):
         return 409, "duplicate_dataset_snapshot"
     if isinstance(exc, DuplicateDatasetItemError):

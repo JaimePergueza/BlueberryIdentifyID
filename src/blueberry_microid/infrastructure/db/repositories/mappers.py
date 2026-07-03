@@ -18,6 +18,7 @@ from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureV
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
+from blueberry_microid.domain.entities.petri_region_review import PetriRegionReview
 from blueberry_microid.domain.entities.petri_segmentation_region import PetriSegmentationRegion
 from blueberry_microid.domain.entities.petri_segmentation_run import PetriSegmentationRun
 from blueberry_microid.domain.entities.prediction import Prediction
@@ -36,6 +37,7 @@ from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import Im
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
 from blueberry_microid.domain.enums.image_feature_extraction_status import ImageFeatureExtractionStatus
 from blueberry_microid.domain.enums.image_modality import ImageModality
+from blueberry_microid.domain.enums.petri_region_review_decision import PetriRegionReviewDecision
 from blueberry_microid.domain.enums.petri_segmentation_status import PetriSegmentationStatus
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
@@ -56,6 +58,7 @@ from blueberry_microid.infrastructure.db.models.image_feature_vector import Imag
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
+from blueberry_microid.infrastructure.db.models.petri_region_review import PetriRegionReviewModel
 from blueberry_microid.infrastructure.db.models.petri_segmentation_region import PetriSegmentationRegionModel
 from blueberry_microid.infrastructure.db.models.petri_segmentation_run import PetriSegmentationRunModel
 from blueberry_microid.infrastructure.db.models.prediction import PredictionModel
@@ -442,6 +445,30 @@ def image_feature_vector_to_entity(model: ImageFeatureVectorModel) -> ImageFeatu
         extraction_version=model.extraction_version,
         id=model.id,
         created_at=model.created_at,
+    )
+
+
+def petri_region_review_to_entity(model: PetriRegionReviewModel) -> PetriRegionReview:
+    return PetriRegionReview(
+        petri_segmentation_region_id=model.petri_segmentation_region_id,
+        petri_segmentation_run_id=model.petri_segmentation_run_id,
+        dataset_release_id=model.dataset_release_id,
+        dataset_item_id=model.dataset_item_id,
+        dataset_split_item_id=model.dataset_split_item_id,
+        decision=PetriRegionReviewDecision(model.decision),
+        id=model.id,
+        reviewer_id=model.reviewer_id,
+        reviewer_name=model.reviewer_name,
+        confidence_score=model.confidence_score,
+        is_final=model.is_final,
+        corrected_bbox_x=model.corrected_bbox_x,
+        corrected_bbox_y=model.corrected_bbox_y,
+        corrected_bbox_width=model.corrected_bbox_width,
+        corrected_bbox_height=model.corrected_bbox_height,
+        corrected_notes=model.corrected_notes,
+        review_notes=model.review_notes,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
     )
 
 

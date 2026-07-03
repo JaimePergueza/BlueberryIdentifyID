@@ -39,6 +39,7 @@ from blueberry_microid.application.ports.inference_engine import InferenceEngine
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.petri_region_review_repository import PetriRegionReviewRepositoryPort
 from blueberry_microid.application.ports.petri_segmentation_region_repository import (
     PetriSegmentationRegionRepositoryPort,
 )
@@ -60,6 +61,9 @@ from blueberry_microid.application.services.image_intake_service import ImageInt
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
 from blueberry_microid.application.services.dataset_splitter import DatasetSplitter
+from blueberry_microid.application.services.petri_reviewed_annotation_manifest_exporter import (
+    PetriReviewedAnnotationManifestExporter,
+)
 from blueberry_microid.application.services.training_run_comparator import TrainingRunComparator
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -134,6 +138,18 @@ from blueberry_microid.application.use_cases.micro_image.register_micro_image im
 from blueberry_microid.application.use_cases.model_version.create_model_version import CreateModelVersionUseCase
 from blueberry_microid.application.use_cases.model_version.list_model_versions import ListModelVersionsUseCase
 from blueberry_microid.application.use_cases.petri_image.register_petri_image import RegisterPetriImageUseCase
+from blueberry_microid.application.use_cases.petri_region_review.get_final_petri_region_review import (
+    GetFinalPetriRegionReviewUseCase,
+)
+from blueberry_microid.application.use_cases.petri_region_review.get_petri_region_review import (
+    GetPetriRegionReviewUseCase,
+)
+from blueberry_microid.application.use_cases.petri_region_review.list_petri_region_reviews import (
+    ListPetriRegionReviewsUseCase,
+)
+from blueberry_microid.application.use_cases.petri_region_review.submit_petri_region_review import (
+    SubmitPetriRegionReviewUseCase,
+)
 from blueberry_microid.application.use_cases.petri_segmentation.create_petri_segmentation_run import (
     CreatePetriSegmentationRunUseCase,
 )
@@ -193,6 +209,9 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_model_version_r
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_image_repository import (
     SqlAlchemyPetriImageRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_region_review_repository import (
+    SqlAlchemyPetriRegionReviewRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_segmentation_region_repository import (
     SqlAlchemyPetriSegmentationRegionRepository,
@@ -418,6 +437,12 @@ def get_petri_segmentation_region_repository(
     session: Session = Depends(get_db_session),
 ) -> PetriSegmentationRegionRepositoryPort:
     return SqlAlchemyPetriSegmentationRegionRepository(session)
+
+
+def get_petri_region_review_repository(
+    session: Session = Depends(get_db_session),
+) -> PetriRegionReviewRepositoryPort:
+    return SqlAlchemyPetriRegionReviewRepository(session)
 
 
 # --- dataset splitting service ------------------------------------------------
@@ -966,3 +991,42 @@ def get_list_petri_segmentation_regions_use_case(
     region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
 ) -> ListPetriSegmentationRegionsUseCase:
     return ListPetriSegmentationRegionsUseCase(run_repository, region_repository)
+
+
+def get_submit_petri_region_review_use_case(
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> SubmitPetriRegionReviewUseCase:
+    return SubmitPetriRegionReviewUseCase(region_repository, unit_of_work)
+
+
+def get_get_petri_region_review_use_case(
+    review_repository: PetriRegionReviewRepositoryPort = Depends(get_petri_region_review_repository),
+) -> GetPetriRegionReviewUseCase:
+    return GetPetriRegionReviewUseCase(review_repository)
+
+
+def get_get_final_petri_region_review_use_case(
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+    review_repository: PetriRegionReviewRepositoryPort = Depends(get_petri_region_review_repository),
+) -> GetFinalPetriRegionReviewUseCase:
+    return GetFinalPetriRegionReviewUseCase(region_repository, review_repository)
+
+
+def get_list_petri_region_reviews_use_case(
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+    segmentation_run_repository: PetriSegmentationRunRepositoryPort = Depends(get_petri_segmentation_run_repository),
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    review_repository: PetriRegionReviewRepositoryPort = Depends(get_petri_region_review_repository),
+) -> ListPetriRegionReviewsUseCase:
+    return ListPetriRegionReviewsUseCase(
+        region_repository, segmentation_run_repository, dataset_release_repository, review_repository
+    )
+
+
+def get_petri_reviewed_annotation_manifest_exporter(
+    segmentation_run_repository: PetriSegmentationRunRepositoryPort = Depends(get_petri_segmentation_run_repository),
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+    review_repository: PetriRegionReviewRepositoryPort = Depends(get_petri_region_review_repository),
+) -> PetriReviewedAnnotationManifestExporter:
+    return PetriReviewedAnnotationManifestExporter(segmentation_run_repository, region_repository, review_repository)

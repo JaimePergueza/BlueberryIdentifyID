@@ -34,6 +34,9 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_e
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_vector_repository import (
     SqlAlchemyImageFeatureVectorRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_region_review_repository import (
+    SqlAlchemyPetriRegionReviewRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_segmentation_region_repository import (
     SqlAlchemyPetriSegmentationRegionRepository,
 )
@@ -104,6 +107,9 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.image_feature_vector_repository = SqlAlchemyImageFeatureVectorRepository(
+            self.session, auto_commit=False
+        )
+        self.petri_region_review_repository = SqlAlchemyPetriRegionReviewRepository(
             self.session, auto_commit=False
         )
         self.petri_segmentation_region_repository = SqlAlchemyPetriSegmentationRegionRepository(
