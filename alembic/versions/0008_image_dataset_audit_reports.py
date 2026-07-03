@@ -65,7 +65,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("severity", sa.String(length=32), nullable=False),
-        sa.Column("modality", sa.String(length=16), nullable=False),
+        sa.Column("modality", sa.String(length=32), nullable=False),
         sa.Column(
             "dataset_item_id",
             postgresql.UUID(as_uuid=True),

@@ -81,18 +81,7 @@ jobs:
         run: python scripts/check_postgres_migrations.py
 
       - name: Run PostgreSQL-specific tests
-        run: |
-          set +e
-          pytest -v -m postgres tests/integration/postgres > pg_test_output.log 2>&1
-          exit_code=$?
-          if [ $exit_code -ne 0 ]; then
-            cat pg_test_output.log
-            echo "=== TEMPORARY CI DEBUG: emitting failure lines as annotations ==="
-            grep -E "FAILED|Error|assert|^E " pg_test_output.log | tail -n 40 | while IFS= read -r line; do
-              echo "::error::${line}"
-            done
-          fi
-          exit $exit_code
+        run: pytest -v -m postgres tests/integration/postgres
 
   celery-smoke:
     runs-on: ubuntu-latest

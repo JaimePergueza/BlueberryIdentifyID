@@ -30,7 +30,7 @@ class ImageDatasetAuditIssueModel(Base):
         UUID(as_uuid=True), ForeignKey("image_dataset_audit_runs.id"), nullable=False, index=True
     )
     severity: Mapped[str] = mapped_column(String(32), nullable=False)
-    modality: Mapped[str] = mapped_column(String(16), nullable=False)
+    modality: Mapped[str] = mapped_column(String(32), nullable=False)
     dataset_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("dataset_items.id"), nullable=True
     )
