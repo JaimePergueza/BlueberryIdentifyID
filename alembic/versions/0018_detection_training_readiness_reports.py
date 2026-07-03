@@ -75,33 +75,36 @@ def upgrade() -> None:
             name="ck_detection_training_readiness_reports_status",
         ),
     )
+    # Index names below are abbreviated ("ix_dtr_reports_...") because the
+    # full "ix_detection_training_readiness_reports_..." prefix pushes
+    # several of them past PostgreSQL's 63-character identifier limit.
     op.create_index(
-        "ix_detection_training_readiness_reports_detection_training_run_id",
+        "ix_dtr_reports_detection_training_run_id",
         "detection_training_readiness_reports",
         ["detection_training_run_id"],
     )
     op.create_index(
-        "ix_detection_training_readiness_reports_annotation_bundle_run_id",
+        "ix_dtr_reports_annotation_bundle_run_id",
         "detection_training_readiness_reports",
         ["annotation_bundle_run_id"],
     )
     op.create_index(
-        "ix_detection_training_readiness_reports_annotation_quality_gate_run_id",
+        "ix_dtr_reports_annotation_quality_gate_run_id",
         "detection_training_readiness_reports",
         ["annotation_quality_gate_run_id"],
     )
     op.create_index(
-        "ix_detection_training_readiness_reports_dataset_release_id",
+        "ix_dtr_reports_dataset_release_id",
         "detection_training_readiness_reports",
         ["dataset_release_id"],
     )
     op.create_index(
-        "ix_detection_training_readiness_reports_petri_annotation_export_run_id",
+        "ix_dtr_reports_petri_annotation_export_run_id",
         "detection_training_readiness_reports",
         ["petri_annotation_export_run_id"],
     )
     op.create_index(
-        "ix_detection_training_readiness_reports_created_at",
+        "ix_dtr_reports_created_at",
         "detection_training_readiness_reports",
         ["created_at"],
     )
@@ -125,46 +128,46 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_detection_training_readiness_issues_readiness_report_id",
+        "ix_dtr_issues_readiness_report_id",
         "detection_training_readiness_issues",
         ["readiness_report_id"],
     )
-    op.create_index("ix_detection_training_readiness_issues_severity", "detection_training_readiness_issues", ["severity"])
-    op.create_index("ix_detection_training_readiness_issues_code", "detection_training_readiness_issues", ["code"])
+    op.create_index("ix_dtr_issues_severity", "detection_training_readiness_issues", ["severity"])
+    op.create_index("ix_dtr_issues_code", "detection_training_readiness_issues", ["code"])
     op.create_index(
-        "ix_detection_training_readiness_issues_created_at", "detection_training_readiness_issues", ["created_at"]
+        "ix_dtr_issues_created_at", "detection_training_readiness_issues", ["created_at"]
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_detection_training_readiness_issues_created_at", table_name="detection_training_readiness_issues")
-    op.drop_index("ix_detection_training_readiness_issues_code", table_name="detection_training_readiness_issues")
-    op.drop_index("ix_detection_training_readiness_issues_severity", table_name="detection_training_readiness_issues")
+    op.drop_index("ix_dtr_issues_created_at", table_name="detection_training_readiness_issues")
+    op.drop_index("ix_dtr_issues_code", table_name="detection_training_readiness_issues")
+    op.drop_index("ix_dtr_issues_severity", table_name="detection_training_readiness_issues")
     op.drop_index(
-        "ix_detection_training_readiness_issues_readiness_report_id", table_name="detection_training_readiness_issues"
+        "ix_dtr_issues_readiness_report_id", table_name="detection_training_readiness_issues"
     )
     op.drop_table("detection_training_readiness_issues")
     op.drop_index(
-        "ix_detection_training_readiness_reports_created_at", table_name="detection_training_readiness_reports"
+        "ix_dtr_reports_created_at", table_name="detection_training_readiness_reports"
     )
     op.drop_index(
-        "ix_detection_training_readiness_reports_petri_annotation_export_run_id",
+        "ix_dtr_reports_petri_annotation_export_run_id",
         table_name="detection_training_readiness_reports",
     )
     op.drop_index(
-        "ix_detection_training_readiness_reports_dataset_release_id",
+        "ix_dtr_reports_dataset_release_id",
         table_name="detection_training_readiness_reports",
     )
     op.drop_index(
-        "ix_detection_training_readiness_reports_annotation_quality_gate_run_id",
+        "ix_dtr_reports_annotation_quality_gate_run_id",
         table_name="detection_training_readiness_reports",
     )
     op.drop_index(
-        "ix_detection_training_readiness_reports_annotation_bundle_run_id",
+        "ix_dtr_reports_annotation_bundle_run_id",
         table_name="detection_training_readiness_reports",
     )
     op.drop_index(
-        "ix_detection_training_readiness_reports_detection_training_run_id",
+        "ix_dtr_reports_detection_training_run_id",
         table_name="detection_training_readiness_reports",
     )
     op.drop_table("detection_training_readiness_reports")
