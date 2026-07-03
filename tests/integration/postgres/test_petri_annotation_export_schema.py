@@ -38,24 +38,25 @@ def _create_export_run_with_review(pg_session):
 
 
 def _item(export_run, review, run, region, item, split_item, **kwargs):
-    return PetriAnnotationExportItemModel(
-        export_run_id=export_run.id,
-        petri_region_review_id=review.id,
-        petri_segmentation_region_id=region.id,
-        dataset_release_id=run.dataset_release_id,
-        dataset_item_id=item.id,
-        dataset_split_item_id=split_item.id,
-        split="train",
-        petri_image_path="/pg/petri.png",
-        export_label="candidate_region",
-        bbox_x=10,
-        bbox_y=10,
-        bbox_width=20,
-        bbox_height=20,
-        bbox_source="original",
-        export_payload={"label": "candidate_region"},
-        **kwargs,
-    )
+    values = {
+        "export_run_id": export_run.id,
+        "petri_region_review_id": review.id,
+        "petri_segmentation_region_id": region.id,
+        "dataset_release_id": run.dataset_release_id,
+        "dataset_item_id": item.id,
+        "dataset_split_item_id": split_item.id,
+        "split": "train",
+        "petri_image_path": "/pg/petri.png",
+        "export_label": "candidate_region",
+        "bbox_x": 10,
+        "bbox_y": 10,
+        "bbox_width": 20,
+        "bbox_height": 20,
+        "bbox_source": "original",
+        "export_payload": {"label": "candidate_region"},
+    }
+    values.update(kwargs)
+    return PetriAnnotationExportItemModel(**values)
 
 
 def test_alembic_created_petri_annotation_export_tables(pg_session):
