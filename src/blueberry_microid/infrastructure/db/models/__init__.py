@@ -17,6 +17,8 @@ from blueberry_microid.infrastructure.db.models.image_feature_vector import Imag
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
+from blueberry_microid.infrastructure.db.models.petri_annotation_export_item import PetriAnnotationExportItemModel
+from blueberry_microid.infrastructure.db.models.petri_annotation_export_run import PetriAnnotationExportRunModel
 from blueberry_microid.infrastructure.db.models.petri_region_review import PetriRegionReviewModel
 from blueberry_microid.infrastructure.db.models.petri_segmentation_region import PetriSegmentationRegionModel
 from blueberry_microid.infrastructure.db.models.petri_segmentation_run import PetriSegmentationRunModel
@@ -44,6 +46,8 @@ __all__ = [
     "MicroImageModel",
     "ModelVersionModel",
     "PetriImageModel",
+    "PetriAnnotationExportItemModel",
+    "PetriAnnotationExportRunModel",
     "PetriRegionReviewModel",
     "PetriSegmentationRegionModel",
     "PetriSegmentationRunModel",

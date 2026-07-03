@@ -295,3 +295,24 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   y conservan `X-Request-ID`. Sigue prohibido YOLO, PyTorch, TensorFlow,
   entrenamiento real, datasets externos, taxonomia y reemplazo de
   `MockInferenceEngine` en esta capa.
+## 18. Exportacion supervisada de anotaciones Petri (Fase 21)
+
+- `PetriAnnotationExportRun` y `PetriAnnotationExportItem` convierten reviews
+  finales de `PetriSegmentationRegion` en formatos de anotacion supervisada:
+  `blueberry_manifest`, `coco_json` y `yolo_txt`.
+- `yolo_txt` significa solo lineas de label representadas en JSON. No
+  implementes ni entrenes YOLO, no agregues pesos, dependencias, detectores,
+  pipelines de entrenamiento ni archivos de labels escritos por defecto.
+- `PetriAnnotationExporter` debe usar solo reviews finales por defecto y
+  exportar solo `candidate_valid` como positivo entrenable por defecto.
+  `candidate_false_positive`, `candidate_uncertain` y `needs_resegmentation`
+  no son positivos por defecto.
+- La categoria debe permanecer generica: `candidate_region`. No usar bacteria,
+  fungi, colony, genus, species, diagnostico ni taxonomia como labels.
+- El bbox corregido tiene prioridad si existe; si no, se usa el bbox original
+  de `PetriSegmentationRegion`. Nunca mutar la region, la review ni las
+  imagenes originales.
+- No copiar imagenes por defecto, no guardar binarios ni mascaras, no lanzar
+  Celery, no entrenar modelos, no usar PyTorch/TensorFlow/CNN/ViT/deep
+  learning, no descargar datasets externos, no agregar frontend/autenticacion
+  y no reemplazar `MockInferenceEngine`.

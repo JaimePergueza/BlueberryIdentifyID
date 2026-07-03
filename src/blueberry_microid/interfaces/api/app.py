@@ -24,6 +24,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     ml_preflight,
     micro_images,
     model_versions,
+    petri_annotation_exports,
     petri_region_reviews,
     petri_segmentations,
     petri_images,
@@ -92,6 +93,7 @@ def create_app() -> FastAPI:
     app.include_router(image_features.router, prefix=API_V1_PREFIX)
     app.include_router(petri_segmentations.router, prefix=API_V1_PREFIX)
     app.include_router(petri_region_reviews.router, prefix=API_V1_PREFIX)
+    app.include_router(petri_annotation_exports.router, prefix=API_V1_PREFIX)
     app.include_router(tasks.router, prefix=API_V1_PREFIX)
 
     register_exception_handlers(app)

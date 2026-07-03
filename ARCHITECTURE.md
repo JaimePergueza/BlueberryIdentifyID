@@ -1342,3 +1342,59 @@ identificacion microbiologica. Fase 20 no entrena modelos, no usa
 PyTorch/TensorFlow/YOLO/CNN/ViT/deep learning, no descarga datasets
 externos, no agrega frontend/autenticacion/taxonomia, no usa Celery y no
 reemplaza `MockInferenceEngine`.
+## 37. Fase 21 - exportacion supervisada de anotaciones Petri
+
+Objetivo: convertir `PetriRegionReview` finales sobre
+`PetriSegmentationRegion` en formatos de anotacion supervisada para
+entrenamiento futuro, sin entrenar modelos y sin copiar imagenes por defecto.
+
+**Entidades.** `PetriAnnotationExportRun` representa una exportacion
+persistida para un `DatasetRelease` + `PetriSegmentationRun`: formato
+(`blueberry_manifest`, `coco_json`, `yolo_txt`), status (`completed`,
+`partial`, `failed`), config, conteos, `output_manifest`, `summary`,
+`created_by`/`notes` y `error_message`. `PetriAnnotationExportItem`
+representa una anotacion exportada: referencia el run de exportacion, la
+revision humana final, la region original, dataset item/split item, split,
+ruta Petri, label generico, bbox, fuente de bbox (`corrected` u `original`)
+y payload JSON. No guarda imagenes, mascaras ni taxonomia.
+
+**Config y politicas.** `PetriAnnotationExportConfig` permite elegir formato
+y filtro de decisiones. Por defecto `decision_filter=valid_only`, por lo que
+solo `candidate_valid` se exporta como objeto positivo. `candidate_false_positive`,
+`candidate_uncertain` y `needs_resegmentation` no son positivos entrenables
+por defecto. Si existe bbox corregido y `include_corrected_bbox=true`, tiene
+prioridad; si no, se usa el bbox original de segmentacion. `category_name`
+permanece generico (`candidate_region`) y rechaza terminos taxonomicos o
+diagnosticos.
+
+**Exporter.** `PetriAnnotationExporter` es un servicio puro de aplicacion:
+recibe un `PetriSegmentationRun`, regiones, reviews y config; ordena de forma
+determinista; genera `output_manifest`; y construye `PetriAnnotationExportItem`.
+No escribe archivos, no modifica imagenes, no crea mascaras y no lanza
+Celery. El formato `yolo_txt` produce lineas de label en JSON con class id 0
+y coordenadas normalizadas; requiere dimensiones de imagen y falla de forma
+controlada si no puede obtenerlas. Esto no es un modelo YOLO.
+
+**Persistencia.** Alembic `0014_petri_annotation_exports.py` crea
+`petri_annotation_export_runs` y `petri_annotation_export_items`, con FKs a
+`dataset_releases`, `petri_segmentation_runs`, `petri_region_reviews`,
+`petri_segmentation_regions`, `dataset_items` y `dataset_split_items`; CHECKs
+para formato/status/bbox_source/dimensiones; unique
+`export_run_id + petri_region_review_id`; y JSONB para config, manifest,
+summary y payloads.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/petri-annotation-exports` | Crea una exportacion supervisada |
+| GET | `/api/v1/ml/petri-annotation-exports` | Lista exportaciones |
+| GET | `/api/v1/ml/petri-annotation-exports/{export_run_id}` | Detalle del run |
+| GET | `/api/v1/ml/petri-annotation-exports/{export_run_id}/items` | Items exportados |
+| GET | `/api/v1/ml/petri-annotation-exports/{export_run_id}/manifest` | Manifest JSON completo |
+| GET | `/api/v1/datasets/releases/{dataset_release_id}/petri-annotation-exports` | Exportaciones por release |
+| GET | `/api/v1/ml/petri-segmentations/{petri_segmentation_run_id}/annotation-exports` | Exportaciones por segmentacion |
+
+Fase 21 no implementa YOLO como modelo, no entrena YOLO, no usa PyTorch,
+TensorFlow, CNN, ViT ni deep learning, no descarga datasets externos, no
+agrega frontend/autenticacion/taxonomia y no reemplaza `MockInferenceEngine`.

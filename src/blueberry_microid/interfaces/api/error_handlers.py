@@ -47,6 +47,8 @@ from blueberry_microid.application.exceptions import (
     MicroImageNotFoundError,
     ModelVersionNotFoundError,
     NotFoundError,
+    PetriAnnotationExportNotAllowedError,
+    PetriAnnotationExportRunNotFoundError,
     PetriImageNotFoundError,
     PetriRegionReviewNotFoundError,
     PetriSegmentationNotAllowedError,
@@ -109,6 +111,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "petri_segmentation_region_not_found"
     if isinstance(exc, PetriRegionReviewNotFoundError):
         return 404, "petri_region_review_not_found"
+    if isinstance(exc, PetriAnnotationExportRunNotFoundError):
+        return 404, "petri_annotation_export_run_not_found"
     if isinstance(exc, PredictionNotFoundError):
         return 404, "prediction_not_found"
     if isinstance(exc, NotFoundError):
@@ -140,6 +144,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "image_feature_extraction_not_allowed"
     if isinstance(exc, PetriSegmentationNotAllowedError):
         return 409, "petri_segmentation_not_allowed"
+    if isinstance(exc, PetriAnnotationExportNotAllowedError):
+        return 409, "petri_annotation_export_not_allowed"
     if isinstance(exc, AnalysisRunNotReviewableError):
         return 409, "analysis_run_not_reviewable"
     if isinstance(exc, ConflictError):

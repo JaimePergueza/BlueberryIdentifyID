@@ -80,6 +80,10 @@ class PetriRegionReviewNotFoundError(NotFoundError):
     """Raised when a requested PetriRegionReview or final review does not exist."""
 
 
+class PetriAnnotationExportRunNotFoundError(NotFoundError):
+    """Raised when a requested PetriAnnotationExportRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -157,6 +161,10 @@ class PetriSegmentationNotAllowedError(ConflictError):
     """Raised when a PetriSegmentationRun cannot be created from current
     state: the optional image audit is missing, belongs to a different release,
     or has failed."""
+
+
+class PetriAnnotationExportNotAllowedError(ConflictError):
+    """Raised when reviewed Petri annotations cannot be exported for a requested scope."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

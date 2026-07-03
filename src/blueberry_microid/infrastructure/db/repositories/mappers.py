@@ -18,6 +18,8 @@ from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureV
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
+from blueberry_microid.domain.entities.petri_annotation_export_item import PetriAnnotationExportItem
+from blueberry_microid.domain.entities.petri_annotation_export_run import PetriAnnotationExportRun
 from blueberry_microid.domain.entities.petri_region_review import PetriRegionReview
 from blueberry_microid.domain.entities.petri_segmentation_region import PetriSegmentationRegion
 from blueberry_microid.domain.entities.petri_segmentation_run import PetriSegmentationRun
@@ -37,6 +39,9 @@ from blueberry_microid.domain.enums.image_dataset_audit_issue_severity import Im
 from blueberry_microid.domain.enums.image_dataset_audit_status import ImageDatasetAuditStatus
 from blueberry_microid.domain.enums.image_feature_extraction_status import ImageFeatureExtractionStatus
 from blueberry_microid.domain.enums.image_modality import ImageModality
+from blueberry_microid.domain.enums.petri_annotation_bbox_source import PetriAnnotationBboxSource
+from blueberry_microid.domain.enums.petri_annotation_export_format import PetriAnnotationExportFormat
+from blueberry_microid.domain.enums.petri_annotation_export_status import PetriAnnotationExportStatus
 from blueberry_microid.domain.enums.petri_region_review_decision import PetriRegionReviewDecision
 from blueberry_microid.domain.enums.petri_segmentation_status import PetriSegmentationStatus
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
@@ -58,6 +63,8 @@ from blueberry_microid.infrastructure.db.models.image_feature_vector import Imag
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
+from blueberry_microid.infrastructure.db.models.petri_annotation_export_item import PetriAnnotationExportItemModel
+from blueberry_microid.infrastructure.db.models.petri_annotation_export_run import PetriAnnotationExportRunModel
 from blueberry_microid.infrastructure.db.models.petri_region_review import PetriRegionReviewModel
 from blueberry_microid.infrastructure.db.models.petri_segmentation_region import PetriSegmentationRegionModel
 from blueberry_microid.infrastructure.db.models.petri_segmentation_run import PetriSegmentationRunModel
@@ -516,6 +523,51 @@ def petri_segmentation_region_to_entity(model: PetriSegmentationRegionModel) -> 
         solidity=model.solidity,
         mean_intensity=model.mean_intensity,
         region_features=model.region_features,
+        id=model.id,
+        created_at=model.created_at,
+    )
+
+
+def petri_annotation_export_run_to_entity(model: PetriAnnotationExportRunModel) -> PetriAnnotationExportRun:
+    return PetriAnnotationExportRun(
+        dataset_release_id=model.dataset_release_id,
+        petri_segmentation_run_id=model.petri_segmentation_run_id,
+        export_format=PetriAnnotationExportFormat(model.export_format),
+        status=PetriAnnotationExportStatus(model.status),
+        is_completed=model.is_completed,
+        config=model.config,
+        exported_annotation_count=model.exported_annotation_count,
+        skipped_review_count=model.skipped_review_count,
+        image_count=model.image_count,
+        category_count=model.category_count,
+        output_manifest=model.output_manifest,
+        summary=model.summary,
+        id=model.id,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def petri_annotation_export_item_to_entity(model: PetriAnnotationExportItemModel) -> PetriAnnotationExportItem:
+    return PetriAnnotationExportItem(
+        export_run_id=model.export_run_id,
+        petri_region_review_id=model.petri_region_review_id,
+        petri_segmentation_region_id=model.petri_segmentation_region_id,
+        dataset_release_id=model.dataset_release_id,
+        dataset_item_id=model.dataset_item_id,
+        dataset_split_item_id=model.dataset_split_item_id,
+        split=DatasetSplit(model.split),
+        petri_image_path=model.petri_image_path,
+        export_label=model.export_label,
+        bbox_x=model.bbox_x,
+        bbox_y=model.bbox_y,
+        bbox_width=model.bbox_width,
+        bbox_height=model.bbox_height,
+        bbox_source=PetriAnnotationBboxSource(model.bbox_source),
+        export_payload=model.export_payload,
         id=model.id,
         created_at=model.created_at,
     )

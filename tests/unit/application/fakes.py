@@ -39,6 +39,12 @@ from blueberry_microid.application.ports.inference_engine import InferenceEngine
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.petri_annotation_export_item_repository import (
+    PetriAnnotationExportItemRepositoryPort,
+)
+from blueberry_microid.application.ports.petri_annotation_export_run_repository import (
+    PetriAnnotationExportRunRepositoryPort,
+)
 from blueberry_microid.application.ports.petri_region_review_repository import PetriRegionReviewRepositoryPort
 from blueberry_microid.application.ports.petri_segmentation_region_repository import (
     PetriSegmentationRegionRepositoryPort,
@@ -72,6 +78,8 @@ from blueberry_microid.domain.entities.image_feature_vector import ImageFeatureV
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
 from blueberry_microid.domain.entities.petri_image import PetriImage
+from blueberry_microid.domain.entities.petri_annotation_export_item import PetriAnnotationExportItem
+from blueberry_microid.domain.entities.petri_annotation_export_run import PetriAnnotationExportRun
 from blueberry_microid.domain.entities.petri_region_review import PetriRegionReview
 from blueberry_microid.domain.entities.petri_segmentation_region import PetriSegmentationRegion
 from blueberry_microid.domain.entities.petri_segmentation_run import PetriSegmentationRun
@@ -564,6 +572,66 @@ class InMemoryPetriRegionReviewRepository(PetriRegionReviewRepositoryPort):
         self._by_id = copy.deepcopy(state)
 
 
+class InMemoryPetriAnnotationExportRunRepository(PetriAnnotationExportRunRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, PetriAnnotationExportRun] = {}
+
+    def add(self, export_run: PetriAnnotationExportRun) -> PetriAnnotationExportRun:
+        self._by_id[export_run.id] = export_run
+        return export_run
+
+    def get_by_id(self, export_run_id: UUID) -> Optional[PetriAnnotationExportRun]:
+        return self._by_id.get(export_run_id)
+
+    def list_all(self) -> list[PetriAnnotationExportRun]:
+        return sorted(self._by_id.values(), key=lambda run: (run.created_at, run.id))
+
+    def list_by_dataset_release_id(self, dataset_release_id: UUID) -> list[PetriAnnotationExportRun]:
+        return sorted(
+            [run for run in self._by_id.values() if run.dataset_release_id == dataset_release_id],
+            key=lambda run: (run.created_at, run.id),
+        )
+
+    def list_by_petri_segmentation_run_id(self, petri_segmentation_run_id: UUID) -> list[PetriAnnotationExportRun]:
+        return sorted(
+            [run for run in self._by_id.values() if run.petri_segmentation_run_id == petri_segmentation_run_id],
+            key=lambda run: (run.created_at, run.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, PetriAnnotationExportRun]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, PetriAnnotationExportRun]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryPetriAnnotationExportItemRepository(PetriAnnotationExportItemRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, PetriAnnotationExportItem] = {}
+
+    def add_many(self, items: list[PetriAnnotationExportItem]) -> list[PetriAnnotationExportItem]:
+        seen = {(item.export_run_id, item.petri_region_review_id) for item in self._by_id.values()}
+        for item in items:
+            key = (item.export_run_id, item.petri_region_review_id)
+            if key in seen:
+                raise ValueError("duplicate petri region review in annotation export")
+            seen.add(key)
+            self._by_id[item.id] = item
+        return items
+
+    def list_by_export_run_id(self, export_run_id: UUID) -> list[PetriAnnotationExportItem]:
+        return sorted(
+            [item for item in self._by_id.values() if item.export_run_id == export_run_id],
+            key=lambda item: (item.petri_image_path, item.created_at, item.id),
+        )
+
+    def snapshot_state(self) -> dict[UUID, PetriAnnotationExportItem]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, PetriAnnotationExportItem]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
 class InMemoryTrainingRunRepository(TrainingRunRepositoryPort):
     def __init__(self) -> None:
         self._by_id: dict[UUID, TrainingRun] = {}
@@ -796,6 +864,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         petri_segmentation_run_repository: Optional[PetriSegmentationRunRepositoryPort] = None,
         petri_segmentation_region_repository: Optional[PetriSegmentationRegionRepositoryPort] = None,
         petri_region_review_repository: Optional[PetriRegionReviewRepositoryPort] = None,
+        petri_annotation_export_run_repository: Optional[PetriAnnotationExportRunRepositoryPort] = None,
+        petri_annotation_export_item_repository: Optional[PetriAnnotationExportItemRepositoryPort] = None,
     ) -> None:
         self.analysis_run_repository = analysis_run_repository
         self.prediction_repository = prediction_repository
@@ -817,6 +887,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.petri_segmentation_run_repository = petri_segmentation_run_repository
         self.petri_segmentation_region_repository = petri_segmentation_region_repository
         self.petri_region_review_repository = petri_region_review_repository
+        self.petri_annotation_export_run_repository = petri_annotation_export_run_repository
+        self.petri_annotation_export_item_repository = petri_annotation_export_item_repository
         self.entered = False
         self.committed = False
         self._human_review_snapshot = None
@@ -833,6 +905,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._petri_segmentation_run_snapshot = None
         self._petri_segmentation_region_snapshot = None
         self._petri_region_review_snapshot = None
+        self._petri_annotation_export_run_snapshot = None
+        self._petri_annotation_export_item_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
@@ -868,6 +942,14 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self._petri_segmentation_region_snapshot = self.petri_segmentation_region_repository.snapshot_state()
         if hasattr(self.petri_region_review_repository, "snapshot_state"):
             self._petri_region_review_snapshot = self.petri_region_review_repository.snapshot_state()
+        if hasattr(self.petri_annotation_export_run_repository, "snapshot_state"):
+            self._petri_annotation_export_run_snapshot = (
+                self.petri_annotation_export_run_repository.snapshot_state()
+            )
+        if hasattr(self.petri_annotation_export_item_repository, "snapshot_state"):
+            self._petri_annotation_export_item_snapshot = (
+                self.petri_annotation_export_item_repository.snapshot_state()
+            )
         return self
 
     def __exit__(
@@ -906,6 +988,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
             self.petri_segmentation_region_repository.restore_state(self._petri_segmentation_region_snapshot)
         if exc_type is not None and self._petri_region_review_snapshot is not None:
             self.petri_region_review_repository.restore_state(self._petri_region_review_snapshot)
+        if exc_type is not None and self._petri_annotation_export_run_snapshot is not None:
+            self.petri_annotation_export_run_repository.restore_state(self._petri_annotation_export_run_snapshot)
+        if exc_type is not None and self._petri_annotation_export_item_snapshot is not None:
+            self.petri_annotation_export_item_repository.restore_state(self._petri_annotation_export_item_snapshot)
         return None
 
     def commit(self) -> None:

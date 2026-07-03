@@ -39,6 +39,12 @@ from blueberry_microid.application.ports.inference_engine import InferenceEngine
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.petri_annotation_export_item_repository import (
+    PetriAnnotationExportItemRepositoryPort,
+)
+from blueberry_microid.application.ports.petri_annotation_export_run_repository import (
+    PetriAnnotationExportRunRepositoryPort,
+)
 from blueberry_microid.application.ports.petri_region_review_repository import PetriRegionReviewRepositoryPort
 from blueberry_microid.application.ports.petri_segmentation_region_repository import (
     PetriSegmentationRegionRepositoryPort,
@@ -64,6 +70,7 @@ from blueberry_microid.application.services.dataset_splitter import DatasetSplit
 from blueberry_microid.application.services.petri_reviewed_annotation_manifest_exporter import (
     PetriReviewedAnnotationManifestExporter,
 )
+from blueberry_microid.application.services.petri_annotation_exporter import PetriAnnotationExporter
 from blueberry_microid.application.services.training_run_comparator import TrainingRunComparator
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -138,6 +145,18 @@ from blueberry_microid.application.use_cases.micro_image.register_micro_image im
 from blueberry_microid.application.use_cases.model_version.create_model_version import CreateModelVersionUseCase
 from blueberry_microid.application.use_cases.model_version.list_model_versions import ListModelVersionsUseCase
 from blueberry_microid.application.use_cases.petri_image.register_petri_image import RegisterPetriImageUseCase
+from blueberry_microid.application.use_cases.petri_annotation_export.create_petri_annotation_export_run import (
+    CreatePetriAnnotationExportRunUseCase,
+)
+from blueberry_microid.application.use_cases.petri_annotation_export.get_petri_annotation_export_run import (
+    GetPetriAnnotationExportRunUseCase,
+)
+from blueberry_microid.application.use_cases.petri_annotation_export.list_petri_annotation_export_items import (
+    ListPetriAnnotationExportItemsUseCase,
+)
+from blueberry_microid.application.use_cases.petri_annotation_export.list_petri_annotation_export_runs import (
+    ListPetriAnnotationExportRunsUseCase,
+)
 from blueberry_microid.application.use_cases.petri_region_review.get_final_petri_region_review import (
     GetFinalPetriRegionReviewUseCase,
 )
@@ -209,6 +228,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_model_version_r
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_image_repository import (
     SqlAlchemyPetriImageRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_annotation_export_item_repository import (
+    SqlAlchemyPetriAnnotationExportItemRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_annotation_export_run_repository import (
+    SqlAlchemyPetriAnnotationExportRunRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_region_review_repository import (
     SqlAlchemyPetriRegionReviewRepository,
@@ -445,6 +470,18 @@ def get_petri_region_review_repository(
     return SqlAlchemyPetriRegionReviewRepository(session)
 
 
+def get_petri_annotation_export_run_repository(
+    session: Session = Depends(get_db_session),
+) -> PetriAnnotationExportRunRepositoryPort:
+    return SqlAlchemyPetriAnnotationExportRunRepository(session)
+
+
+def get_petri_annotation_export_item_repository(
+    session: Session = Depends(get_db_session),
+) -> PetriAnnotationExportItemRepositoryPort:
+    return SqlAlchemyPetriAnnotationExportItemRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -462,6 +499,10 @@ def get_image_path_validator() -> ImagePathValidator:
 
 def get_image_dataset_auditor() -> ImageDatasetAuditor:
     return ImageDatasetAuditor()
+
+
+def get_petri_annotation_exporter() -> PetriAnnotationExporter:
+    return PetriAnnotationExporter()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1030,3 +1071,40 @@ def get_petri_reviewed_annotation_manifest_exporter(
     review_repository: PetriRegionReviewRepositoryPort = Depends(get_petri_region_review_repository),
 ) -> PetriReviewedAnnotationManifestExporter:
     return PetriReviewedAnnotationManifestExporter(segmentation_run_repository, region_repository, review_repository)
+
+
+def get_create_petri_annotation_export_run_use_case(
+    dataset_release_repository: DatasetReleaseRepositoryPort = Depends(get_dataset_release_repository),
+    segmentation_run_repository: PetriSegmentationRunRepositoryPort = Depends(get_petri_segmentation_run_repository),
+    region_repository: PetriSegmentationRegionRepositoryPort = Depends(get_petri_segmentation_region_repository),
+    review_repository: PetriRegionReviewRepositoryPort = Depends(get_petri_region_review_repository),
+    exporter: PetriAnnotationExporter = Depends(get_petri_annotation_exporter),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreatePetriAnnotationExportRunUseCase:
+    return CreatePetriAnnotationExportRunUseCase(
+        dataset_release_repository,
+        segmentation_run_repository,
+        region_repository,
+        review_repository,
+        exporter,
+        unit_of_work,
+    )
+
+
+def get_get_petri_annotation_export_run_use_case(
+    run_repository: PetriAnnotationExportRunRepositoryPort = Depends(get_petri_annotation_export_run_repository),
+) -> GetPetriAnnotationExportRunUseCase:
+    return GetPetriAnnotationExportRunUseCase(run_repository)
+
+
+def get_list_petri_annotation_export_runs_use_case(
+    run_repository: PetriAnnotationExportRunRepositoryPort = Depends(get_petri_annotation_export_run_repository),
+) -> ListPetriAnnotationExportRunsUseCase:
+    return ListPetriAnnotationExportRunsUseCase(run_repository)
+
+
+def get_list_petri_annotation_export_items_use_case(
+    run_repository: PetriAnnotationExportRunRepositoryPort = Depends(get_petri_annotation_export_run_repository),
+    item_repository: PetriAnnotationExportItemRepositoryPort = Depends(get_petri_annotation_export_item_repository),
+) -> ListPetriAnnotationExportItemsUseCase:
+    return ListPetriAnnotationExportItemsUseCase(run_repository, item_repository)

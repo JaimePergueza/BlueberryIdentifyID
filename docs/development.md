@@ -1422,3 +1422,43 @@ Endpoints:
 No PyTorch, TensorFlow, YOLO, CNN, ViT, deep learning, real model training,
 external datasets, or taxonomy are introduced in this phase, and
 `MockInferenceEngine` is not replaced.
+
+## 30. Supervised Petri annotation exports (Fase 21)
+
+Fase 21 converts final human reviews of Petri candidate regions into
+supervised annotation export formats for future training. It still does not
+train anything.
+
+- `PetriAnnotationExportRun` stores one export attempt for a
+  `DatasetRelease` + `PetriSegmentationRun`: format, status
+  (`completed`, `partial`, `failed`), config, output manifest JSON, counts,
+  summary, creator/notes, and optional error message.
+- `PetriAnnotationExportItem` stores one exported annotation: references to
+  the export run, final `PetriRegionReview`, original
+  `PetriSegmentationRegion`, dataset item/split item, split, Petri image
+  path, generic label, bbox, bbox source (`corrected` or `original`), and a
+  per-item JSON payload. It never stores images, masks, or taxonomy.
+- `PetriAnnotationExporter` selects reviews deterministically. By default it
+  uses only `is_final=True` reviews with decision `candidate_valid`. It uses
+  a corrected bbox when present and allowed; otherwise it falls back to the
+  original segmentation bbox. `candidate_false_positive`,
+  `candidate_uncertain`, and `needs_resegmentation` are not positive
+  training objects by default.
+- Supported formats are `blueberry_manifest`, `coco_json`, and `yolo_txt`.
+  COCO is only annotation JSON. YOLO is only a label-line manifest in JSON
+  (`0 x_center y_center width height`), not a YOLO model or training path.
+
+Endpoints:
+
+- `POST /api/v1/ml/petri-annotation-exports`
+- `GET /api/v1/ml/petri-annotation-exports`
+- `GET /api/v1/ml/petri-annotation-exports/{export_run_id}`
+- `GET /api/v1/ml/petri-annotation-exports/{export_run_id}/items`
+- `GET /api/v1/ml/petri-annotation-exports/{export_run_id}/manifest`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/petri-annotation-exports`
+- `GET /api/v1/ml/petri-segmentations/{petri_segmentation_run_id}/annotation-exports`
+
+This phase does not copy images by default, does not write label files to
+disk, does not train YOLO or any other model, and does not add PyTorch,
+TensorFlow, CNN, ViT, deep learning, external datasets, frontend,
+authentication, taxonomy, MLflow, TensorBoard, or W&B.
