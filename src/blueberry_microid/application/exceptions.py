@@ -88,6 +88,10 @@ class AnnotationBundleRunNotFoundError(NotFoundError):
     """Raised when a requested AnnotationBundleRun does not exist."""
 
 
+class AnnotationQualityGateRunNotFoundError(NotFoundError):
+    """Raised when a requested AnnotationQualityGateRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -173,6 +177,10 @@ class PetriAnnotationExportNotAllowedError(ConflictError):
 
 class AnnotationBundleNotAllowedError(ConflictError):
     """Raised when a supervised annotation bundle cannot be created safely."""
+
+
+class AnnotationQualityGateNotAllowedError(ConflictError):
+    """Raised when a supervised annotation quality gate cannot be created safely."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

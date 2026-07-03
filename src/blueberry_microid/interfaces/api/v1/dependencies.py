@@ -20,6 +20,12 @@ from celery import Celery
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.annotation_bundle_file_repository import AnnotationBundleFileRepositoryPort
 from blueberry_microid.application.ports.annotation_bundle_run_repository import AnnotationBundleRunRepositoryPort
+from blueberry_microid.application.ports.annotation_quality_gate_issue_repository import (
+    AnnotationQualityGateIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.annotation_quality_gate_run_repository import (
+    AnnotationQualityGateRunRepositoryPort,
+)
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.dataset_snapshot_repository import DatasetSnapshotRepositoryPort
@@ -68,6 +74,7 @@ from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.image_intake_service import ImageIntakeService
 from blueberry_microid.application.services.annotation_bundle_validator import AnnotationBundleValidator
 from blueberry_microid.application.services.annotation_bundle_writer import AnnotationBundleWriter
+from blueberry_microid.application.services.annotation_quality_gate_validator import AnnotationQualityGateValidator
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
 from blueberry_microid.application.services.dataset_splitter import DatasetSplitter
@@ -87,6 +94,18 @@ from blueberry_microid.application.use_cases.annotation_bundle.list_annotation_b
 )
 from blueberry_microid.application.use_cases.annotation_bundle.list_annotation_bundle_runs import (
     ListAnnotationBundleRunsUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_quality_gate.create_annotation_quality_gate_run import (
+    CreateAnnotationQualityGateRunUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_quality_gate.get_annotation_quality_gate_run import (
+    GetAnnotationQualityGateRunUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_quality_gate.list_annotation_quality_gate_issues import (
+    ListAnnotationQualityGateIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.annotation_quality_gate.list_annotation_quality_gate_runs import (
+    ListAnnotationQualityGateRunsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -214,6 +233,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bund
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bundle_run_repository import (
     SqlAlchemyAnnotationBundleRunRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_quality_gate_issue_repository import (
+    SqlAlchemyAnnotationQualityGateIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_quality_gate_run_repository import (
+    SqlAlchemyAnnotationQualityGateRunRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
@@ -516,6 +541,18 @@ def get_annotation_bundle_file_repository(
     return SqlAlchemyAnnotationBundleFileRepository(session)
 
 
+def get_annotation_quality_gate_run_repository(
+    session: Session = Depends(get_db_session),
+) -> AnnotationQualityGateRunRepositoryPort:
+    return SqlAlchemyAnnotationQualityGateRunRepository(session)
+
+
+def get_annotation_quality_gate_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> AnnotationQualityGateIssueRepositoryPort:
+    return SqlAlchemyAnnotationQualityGateIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -545,6 +582,10 @@ def get_annotation_bundle_validator() -> AnnotationBundleValidator:
 
 def get_annotation_bundle_writer() -> AnnotationBundleWriter:
     return AnnotationBundleWriter()
+
+
+def get_annotation_quality_gate_validator() -> AnnotationQualityGateValidator:
+    return AnnotationQualityGateValidator()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1187,3 +1228,38 @@ def get_list_annotation_bundle_files_use_case(
     file_repository: AnnotationBundleFileRepositoryPort = Depends(get_annotation_bundle_file_repository),
 ) -> ListAnnotationBundleFilesUseCase:
     return ListAnnotationBundleFilesUseCase(run_repository, file_repository)
+
+
+def get_create_annotation_quality_gate_run_use_case(
+    bundle_run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+    bundle_file_repository: AnnotationBundleFileRepositoryPort = Depends(get_annotation_bundle_file_repository),
+    validator: AnnotationQualityGateValidator = Depends(get_annotation_quality_gate_validator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateAnnotationQualityGateRunUseCase:
+    return CreateAnnotationQualityGateRunUseCase(
+        bundle_run_repository,
+        bundle_file_repository,
+        validator,
+        unit_of_work,
+    )
+
+
+def get_get_annotation_quality_gate_run_use_case(
+    run_repository: AnnotationQualityGateRunRepositoryPort = Depends(get_annotation_quality_gate_run_repository),
+) -> GetAnnotationQualityGateRunUseCase:
+    return GetAnnotationQualityGateRunUseCase(run_repository)
+
+
+def get_list_annotation_quality_gate_runs_use_case(
+    run_repository: AnnotationQualityGateRunRepositoryPort = Depends(get_annotation_quality_gate_run_repository),
+) -> ListAnnotationQualityGateRunsUseCase:
+    return ListAnnotationQualityGateRunsUseCase(run_repository)
+
+
+def get_list_annotation_quality_gate_issues_use_case(
+    run_repository: AnnotationQualityGateRunRepositoryPort = Depends(get_annotation_quality_gate_run_repository),
+    issue_repository: AnnotationQualityGateIssueRepositoryPort = Depends(
+        get_annotation_quality_gate_issue_repository
+    ),
+) -> ListAnnotationQualityGateIssuesUseCase:
+    return ListAnnotationQualityGateIssuesUseCase(run_repository, issue_repository)

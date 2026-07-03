@@ -341,3 +341,26 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   learning, copiar o descargar datasets externos, agregar frontend,
   autenticacion, taxonomia, diagnostico, Celery en este flujo o reemplazar
   `MockInferenceEngine`.
+
+## 20. Supervised Annotation Quality Gate (Fase 23)
+
+- `AnnotationQualityGateRun` valida tecnicamente un `AnnotationBundleRun`
+  antes de cualquier entrenamiento futuro. No entrena, no evalua modelos y no
+  convierte el bundle en evidencia cientifica definitiva.
+- `AnnotationQualityGateIssue` persiste hallazgos con severidad `error` o
+  `warning`; errores bloquean el gate, warnings no bloquean. Guardar solo
+  metadata y referencias, nunca imagenes ni contenido completo de archivos.
+- `AnnotationQualityGateValidator` puede revisar estado del bundle, archivos
+  esperados, Blueberry manifest, COCO JSON, labels YOLO como texto,
+  `dataset.yaml`, splits, categorias genericas, bboxes, duplicados, soporte
+  minimo e imagenes sin anotaciones. No abrir imagenes completas ni modificar
+  archivos originales.
+- Status: `passed` sin errores ni warnings; `warning` sin errores y con
+  warnings; `failed` con errores bloqueantes. `passed` no significa
+  diagnostico, taxonomia, validez cientifica ni performance de modelo.
+- Endpoints bajo `/api/v1/ml/annotation-quality-gates`,
+  `/api/v1/datasets/releases/{id}/annotation-quality-gates` y
+  `/api/v1/ml/annotation-bundles/{id}/quality-gates`, con `X-Request-ID`.
+- Sigue prohibido YOLO como modelo, entrenar YOLO, PyTorch, TensorFlow, CNN,
+  ViT, deep learning, datasets externos, frontend, autenticacion, taxonomia,
+  diagnostico, MLflow/TensorBoard/W&B y reemplazar `MockInferenceEngine`.

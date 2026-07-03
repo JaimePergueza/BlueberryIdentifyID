@@ -19,6 +19,8 @@ from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
     AnnotationBundleFileModel,
     AnnotationBundleRunModel,
+    AnnotationQualityGateIssueModel,
+    AnnotationQualityGateRunModel,
     Base,
     DatasetItemModel,
     DatasetReleaseModel,
@@ -78,6 +80,8 @@ _SQLITE_TABLES = [
     PetriAnnotationExportItemModel.__table__,
     AnnotationBundleRunModel.__table__,
     AnnotationBundleFileModel.__table__,
+    AnnotationQualityGateRunModel.__table__,
+    AnnotationQualityGateIssueModel.__table__,
 ]
 
 

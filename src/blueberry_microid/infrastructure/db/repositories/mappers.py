@@ -8,6 +8,8 @@ application layer.
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
 from blueberry_microid.domain.entities.annotation_bundle_file import AnnotationBundleFile
 from blueberry_microid.domain.entities.annotation_bundle_run import AnnotationBundleRun
+from blueberry_microid.domain.entities.annotation_quality_gate_issue import AnnotationQualityGateIssue
+from blueberry_microid.domain.entities.annotation_quality_gate_run import AnnotationQualityGateRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
@@ -36,6 +38,10 @@ from blueberry_microid.domain.entities.training_run_comparison_entry import Trai
 from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.annotation_bundle_file_role import AnnotationBundleFileRole
 from blueberry_microid.domain.enums.annotation_bundle_status import AnnotationBundleStatus
+from blueberry_microid.domain.enums.annotation_quality_gate_issue_severity import (
+    AnnotationQualityGateIssueSeverity,
+)
+from blueberry_microid.domain.enums.annotation_quality_gate_status import AnnotationQualityGateStatus
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
@@ -57,6 +63,8 @@ from blueberry_microid.domain.enums.training_run_status import TrainingRunStatus
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.annotation_bundle_file import AnnotationBundleFileModel
 from blueberry_microid.infrastructure.db.models.annotation_bundle_run import AnnotationBundleRunModel
+from blueberry_microid.infrastructure.db.models.annotation_quality_gate_issue import AnnotationQualityGateIssueModel
+from blueberry_microid.infrastructure.db.models.annotation_quality_gate_run import AnnotationQualityGateRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
@@ -614,5 +622,51 @@ def annotation_bundle_file_to_entity(model: AnnotationBundleFileModel) -> Annota
         content_type=model.content_type,
         size_bytes=model.size_bytes,
         checksum_sha256=model.checksum_sha256,
+        created_at=model.created_at,
+    )
+
+
+def annotation_quality_gate_run_to_entity(model: AnnotationQualityGateRunModel) -> AnnotationQualityGateRun:
+    return AnnotationQualityGateRun(
+        annotation_bundle_run_id=model.annotation_bundle_run_id,
+        dataset_release_id=model.dataset_release_id,
+        petri_annotation_export_run_id=model.petri_annotation_export_run_id,
+        status=AnnotationQualityGateStatus(model.status),
+        is_passed=model.is_passed,
+        config=model.config,
+        total_images=model.total_images,
+        total_annotations=model.total_annotations,
+        train_image_count=model.train_image_count,
+        validation_image_count=model.validation_image_count,
+        test_image_count=model.test_image_count,
+        train_annotation_count=model.train_annotation_count,
+        validation_annotation_count=model.validation_annotation_count,
+        test_annotation_count=model.test_annotation_count,
+        error_count=model.error_count,
+        warning_count=model.warning_count,
+        quality_summary=model.quality_summary,
+        split_distribution=model.split_distribution,
+        bbox_statistics=model.bbox_statistics,
+        category_distribution=model.category_distribution,
+        id=model.id,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def annotation_quality_gate_issue_to_entity(model: AnnotationQualityGateIssueModel) -> AnnotationQualityGateIssue:
+    return AnnotationQualityGateIssue(
+        quality_gate_run_id=model.quality_gate_run_id,
+        severity=AnnotationQualityGateIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
+        split=model.split,
+        image_path=model.image_path,
+        annotation_ref=model.annotation_ref,
+        details=model.details,
         created_at=model.created_at,
     )

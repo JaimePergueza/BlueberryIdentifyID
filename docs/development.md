@@ -1504,3 +1504,48 @@ images by default, does not include binaries, does not train or evaluate a
 model, does not add PyTorch/TensorFlow/CNN/ViT/deep learning, does not
 download datasets, does not add frontend/authentication/taxonomy, and does
 not replace `MockInferenceEngine`.
+
+## 32. Supervised annotation quality gates (Fase 23)
+
+Fase 23 adds a persisted technical quality gate for an `AnnotationBundleRun`.
+It answers whether a generated supervised annotation bundle is technically
+ready for a future training workflow. It does not train, score, or approve a
+model.
+
+- `AnnotationQualityGateConfig` defines thresholds and policies for completed
+  bundle status, expected files, COCO/Yolo/Blueberry manifest checks, split
+  support, bbox size, empty splits, duplicate boxes, images without
+  annotations, single-class warnings, allowed splits, and allowed categories.
+  Allowed categories must remain non-taxonomic.
+- `AnnotationQualityGateRun` stores the auditable result for one
+  `AnnotationBundleRun`: status (`passed`, `warning`, `failed`), counts by
+  split, error/warning counts, quality summary, bbox statistics, category
+  distribution, config, creator/notes, and optional error message.
+- `AnnotationQualityGateIssue` stores each blocking error or warning:
+  severity, code, message, optional split/image/annotation reference, and JSON
+  details. It stores metadata only, never full file contents or images.
+- `AnnotationQualityGateValidator` checks bundle state, expected files,
+  manifest consistency, allowed categories, splits, bbox validity, duplicate
+  bboxes, support thresholds, images without annotations, COCO consistency,
+  and YOLO label-line syntax. YOLO here remains label text format only.
+
+Statuses:
+
+- `passed`: no blocking errors and no warnings under the selected config.
+- `warning`: no blocking errors, but reviewable warnings exist.
+- `failed`: at least one blocking technical error exists.
+
+Endpoints:
+
+- `POST /api/v1/ml/annotation-quality-gates`
+- `GET /api/v1/ml/annotation-quality-gates`
+- `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}`
+- `GET /api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/issues`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/annotation-quality-gates`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/quality-gates`
+
+A passed quality gate means only technical readiness by configured checks. It
+does not imply scientific sufficiency, microbiological diagnosis, taxonomy,
+or model performance. This phase does not implement or train YOLO, does not
+use PyTorch/TensorFlow/CNN/ViT/deep learning, does not download datasets, and
+does not replace `MockInferenceEngine`.

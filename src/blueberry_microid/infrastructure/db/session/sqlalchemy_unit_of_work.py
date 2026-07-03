@@ -13,6 +13,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bund
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_bundle_run_repository import (
     SqlAlchemyAnnotationBundleRunRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_quality_gate_issue_repository import (
+    SqlAlchemyAnnotationQualityGateIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_quality_gate_run_repository import (
+    SqlAlchemyAnnotationQualityGateRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
 )
@@ -106,6 +112,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
         self.analysis_run_repository = SqlAlchemyAnalysisRunRepository(self.session, auto_commit=False)
         self.annotation_bundle_file_repository = SqlAlchemyAnnotationBundleFileRepository(self.session, auto_commit=False)
         self.annotation_bundle_run_repository = SqlAlchemyAnnotationBundleRunRepository(self.session, auto_commit=False)
+        self.annotation_quality_gate_issue_repository = SqlAlchemyAnnotationQualityGateIssueRepository(
+            self.session, auto_commit=False
+        )
+        self.annotation_quality_gate_run_repository = SqlAlchemyAnnotationQualityGateRunRepository(
+            self.session, auto_commit=False
+        )
         self.dataset_item_repository = SqlAlchemyDatasetItemRepository(self.session, auto_commit=False)
         self.dataset_release_repository = SqlAlchemyDatasetReleaseRepository(self.session, auto_commit=False)
         self.dataset_snapshot_repository = SqlAlchemyDatasetSnapshotRepository(self.session, auto_commit=False)

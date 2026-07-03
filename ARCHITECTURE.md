@@ -1441,3 +1441,51 @@ YOLO aqui significa solo sintaxis de archivo de labels. Fase 22 no entrena
 YOLO ni ningun modelo, no usa PyTorch/TensorFlow/CNN/ViT/deep learning, no
 descarga datasets externos, no copia imagenes por defecto, no agrega
 frontend/autenticacion/taxonomia y no reemplaza `MockInferenceEngine`.
+
+## 39. Fase 23 - Supervised Annotation Quality Gate
+
+Objetivo: validar tecnicamente un `AnnotationBundleRun` antes de cualquier
+entrenamiento futuro. El gate no entrena modelos y no calcula metricas de
+modelo.
+
+**Entidades.** `AnnotationQualityGateRun` representa el resultado persistido
+del gate para un bundle: status (`passed`, `warning`, `failed`), conteos de
+imagenes/anotaciones por split, conteos de errores/warnings, config,
+`quality_summary`, `split_distribution`, `bbox_statistics` y
+`category_distribution`. `AnnotationQualityGateIssue` representa cada hallazgo
+con severidad (`error` o `warning`), codigo, mensaje y referencias opcionales
+a split, imagen o anotacion. No guarda imagenes ni contenido completo de
+archivos.
+
+**Validator.** `AnnotationQualityGateValidator` inspecciona metadata del
+bundle y archivos de texto/JSON/YAML ya generados. Valida estado del bundle,
+existencia de archivos esperados, Blueberry manifest, COCO JSON, labels YOLO
+como texto, `dataset.yaml`, splits permitidos, categorias permitidas,
+terminos taxonomicos prohibidos, bboxes invalidas/pequenas/fuera de bounds
+cuando hay dimensiones, duplicados, soporte minimo e imagenes sin
+anotaciones. No abre imagenes completas ni ejecuta entrenamiento.
+
+**Persistencia.** Alembic `0016_annotation_quality_gates.py` crea
+`annotation_quality_gate_runs` y `annotation_quality_gate_issues`, con FKs a
+`annotation_bundle_runs`, `dataset_releases` y
+`petri_annotation_export_runs`; CHECKs de status/severity/split; indices de
+consulta; y JSONB para config, summary, distribuciones, estadisticas y
+details.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/annotation-quality-gates` | Ejecuta y persiste un gate para un bundle |
+| GET | `/api/v1/ml/annotation-quality-gates` | Lista gates |
+| GET | `/api/v1/ml/annotation-quality-gates/{quality_gate_run_id}` | Detalle del gate |
+| GET | `/api/v1/ml/annotation-quality-gates/{quality_gate_run_id}/issues` | Issues del gate |
+| GET | `/api/v1/datasets/releases/{dataset_release_id}/annotation-quality-gates` | Gates por release |
+| GET | `/api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/quality-gates` | Gates por bundle |
+
+`passed` significa que no hay errores ni warnings bajo la configuracion
+seleccionada; no significa validez cientifica definitiva, diagnostico,
+taxonomia ni performance de modelo. Fase 23 no implementa YOLO como modelo,
+no entrena YOLO ni ningun modelo, no usa PyTorch/TensorFlow/CNN/ViT/deep
+learning, no descarga datasets externos, no agrega frontend/autenticacion/
+taxonomia y no reemplaza `MockInferenceEngine`.

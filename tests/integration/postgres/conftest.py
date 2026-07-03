@@ -28,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 # CASCADE the order is not strictly required, but keeping it explicit
 # documents the dependency graph.
 _ALL_TABLES = (
+    "annotation_quality_gate_issues",
+    "annotation_quality_gate_runs",
     "annotation_bundle_files",
     "annotation_bundle_runs",
     "petri_annotation_export_items",

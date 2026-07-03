@@ -1,6 +1,10 @@
 from blueberry_microid.domain.enums.analysis_status import AnalysisStatus
 from blueberry_microid.domain.enums.annotation_bundle_file_role import AnnotationBundleFileRole
 from blueberry_microid.domain.enums.annotation_bundle_status import AnnotationBundleStatus
+from blueberry_microid.domain.enums.annotation_quality_gate_issue_severity import (
+    AnnotationQualityGateIssueSeverity,
+)
+from blueberry_microid.domain.enums.annotation_quality_gate_status import AnnotationQualityGateStatus
 from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
@@ -21,6 +25,8 @@ __all__ = [
     "AnalysisStatus",
     "AnnotationBundleFileRole",
     "AnnotationBundleStatus",
+    "AnnotationQualityGateIssueSeverity",
+    "AnnotationQualityGateStatus",
     "BaselineModelType",
     "ComparisonPrimaryMetric",
     "ComparisonSelectionPolicy",

@@ -6,6 +6,8 @@ configuration is used (e.g. by Base.metadata.create_all() or Alembic).
 from blueberry_microid.infrastructure.db.models.analysis_run import AnalysisRunModel
 from blueberry_microid.infrastructure.db.models.annotation_bundle_file import AnnotationBundleFileModel
 from blueberry_microid.infrastructure.db.models.annotation_bundle_run import AnnotationBundleRunModel
+from blueberry_microid.infrastructure.db.models.annotation_quality_gate_issue import AnnotationQualityGateIssueModel
+from blueberry_microid.infrastructure.db.models.annotation_quality_gate_run import AnnotationQualityGateRunModel
 from blueberry_microid.infrastructure.db.models.base import Base
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
@@ -37,6 +39,8 @@ __all__ = [
     "AnalysisRunModel",
     "AnnotationBundleFileModel",
     "AnnotationBundleRunModel",
+    "AnnotationQualityGateIssueModel",
+    "AnnotationQualityGateRunModel",
     "Base",
     "DatasetItemModel",
     "DatasetReleaseModel",
