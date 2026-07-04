@@ -601,3 +601,56 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   repositorio, ejecutar entrenamiento en CI, requerir GPU obligatoria,
   frontend, autenticacion, taxonomia, diagnostico, MLflow/TensorBoard/W&B y
   reemplazar `MockInferenceEngine`.
+
+## 25. Git Ignore & Training Safety Guardrails (Fase 28)
+
+- `.gitignore` incluye, ademas de las reglas previas (cache de Python,
+  entornos virtuales, DB local, imagenes de storage), un bloque explicito de
+  guardrails de entrenamiento: extensiones de pesos/modelos
+  (`*.pt`/`*.pth`/`*.onnx`/`*.h5`/`*.ckpt`/`*.pb`/`*.tflite`) y carpetas de
+  salida (`runs/`, `training_outputs/`, `training_artifacts/`,
+  `model_artifacts/`, `checkpoints/`, `weights/`, `mlruns/`, `wandb/`,
+  `tensorboard/`, `lightning_logs/`, `predictions/`, `inference_outputs/`,
+  `evaluation_outputs/`, `experiments/`, `.local_training/`). Esta lista es
+  la unica fuente de verdad manual del repositorio; nunca se genera ni se
+  edita por codigo.
+- `blueberry_microid.ml.configs.training_safety_defaults` centraliza
+  `default_forbidden_extensions()`/`default_required_gitignore_patterns()` —
+  **unica fuente de verdad programatica**, compartida entre
+  `DetectionTrainingArtifactPolicyConfig` (Fase 27, evaluacion por-policy) y
+  el nuevo `RepositorySafetyConfig` (Fase 28, escaneo de todo el
+  repositorio). Cambiar la lista de patrones requeridos se hace una sola vez
+  ahi; nunca se duplica el literal en ninguno de los dos configs.
+- `RepositorySafetyValidator` (`ml/validation/repository_safety_validator.py`)
+  es un chequeo de solo lectura e independiente de cualquier
+  `DetectionTrainingRun`/`DetectionTrainingArtifactPolicy` persistido: lee
+  `.gitignore` del repo (sin escribirlo nunca) y, opcionalmente, valida una
+  lista de rutas candidatas (paths absolutos) contra extensiones prohibidas
+  y ubicacion relativa al repo. Vive en `ml/` (no en `application/`) porque
+  no depende de ningun puerto ni orquesta un caso de uso — es una utilidad
+  reutilizable tanto por un futuro caso de uso como por el CLI standalone.
+  Nunca importa `torch`/`ultralytics`, nunca llama `subprocess`, nunca crea
+  ni modifica archivos.
+- `scripts/check_repository_safety.py` es un CLI standalone (mismo patron
+  que `scripts/validate_training_manifest.py`) que imprime un reporte JSON y
+  devuelve `0` si el repositorio es seguro o `1` si falta algun patron de
+  `.gitignore` o hay una ruta candidata violatoria. No se conecta a FastAPI,
+  PostgreSQL, Redis ni Celery, y no requiere ningun `DetectionTrainingRun`
+  previo — es intencionalmente el chequeo mas barato posible antes de un
+  futuro entrenamiento real.
+- El test `tests/unit/ml/test_repository_safety_validator.py::test_real_repository_gitignore_is_safe`
+  valida el `.gitignore` **real** del repositorio (no uno sintetico en
+  `tmp_path`) contra `RepositorySafetyConfig()` por defecto; corre dentro del
+  job `unit-and-api-tests` existente, sin agregar un job de CI nuevo ni
+  instalar dependencias adicionales — el guardrail de CI para esta fase es
+  literalmente ese test.
+- Esta fase no agrega entidades ni tablas nuevas: es higiene de repositorio,
+  no un nuevo agregado de dominio. No modifica `DetectionTrainingArtifactPolicy`/
+  `Record`/`Issue` de la Fase 27 mas alla de reapuntar sus valores por
+  defecto al modulo compartido de Fase 28.
+- Sigue prohibido entrenar YOLO, instalar `ultralytics`, importar `torch`,
+  PyTorch, TensorFlow, CNN, ViT, deep learning real, descargar pesos o
+  datasets externos, copiar o modificar imagenes, guardar binarios en base
+  de datos, subir artefactos binarios al repositorio, ejecutar entrenamiento
+  en CI, requerir GPU obligatoria, frontend, autenticacion, taxonomia,
+  diagnostico, MLflow/TensorBoard/W&B y reemplazar `MockInferenceEngine`.

@@ -1943,3 +1943,73 @@ diagnostico, no integra MLflow/TensorBoard/W&B y no reemplaza
 exista un artefacto real, un peso entrenado, ni que el entorno de
 entrenamiento este realmente provisionado — solo que los gates tecnicos de
 politica de artefactos configurados pasaron.
+
+## 44. Fase 28 - Git Ignore & Training Safety Guardrails
+
+Objetivo: cerrar el riesgo operativo que dejo abierto la Fase 27 (el
+`.gitignore` real del repositorio no cubria los patrones de pesos/outputs
+que `DetectionTrainingArtifactPolicyEvaluator` ya exigia), y dar un
+mecanismo de validacion independiente de cualquier entidad persistida para
+confirmar que el repositorio nunca pueda recibir pesos o artefactos pesados
+por accidente antes de una futura fase de entrenamiento real.
+
+**`.gitignore`.** Se agrego un bloque explicito con extensiones de
+pesos/modelos (`*.pt`, `*.pth`, `*.onnx`, `*.h5`, `*.ckpt`, `*.pb`,
+`*.tflite`) y carpetas de salida de entrenamiento (`runs/`,
+`training_outputs/`, `training_artifacts/`, `model_artifacts/`,
+`checkpoints/`, `weights/`, `mlruns/`, `wandb/`, `tensorboard/`,
+`lightning_logs/`, `predictions/`, `inference_outputs/`,
+`evaluation_outputs/`, `experiments/`, `.local_training/`). Es edicion
+manual documentada; ningun codigo de esta fase escribe ni modifica
+`.gitignore` — coherente con la regla ya establecida en Fase 27 de "solo
+validar y recomendar, nunca modificar".
+
+**Fuente de verdad compartida.**
+`blueberry_microid.ml.configs.training_safety_defaults` centraliza
+`default_forbidden_extensions()` y `default_required_gitignore_patterns()`.
+Antes de esta fase, `DetectionTrainingArtifactPolicyConfig` definia estas
+listas de forma local con solo 7 patrones; ahora ambas listas viven en un
+unico modulo y `DetectionTrainingArtifactPolicyConfig` (Fase 27) y el nuevo
+`RepositorySafetyConfig` (Fase 28) las importan de ahi, evitando que las dos
+capas de validacion (por-policy vs. de-todo-el-repositorio) diverjan sobre
+que cuenta como patron/extension prohibida.
+
+**`RepositorySafetyValidator`.**
+(`ml/validation/repository_safety_validator.py`) es un validador de solo
+lectura, independiente de cualquier `DetectionTrainingRun`/
+`DetectionTrainingArtifactPolicy` persistido: (1) lee `.gitignore` del repo
+y reporta que patrones de `RepositorySafetyConfig.required_gitignore_patterns`
+faltan (o si el archivo no existe); (2) opcionalmente recibe una lista de
+rutas candidatas (absolutas) y marca las que resuelven dentro del
+repositorio con una extension de `forbidden_extensions`. Vive en `ml/`, no
+en `application/`, porque no depende de ningun puerto ni orquesta un caso
+de uso — es una utilidad de infraestructura de higiene de repositorio.
+Nunca escribe `.gitignore`, nunca crea archivos, nunca importa
+`torch`/`ultralytics`, nunca llama `subprocess`. Devuelve un
+`RepositorySafetyReport` (`ml/reports/repository_safety_report.py`) con
+`is_safe`, `gitignore_exists`, `missing_gitignore_patterns`,
+`path_violations` (path/extension/reason) y `recommendations`.
+
+**CLI.** `scripts/check_repository_safety.py` sigue el mismo patron que
+`scripts/validate_training_manifest.py`: imprime el reporte JSON y devuelve
+`0`/`1`. No requiere ningun `DetectionTrainingRun` ni conexion a
+FastAPI/PostgreSQL/Redis/Celery — es intencionalmente el chequeo mas barato
+posible, pensado para poder correrse en cualquier momento (incluido antes
+de cualquier fase de entrenamiento real futura) sin instalar nada nuevo.
+
+**Test de guardrail en CI.**
+`tests/unit/ml/test_repository_safety_validator.py::test_real_repository_gitignore_is_safe`
+ejecuta `RepositorySafetyValidator` contra el `.gitignore` **real** del
+repositorio (no uno sintetico) con la configuracion por defecto. Corre
+dentro del job `unit-and-api-tests` ya existente — no se agrego un job de
+CI nuevo ni una dependencia pesada; el guardrail de esta fase es
+literalmente ese test fallando si alguien borra un patron requerido.
+
+Fase 28 no agrega entidades ni tablas nuevas (es higiene de repositorio, no
+un agregado de dominio), no entrena YOLO, no instala `ultralytics`, no
+importa `torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no
+descarga pesos ni datasets externos, no copia ni modifica imagenes, no
+guarda binarios en base de datos, no sube artefactos binarios al
+repositorio, no ejecuta entrenamiento en CI, no requiere GPU obligatoria,
+no agrega frontend/autenticacion/taxonomia/diagnostico, no integra
+MLflow/TensorBoard/W&B y no reemplaza `MockInferenceEngine`.

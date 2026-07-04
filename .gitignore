@@ -21,3 +21,33 @@ storage/micro_images/*
 !storage/petri_images/.gitkeep
 !storage/micro_images/.gitkeep
 .claude/settings.local.json
+
+# Training artifacts / model weights
+*.pt
+*.pth
+*.onnx
+*.h5
+*.ckpt
+*.pb
+*.tflite
+
+# Training outputs
+runs/
+training_outputs/
+training_artifacts/
+model_artifacts/
+checkpoints/
+weights/
+mlruns/
+wandb/
+tensorboard/
+lightning_logs/
+
+# Large generated prediction outputs
+predictions/
+inference_outputs/
+evaluation_outputs/
+
+# Local experiment scratch
+experiments/
+.local_training/

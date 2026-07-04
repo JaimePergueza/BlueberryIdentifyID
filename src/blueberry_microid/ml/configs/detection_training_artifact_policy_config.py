@@ -3,9 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+from blueberry_microid.ml.configs.training_safety_defaults import (
+    default_forbidden_extensions,
+    default_required_gitignore_patterns,
+)
+
 
 def _default_forbidden_extensions() -> list[str]:
-    return [".pt", ".pth", ".onnx", ".h5", ".ckpt", ".pb", ".tflite"]
+    return default_forbidden_extensions()
 
 
 def _default_allowed_metadata_extensions() -> list[str]:
@@ -13,7 +18,7 @@ def _default_allowed_metadata_extensions() -> list[str]:
 
 
 def _default_required_gitignore_patterns() -> list[str]:
-    return ["*.pt", "*.pth", "*.onnx", "*.h5", "*.ckpt", "runs/", "training_outputs/"]
+    return default_required_gitignore_patterns()
 
 
 def _default_allowed_external_uri_schemes() -> list[str]:

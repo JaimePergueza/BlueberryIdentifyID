@@ -1865,3 +1865,65 @@ MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`. An
 `artifact_policy_ready` policy never certifies that a real artifact, a
 trained weight, or a provisioned training environment exists — only that
 the configured artifact-policy technical gates passed.
+
+## 37. Git ignore & training safety guardrails (Fase 28)
+
+Fase 28 closes the operational risk Fase 27 flagged: the repository's real
+`.gitignore` did not yet cover every weight/model-output pattern that
+`DetectionTrainingArtifactPolicyEvaluator` already required. It adds a
+standalone, read-only way to confirm the repository can never accidentally
+receive weights or heavy training artifacts, independent of any persisted
+`DetectionTrainingRun`/`DetectionTrainingArtifactPolicy`.
+
+- `.gitignore` now has an explicit block for weight/model extensions
+  (`*.pt`, `*.pth`, `*.onnx`, `*.h5`, `*.ckpt`, `*.pb`, `*.tflite`) and
+  training-output directories (`runs/`, `training_outputs/`,
+  `training_artifacts/`, `model_artifacts/`, `checkpoints/`, `weights/`,
+  `mlruns/`, `wandb/`, `tensorboard/`, `lightning_logs/`, `predictions/`,
+  `inference_outputs/`, `evaluation_outputs/`, `experiments/`,
+  `.local_training/`). This is a manual, documented edit — no code in this
+  phase writes or modifies `.gitignore`, the same rule Fase 27 already
+  established for the evaluator.
+- `blueberry_microid.ml.configs.training_safety_defaults` is the single
+  source of truth for `default_forbidden_extensions()`/
+  `default_required_gitignore_patterns()`. Both
+  `DetectionTrainingArtifactPolicyConfig` (Fase 27, per-policy evaluation)
+  and the new `RepositorySafetyConfig` (Fase 28, whole-repository scan) read
+  from this one module, so the two checks can never disagree about what
+  counts as a forbidden pattern.
+- `RepositorySafetyValidator` (`ml/validation/repository_safety_validator.py`)
+  is a read-only check that does not require any
+  `DetectionTrainingRun`/`DetectionTrainingArtifactPolicy` to exist: it
+  reads `.gitignore` and reports missing required patterns (or a missing
+  file), and optionally checks a list of candidate absolute paths for ones
+  that resolve inside the repository with a forbidden extension. It lives
+  in `ml/`, not `application/`, because it depends on no port and
+  orchestrates no use case — it is a repository-hygiene utility any future
+  caller (a use case, a CLI, a pre-commit hook) can reuse. It never writes
+  `.gitignore`, never creates files, never imports `torch`/`ultralytics`,
+  and never calls `subprocess`. It returns a `RepositorySafetyReport`
+  (`ml/reports/repository_safety_report.py`) with `is_safe`,
+  `gitignore_exists`, `missing_gitignore_patterns`, `path_violations`
+  (path/extension/reason), and `recommendations`.
+- `scripts/check_repository_safety.py` follows the same standalone-CLI
+  pattern as `scripts/validate_training_manifest.py`: it prints the JSON
+  report and exits `0`/`1`. It needs no `DetectionTrainingRun` and no
+  FastAPI/PostgreSQL/Redis/Celery connection — the cheapest possible gate,
+  meant to be runnable at any time (including ahead of a future real
+  training phase) without installing anything new.
+- `tests/unit/ml/test_repository_safety_validator.py::test_real_repository_gitignore_is_safe`
+  runs `RepositorySafetyValidator` against the repository's actual
+  `.gitignore` (not a synthetic one) with the default config. It runs inside
+  the existing `unit-and-api-tests` CI job — no new CI job and no heavy
+  dependency were added; this phase's CI guardrail is literally that test
+  failing if someone removes a required pattern.
+
+This phase adds no new entities or tables (it is repository hygiene, not a
+new domain aggregate), does not train YOLO, does not install `ultralytics`,
+does not import `torch`, does not use PyTorch/TensorFlow/CNN/ViT/real deep
+learning, does not download external weights or datasets, does not copy or
+modify images, does not store binaries in the database, does not upload
+binary artifacts to the repository, does not run training in CI, does not
+require a GPU, does not add a frontend/authentication/taxonomy/diagnosis
+claim, does not integrate MLflow/TensorBoard/W&B, and does not replace
+`MockInferenceEngine`.

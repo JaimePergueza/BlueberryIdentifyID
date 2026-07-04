@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 27)
+## MVP status (as of Fase 28)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -58,7 +58,13 @@ artifact policy for a future real training attempt — planned weight/metric/
 prediction/run-dir paths, forbidden binary extensions, repo-vs-external
 storage rules, and `.gitignore` coverage of weight patterns — without
 training anything, without writing a single artifact file, and without
-creating any real weight. The CI workflow runs
+creating any real weight. Fase 28 closes the operational risk Fase 27
+flagged: `.gitignore` now has an explicit block of weight/model extensions
+and training-output directories, `RepositorySafetyValidator` gives a
+standalone, read-only way to confirm the repository can never accidentally
+receive weights or heavy artifacts (independent of any persisted
+`DetectionTrainingRun`), and `scripts/check_repository_safety.py` is a
+zero-dependency CLI gate for that same check. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
