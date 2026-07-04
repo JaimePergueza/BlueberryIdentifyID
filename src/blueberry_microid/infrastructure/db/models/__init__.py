@@ -13,6 +13,15 @@ from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemM
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
+from blueberry_microid.infrastructure.db.models.detection_training_artifact_issue import (
+    DetectionTrainingArtifactIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_artifact_policy import (
+    DetectionTrainingArtifactPolicyModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_artifact_record import (
+    DetectionTrainingArtifactRecordModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_environment_issue import (
     DetectionTrainingEnvironmentIssueModel,
 )
@@ -60,6 +69,9 @@ __all__ = [
     "DatasetReleaseModel",
     "DatasetSnapshotModel",
     "DatasetSplitItemModel",
+    "DetectionTrainingArtifactIssueModel",
+    "DetectionTrainingArtifactPolicyModel",
+    "DetectionTrainingArtifactRecordModel",
     "DetectionTrainingEnvironmentIssueModel",
     "DetectionTrainingEnvironmentSpecModel",
     "DetectionTrainingIssueModel",

@@ -31,6 +31,8 @@ from blueberry_microid.application.exceptions import (
     DatasetReleaseNotFoundError,
     DatasetSnapshotNotFoundError,
     DatasetSplitMetadataError,
+    DetectionTrainingArtifactPolicyNotAllowedError,
+    DetectionTrainingArtifactPolicyNotFoundError,
     DetectionTrainingEnvironmentNotAllowedError,
     DetectionTrainingEnvironmentSpecNotFoundError,
     DetectionTrainingNotAllowedError,
@@ -110,6 +112,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "detection_training_readiness_report_not_found"
     if isinstance(exc, DetectionTrainingEnvironmentSpecNotFoundError):
         return 404, "detection_training_environment_spec_not_found"
+    if isinstance(exc, DetectionTrainingArtifactPolicyNotFoundError):
+        return 404, "detection_training_artifact_policy_not_found"
     if isinstance(exc, HumanReviewNotFoundError):
         return 404, "human_review_not_found"
     if isinstance(exc, DatasetSnapshotNotFoundError):
@@ -175,6 +179,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "detection_training_not_allowed"
     if isinstance(exc, DetectionTrainingEnvironmentNotAllowedError):
         return 409, "detection_training_environment_not_allowed"
+    if isinstance(exc, DetectionTrainingArtifactPolicyNotAllowedError):
+        return 409, "detection_training_artifact_policy_not_allowed"
     if isinstance(exc, ConflictError):
         return 409, "conflict"
 

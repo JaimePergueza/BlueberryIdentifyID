@@ -26,6 +26,9 @@ from blueberry_microid.infrastructure.db.models import (
     DatasetReleaseModel,
     DatasetSnapshotModel,
     DatasetSplitItemModel,
+    DetectionTrainingArtifactIssueModel,
+    DetectionTrainingArtifactPolicyModel,
+    DetectionTrainingArtifactRecordModel,
     DetectionTrainingEnvironmentIssueModel,
     DetectionTrainingEnvironmentSpecModel,
     DetectionTrainingIssueModel,
@@ -94,6 +97,9 @@ _SQLITE_TABLES = [
     DetectionTrainingReadinessIssueModel.__table__,
     DetectionTrainingEnvironmentSpecModel.__table__,
     DetectionTrainingEnvironmentIssueModel.__table__,
+    DetectionTrainingArtifactPolicyModel.__table__,
+    DetectionTrainingArtifactRecordModel.__table__,
+    DetectionTrainingArtifactIssueModel.__table__,
 ]
 
 

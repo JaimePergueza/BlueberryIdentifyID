@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 26)
+## MVP status (as of Fase 27)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -51,7 +51,14 @@ attempt would need (Python/OS, ultralytics/torch/GPU/CUDA policy, base
 weights policy, artifact storage policy, CI vs. local execution policy)
 using only safe checks (`sys.version_info`, `platform.system()`,
 `importlib.util.find_spec`, `pathlib`) — never installing dependencies,
-importing `ultralytics`/`torch`, or running training in CI. The CI workflow runs
+importing `ultralytics`/`torch`, or running training in CI. Fase 27 adds a
+persisted `DetectionTrainingArtifactPolicy`/`DetectionTrainingArtifactRecord`/
+`DetectionTrainingArtifactIssue` layer that defines and validates an
+artifact policy for a future real training attempt — planned weight/metric/
+prediction/run-dir paths, forbidden binary extensions, repo-vs-external
+storage rules, and `.gitignore` coverage of weight patterns — without
+training anything, without writing a single artifact file, and without
+creating any real weight. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
@@ -410,6 +417,19 @@ Detection training environment spec endpoints (Fase 26 - environment specificati
 - `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/environment-specs`
 - `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-environment-specs`
 - `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-environment-specs`
+
+Detection training artifact policy endpoints (Fase 27 - artifact policy/registry only, no training, no real weights):
+
+- `POST /api/v1/ml/detection-training-artifact-policies`
+- `GET /api/v1/ml/detection-training-artifact-policies`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}/records`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}/issues`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/artifact-policies`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/artifact-policies`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}/artifact-policies`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-artifact-policies`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-artifact-policies`
 
 Async processing endpoints:
 

@@ -28,6 +28,15 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
+from blueberry_microid.application.ports.detection_training_artifact_issue_repository import (
+    DetectionTrainingArtifactIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_artifact_policy_repository import (
+    DetectionTrainingArtifactPolicyRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_artifact_record_repository import (
+    DetectionTrainingArtifactRecordRepositoryPort,
+)
 from blueberry_microid.application.ports.detection_training_environment_issue_repository import (
     DetectionTrainingEnvironmentIssueRepositoryPort,
 )
@@ -93,6 +102,9 @@ from blueberry_microid.application.services.annotation_bundle_validator import A
 from blueberry_microid.application.services.annotation_bundle_writer import AnnotationBundleWriter
 from blueberry_microid.application.services.annotation_quality_gate_validator import AnnotationQualityGateValidator
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
+from blueberry_microid.application.services.detection_training_artifact_policy_evaluator import (
+    DetectionTrainingArtifactPolicyEvaluator,
+)
 from blueberry_microid.application.services.detection_training_environment_evaluator import (
     DetectionTrainingEnvironmentEvaluator,
 )
@@ -165,6 +177,21 @@ from blueberry_microid.application.use_cases.detection_training_environment.list
 )
 from blueberry_microid.application.use_cases.detection_training_environment.list_detection_training_environment_specs import (
     ListDetectionTrainingEnvironmentSpecsUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_artifacts.create_detection_training_artifact_policy import (
+    CreateDetectionTrainingArtifactPolicyUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_artifacts.get_detection_training_artifact_policy import (
+    GetDetectionTrainingArtifactPolicyUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_artifacts.list_detection_training_artifact_issues import (
+    ListDetectionTrainingArtifactIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_artifacts.list_detection_training_artifact_policies import (
+    ListDetectionTrainingArtifactPoliciesUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_artifacts.list_detection_training_artifact_records import (
+    ListDetectionTrainingArtifactRecordsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -310,6 +337,15 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapsho
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_item_repository import (
     SqlAlchemyDatasetSplitItemRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_issue_repository import (
+    SqlAlchemyDetectionTrainingArtifactIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_policy_repository import (
+    SqlAlchemyDetectionTrainingArtifactPolicyRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_record_repository import (
+    SqlAlchemyDetectionTrainingArtifactRecordRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_issue_repository import (
     SqlAlchemyDetectionTrainingEnvironmentIssueRepository,
@@ -667,6 +703,24 @@ def get_detection_training_environment_issue_repository(
     return SqlAlchemyDetectionTrainingEnvironmentIssueRepository(session)
 
 
+def get_detection_training_artifact_policy_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingArtifactPolicyRepositoryPort:
+    return SqlAlchemyDetectionTrainingArtifactPolicyRepository(session)
+
+
+def get_detection_training_artifact_record_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingArtifactRecordRepositoryPort:
+    return SqlAlchemyDetectionTrainingArtifactRecordRepository(session)
+
+
+def get_detection_training_artifact_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingArtifactIssueRepositoryPort:
+    return SqlAlchemyDetectionTrainingArtifactIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -712,6 +766,10 @@ def get_detection_training_readiness_evaluator() -> DetectionTrainingReadinessEv
 
 def get_detection_training_environment_evaluator() -> DetectionTrainingEnvironmentEvaluator:
     return DetectionTrainingEnvironmentEvaluator()
+
+
+def get_detection_training_artifact_policy_evaluator() -> DetectionTrainingArtifactPolicyEvaluator:
+    return DetectionTrainingArtifactPolicyEvaluator()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1525,6 +1583,70 @@ def get_list_detection_training_environment_issues_use_case(
     ),
 ) -> ListDetectionTrainingEnvironmentIssuesUseCase:
     return ListDetectionTrainingEnvironmentIssuesUseCase(spec_repository, issue_repository)
+
+
+def get_create_detection_training_artifact_policy_use_case(
+    detection_training_run_repository: DetectionTrainingRunRepositoryPort = Depends(
+        get_detection_training_run_repository
+    ),
+    readiness_report_repository: DetectionTrainingReadinessReportRepositoryPort = Depends(
+        get_detection_training_readiness_report_repository
+    ),
+    environment_spec_repository: DetectionTrainingEnvironmentSpecRepositoryPort = Depends(
+        get_detection_training_environment_spec_repository
+    ),
+    bundle_run_repository: AnnotationBundleRunRepositoryPort = Depends(get_annotation_bundle_run_repository),
+    bundle_file_repository: AnnotationBundleFileRepositoryPort = Depends(get_annotation_bundle_file_repository),
+    evaluator: DetectionTrainingArtifactPolicyEvaluator = Depends(get_detection_training_artifact_policy_evaluator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDetectionTrainingArtifactPolicyUseCase:
+    return CreateDetectionTrainingArtifactPolicyUseCase(
+        detection_training_run_repository,
+        readiness_report_repository,
+        environment_spec_repository,
+        bundle_run_repository,
+        bundle_file_repository,
+        evaluator,
+        unit_of_work,
+    )
+
+
+def get_get_detection_training_artifact_policy_use_case(
+    policy_repository: DetectionTrainingArtifactPolicyRepositoryPort = Depends(
+        get_detection_training_artifact_policy_repository
+    ),
+) -> GetDetectionTrainingArtifactPolicyUseCase:
+    return GetDetectionTrainingArtifactPolicyUseCase(policy_repository)
+
+
+def get_list_detection_training_artifact_policies_use_case(
+    policy_repository: DetectionTrainingArtifactPolicyRepositoryPort = Depends(
+        get_detection_training_artifact_policy_repository
+    ),
+) -> ListDetectionTrainingArtifactPoliciesUseCase:
+    return ListDetectionTrainingArtifactPoliciesUseCase(policy_repository)
+
+
+def get_list_detection_training_artifact_records_use_case(
+    policy_repository: DetectionTrainingArtifactPolicyRepositoryPort = Depends(
+        get_detection_training_artifact_policy_repository
+    ),
+    record_repository: DetectionTrainingArtifactRecordRepositoryPort = Depends(
+        get_detection_training_artifact_record_repository
+    ),
+) -> ListDetectionTrainingArtifactRecordsUseCase:
+    return ListDetectionTrainingArtifactRecordsUseCase(policy_repository, record_repository)
+
+
+def get_list_detection_training_artifact_issues_use_case(
+    policy_repository: DetectionTrainingArtifactPolicyRepositoryPort = Depends(
+        get_detection_training_artifact_policy_repository
+    ),
+    issue_repository: DetectionTrainingArtifactIssueRepositoryPort = Depends(
+        get_detection_training_artifact_issue_repository
+    ),
+) -> ListDetectionTrainingArtifactIssuesUseCase:
+    return ListDetectionTrainingArtifactIssuesUseCase(policy_repository, issue_repository)
 
 
 def get_list_detection_training_issues_use_case(

@@ -14,6 +14,9 @@ from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
+from blueberry_microid.domain.entities.detection_training_artifact_issue import DetectionTrainingArtifactIssue
+from blueberry_microid.domain.entities.detection_training_artifact_policy import DetectionTrainingArtifactPolicy
+from blueberry_microid.domain.entities.detection_training_artifact_record import DetectionTrainingArtifactRecord
 from blueberry_microid.domain.entities.detection_training_environment_issue import DetectionTrainingEnvironmentIssue
 from blueberry_microid.domain.entities.detection_training_environment_spec import DetectionTrainingEnvironmentSpec
 from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
@@ -52,6 +55,20 @@ from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonP
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
+from blueberry_microid.domain.enums.detection_training_artifact_issue_severity import (
+    DetectionTrainingArtifactIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_kind import DetectionTrainingArtifactKind
+from blueberry_microid.domain.enums.detection_training_artifact_location_type import (
+    DetectionTrainingArtifactLocationType,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_policy_decision import (
+    DetectionTrainingArtifactPolicyDecision,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_policy_status import (
+    DetectionTrainingArtifactPolicyStatus,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_state import DetectionTrainingArtifactState
 from blueberry_microid.domain.enums.detection_training_environment_decision import (
     DetectionTrainingEnvironmentDecision,
 )
@@ -91,6 +108,15 @@ from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemM
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
 from blueberry_microid.infrastructure.db.models.dataset_split_item import DatasetSplitItemModel
+from blueberry_microid.infrastructure.db.models.detection_training_artifact_issue import (
+    DetectionTrainingArtifactIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_artifact_policy import (
+    DetectionTrainingArtifactPolicyModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_artifact_record import (
+    DetectionTrainingArtifactRecordModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_environment_issue import (
     DetectionTrainingEnvironmentIssueModel,
 )
@@ -836,6 +862,75 @@ def detection_training_environment_issue_to_entity(
         code=model.code,
         message=model.message,
         id=model.id,
+        details=model.details,
+        created_at=model.created_at,
+    )
+
+
+def detection_training_artifact_policy_to_entity(
+    model: DetectionTrainingArtifactPolicyModel,
+) -> DetectionTrainingArtifactPolicy:
+    return DetectionTrainingArtifactPolicy(
+        detection_training_run_id=model.detection_training_run_id,
+        readiness_report_id=model.readiness_report_id,
+        environment_spec_id=model.environment_spec_id,
+        annotation_bundle_run_id=model.annotation_bundle_run_id,
+        dataset_release_id=model.dataset_release_id,
+        decision=DetectionTrainingArtifactPolicyDecision(model.decision),
+        status=DetectionTrainingArtifactPolicyStatus(model.status),
+        is_policy_ready=model.is_policy_ready,
+        config=model.config,
+        planned_output_summary=model.planned_output_summary,
+        storage_policy=model.storage_policy,
+        git_policy=model.git_policy,
+        checksum_policy=model.checksum_policy,
+        registry_summary=model.registry_summary,
+        risk_summary=model.risk_summary,
+        recommendation_summary=model.recommendation_summary,
+        error_count=model.error_count,
+        warning_count=model.warning_count,
+        info_count=model.info_count,
+        id=model.id,
+        artifact_root_dir=model.artifact_root_dir,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def detection_training_artifact_record_to_entity(
+    model: DetectionTrainingArtifactRecordModel,
+) -> DetectionTrainingArtifactRecord:
+    return DetectionTrainingArtifactRecord(
+        artifact_policy_id=model.artifact_policy_id,
+        detection_training_run_id=model.detection_training_run_id,
+        artifact_kind=DetectionTrainingArtifactKind(model.artifact_kind),
+        artifact_state=DetectionTrainingArtifactState(model.artifact_state),
+        location_type=DetectionTrainingArtifactLocationType(model.location_type),
+        id=model.id,
+        artifact_path=model.artifact_path,
+        relative_path=model.relative_path,
+        external_uri=model.external_uri,
+        file_extension=model.file_extension,
+        size_bytes=model.size_bytes,
+        checksum_sha256=model.checksum_sha256,
+        metadata=model.artifact_metadata,
+        created_at=model.created_at,
+    )
+
+
+def detection_training_artifact_issue_to_entity(
+    model: DetectionTrainingArtifactIssueModel,
+) -> DetectionTrainingArtifactIssue:
+    return DetectionTrainingArtifactIssue(
+        artifact_policy_id=model.artifact_policy_id,
+        severity=DetectionTrainingArtifactIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
+        artifact_path=model.artifact_path,
         details=model.details,
         created_at=model.created_at,
     )

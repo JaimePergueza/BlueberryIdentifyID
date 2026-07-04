@@ -1757,3 +1757,111 @@ frontend/authentication/taxonomy/diagnosis claim, does not integrate
 MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`. An
 `environment_ready` spec never certifies that a real training environment
 was provisioned — only that the configured technical gates passed.
+
+## 36. Training artifact policy & registry (Fase 27)
+
+Fase 27 defines, validates, and persists an artifact policy for a future
+real detection-training attempt, given a `DetectionTrainingRun` that
+already has a `DetectionTrainingReadinessReport` (Fase 25) and a
+`DetectionTrainingEnvironmentSpec` (Fase 26). It never trains anything and
+never creates real weight files.
+
+- `DetectionTrainingArtifactPolicyConfig` (`ml/configs/`) has 22 fields: an
+  optional `artifact_root_dir` with `require_artifact_root_dir=true`, a
+  repo-storage policy (`allow_artifacts_inside_repo=false`/
+  `allow_artifacts_outside_repo=true`), an external-URI policy
+  (`allow_external_uri=false`, `allowed_external_uri_schemes=[]`), an
+  extension policy (`forbidden_extensions` defaulting to
+  `.pt`/`.pth`/`.onnx`/`.h5`/`.ckpt`/`.pb`/`.tflite`,
+  `allowed_metadata_extensions` defaulting to
+  `.json`/`.yaml`/`.yml`/`.txt`/`.csv`/`.md`), a Git policy
+  (`require_gitignore_rules=true`, `required_gitignore_patterns`), a
+  checksum policy (`require_checksums_for_actual_artifacts=true`,
+  `checksum_algorithm="sha256"`, optional `max_artifact_size_mb`), a
+  registry policy (`allow_actual_artifact_registration=false`,
+  `register_planned_artifacts=true`, `register_actual_artifacts=false`,
+  `allow_missing_planned_paths=true`), and `strict_mode`/`notes`. No field
+  ever creates `artifact_root_dir`, writes an artifact file, or computes a
+  real checksum — this phase has no mechanism to produce a real artifact.
+- `DetectionTrainingArtifactPolicy` persists `decision` (one of
+  `artifact_policy_ready`, `needs_external_storage`,
+  `blocked_by_repo_storage`, `blocked_by_missing_output_dir`,
+  `blocked_by_forbidden_extension`, `blocked_by_policy_violation`,
+  `blocked_by_environment`), `status` (`ready`/`warning`/`blocked`/
+  `failed`), `is_policy_ready`, an optional `artifact_root_dir`, and seven
+  JSON policy/summary fields (`planned_output_summary`, `storage_policy`,
+  `git_policy`, `checksum_policy`, `registry_summary`, `risk_summary`,
+  `recommendation_summary`). Like Fases 25-26, a policy can be
+  `status=warning` with `is_policy_ready=true`, but `is_policy_ready=true`
+  always requires `decision=artifact_policy_ready`.
+  `DetectionTrainingArtifactRecord` represents a planned (or, in a future
+  explicit phase, real) artifact — `artifact_kind`, `artifact_state`,
+  `location_type`, optional path/URI fields, `file_extension`,
+  `size_bytes`, `checksum_sha256`, and optional JSON `metadata` — without
+  ever storing binary content. `DetectionTrainingArtifactIssue` stores
+  severity-tagged findings with fixed codes; none of the three entities
+  stores weights, images, or full label sets.
+- `DetectionTrainingArtifactPolicyEvaluator` (`application/services/`)
+  takes the `DetectionTrainingRun`, `DetectionTrainingEnvironmentSpec`,
+  `AnnotationBundleRun`+files, and config — it deliberately does not take
+  the `DetectionTrainingReadinessReport`, because none of its rules depend
+  on a field of that entity (only on the environment spec's
+  `status`/`decision`); readiness-report membership checks live in the use
+  case instead, to avoid duplicating a validation that belongs elsewhere.
+  It only uses safe, read-only checks: `pathlib` for
+  `artifact_root_dir` location **without writing anything**, and reading
+  `.gitignore` if present **without ever modifying it**. It never calls
+  `subprocess`, never imports `torch`/`ultralytics`, never installs
+  dependencies, never downloads anything, never computes a real checksum
+  (no real artifact exists to hash), and never creates a weight file. If a
+  planned `expected_output` (`weights_path_planned`,
+  `metrics_path_planned`, `predictions_path_planned`, `run_dir_planned`)
+  points inside the repo with a forbidden extension, it blocks
+  (`blocked_by_repo_storage`/`blocked_by_forbidden_extension`) before the
+  policy can be accepted; a planned artifact outside the repo is recorded
+  as a `DetectionTrainingArtifactRecord` with `artifact_state=planned`,
+  never `registered`/`missing` (those states only apply to real artifacts
+  in a future phase). Blocking-category priority when several co-occur is
+  `blocked_by_environment` > `blocked_by_missing_output_dir` >
+  `blocked_by_repo_storage` > `blocked_by_forbidden_extension` >
+  `blocked_by_policy_violation`; with warnings but no blocking errors, the
+  decision falls back to `needs_external_storage`.
+- `CreateDetectionTrainingArtifactPolicyUseCase` looks up the
+  `DetectionTrainingRun`, `DetectionTrainingReadinessReport`, and
+  `DetectionTrainingEnvironmentSpec` (404 if any is missing), verifies the
+  readiness report belongs to the run, that the environment spec belongs
+  to the run, and that the environment spec belongs to the readiness
+  report (otherwise 409
+  `detection_training_artifact_policy_not_allowed`), looks up the
+  associated `AnnotationBundleRun` and its files, runs the evaluator, and
+  persists the policy plus its records and issues in one `UnitOfWorkPort`
+  transaction. It never modifies `DetectionTrainingRun`,
+  `DetectionTrainingReadinessReport`, or `DetectionTrainingEnvironmentSpec`.
+  An internal evaluation failure becomes a persisted `status=failed`
+  policy, never an unpersisted exception.
+
+Endpoints:
+
+- `POST /api/v1/ml/detection-training-artifact-policies`
+- `GET /api/v1/ml/detection-training-artifact-policies`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}/records`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}/issues`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/artifact-policies`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/artifact-policies`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}/artifact-policies`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-artifact-policies`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-artifact-policies`
+
+This phase does not train YOLO or any model, does not install
+`ultralytics`, does not import `torch`, does not use
+PyTorch/TensorFlow/CNN/ViT/real deep learning, does not download external
+weights or datasets, does not copy or modify images, does not write
+artifact files or create real `.pt`/`.pth`/`.onnx`/`.h5`/`.ckpt` weights,
+does not upload binaries to the repository, does not run training in CI,
+does not require a GPU, does not add a
+frontend/authentication/taxonomy/diagnosis claim, does not integrate
+MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`. An
+`artifact_policy_ready` policy never certifies that a real artifact, a
+trained weight, or a provisioned training environment exists — only that
+the configured artifact-policy technical gates passed.

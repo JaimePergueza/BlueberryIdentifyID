@@ -519,3 +519,85 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   datasets externos, ejecutar entrenamiento en CI, requerir GPU obligatoria,
   crear pesos `.pt`/`.onnx`/`.h5`, frontend, autenticacion, taxonomia,
   diagnostico, MLflow/TensorBoard/W&B y reemplazar `MockInferenceEngine`.
+
+## 24. Training Artifact Policy & Registry (Fase 27)
+
+- `DetectionTrainingArtifactPolicy` define/valida una politica de
+  artefactos para un futuro entrenamiento real de un `DetectionTrainingRun`
+  ya con `DetectionTrainingReadinessReport` (Fase 25) y
+  `DetectionTrainingEnvironmentSpec` (Fase 26); `is_policy_ready=true` nunca
+  significa que existe un peso real, que se entreno un modelo, ni que un
+  artefacto fue efectivamente escrito en disco — solo que los gates
+  tecnicos de politica configurados pasaron.
+  `DetectionTrainingArtifactRecord` representa un artefacto planificado (o,
+  en una fase futura explicita, uno real) sin guardar nunca su contenido
+  binario; `DetectionTrainingArtifactIssue` guarda hallazgos
+  (`error`/`warning`/`info`) con codigos fijos (p. ej.
+  `output_dir_inside_repo`, `artifact_extension_forbidden`,
+  `model_weight_in_repo_not_allowed`, `gitignore_does_not_exclude_weights`,
+  `actual_artifact_registration_not_allowed_yet`, `no_training_executed`,
+  `planned_artifact_only`); ninguna de las tres entidades guarda pesos,
+  imagenes ni labels completos.
+- `DetectionTrainingArtifactPolicyDecision` tiene exactamente siete valores
+  (`artifact_policy_ready`, `needs_external_storage`,
+  `blocked_by_repo_storage`, `blocked_by_missing_output_dir`,
+  `blocked_by_forbidden_extension`, `blocked_by_policy_violation`,
+  `blocked_by_environment`); `DetectionTrainingArtifactPolicyStatus` tiene
+  `ready`/`warning`/`blocked`/`failed`. Igual que en Fases 25-26, una
+  policy puede quedar `status=warning` con `is_policy_ready=true`, pero
+  `is_policy_ready=true` exige siempre `decision=artifact_policy_ready`.
+- `DetectionTrainingArtifactPolicyConfig` (`ml/configs/`) nunca crea
+  `artifact_root_dir` por defecto (`require_artifact_root_dir=true` solo
+  exige que se declare, no lo crea), nunca escribe archivos de artefactos,
+  y `allow_actual_artifact_registration=false` por defecto — un artefacto
+  `actual_*` nunca se registra sin autorizacion explicita, y esta fase no
+  expone ningun mecanismo para crear uno real. `forbidden_extensions`
+  incluye por defecto `.pt`/`.pth`/`.onnx`/`.h5`/`.ckpt`/`.pb`/`.tflite`.
+- `DetectionTrainingArtifactPolicyEvaluator` (`application/services/`)
+  recibe `DetectionTrainingRun`, `DetectionTrainingEnvironmentSpec`,
+  `AnnotationBundleRun`+archivos y la config — **deliberadamente no recibe
+  `DetectionTrainingReadinessReport`** porque ninguna de sus reglas de
+  negocio depende de un campo de esa entidad (solo del `status`/`decision`
+  del `EnvironmentSpec`); la verificacion de que el readiness report
+  pertenece al run y de que el environment spec pertenece al readiness
+  report vive en el caso de uso, nunca duplicada en el evaluador. El
+  evaluador solo usa chequeos seguros y de solo lectura: `pathlib` para
+  ubicacion de `artifact_root_dir` **sin escribir nada**, lectura de
+  `.gitignore` si existe **sin modificarlo nunca**. Nunca llama
+  `subprocess`, nunca importa `torch`/`ultralytics`, nunca instala
+  dependencias, nunca descarga nada, nunca calcula un checksum real (no
+  existen artefactos reales que hashear), nunca crea un archivo de pesos.
+  Si un `expected_output` planificado (`weights_path_planned`,
+  `metrics_path_planned`, `predictions_path_planned`, `run_dir_planned`)
+  apunta dentro del repositorio con una extension de `forbidden_extensions`,
+  bloquea (`blocked_by_repo_storage`/`blocked_by_forbidden_extension`)
+  antes de aceptar la politica; un artefacto planificado fuera del repo se
+  registra como `DetectionTrainingArtifactRecord` con
+  `artifact_state=planned`, nunca `registered`/`missing` (esos estados
+  solo aplicarian a artefactos reales de una fase futura).
+- **`CreateDetectionTrainingArtifactPolicyUseCase` verifica tres relaciones
+  de pertenencia antes de evaluar**: el `DetectionTrainingReadinessReport`
+  referenciado debe pertenecer al `DetectionTrainingRun` referenciado, el
+  `DetectionTrainingEnvironmentSpec` referenciado debe pertenecer al mismo
+  run, y ese environment spec debe pertenecer a ese mismo readiness report
+  — si cualquiera de las tres relaciones no se cumple,
+  `DetectionTrainingArtifactPolicyNotAllowedError` (409). Nunca modifica
+  `DetectionTrainingRun`, `DetectionTrainingReadinessReport` ni
+  `DetectionTrainingEnvironmentSpec`. Persiste policy + records + issues en
+  una unica transaccion via `UnitOfWorkPort`; un fallo interno de
+  evaluacion se convierte en una policy `status=failed` persistida, nunca
+  en una excepcion sin persistir.
+- Endpoints bajo `/api/v1/ml/detection-training-artifact-policies`,
+  `/api/v1/ml/detection-training-runs/{id}/artifact-policies`,
+  `/api/v1/ml/detection-training-readiness-reports/{id}/artifact-policies`,
+  `/api/v1/ml/detection-training-environment-specs/{id}/artifact-policies`,
+  `/api/v1/ml/annotation-bundles/{id}/detection-training-artifact-policies`
+  y `/api/v1/datasets/releases/{id}/detection-training-artifact-policies`,
+  con `X-Request-ID`.
+- Sigue prohibido entrenar YOLO, instalar `ultralytics`, importar `torch`,
+  PyTorch, TensorFlow, CNN, ViT, deep learning real, descargar pesos o
+  datasets externos, copiar o modificar imagenes, escribir artefactos o
+  crear pesos reales `.pt`/`.pth`/`.onnx`/`.h5`/`.ckpt`, subir binarios al
+  repositorio, ejecutar entrenamiento en CI, requerir GPU obligatoria,
+  frontend, autenticacion, taxonomia, diagnostico, MLflow/TensorBoard/W&B y
+  reemplazar `MockInferenceEngine`.

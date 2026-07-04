@@ -31,6 +31,15 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_snapsho
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_split_item_repository import (
     SqlAlchemyDatasetSplitItemRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_issue_repository import (
+    SqlAlchemyDetectionTrainingArtifactIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_policy_repository import (
+    SqlAlchemyDetectionTrainingArtifactPolicyRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_record_repository import (
+    SqlAlchemyDetectionTrainingArtifactRecordRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_issue_repository import (
     SqlAlchemyDetectionTrainingEnvironmentIssueRepository,
 )
@@ -156,6 +165,15 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.detection_training_environment_spec_repository = SqlAlchemyDetectionTrainingEnvironmentSpecRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_artifact_policy_repository = SqlAlchemyDetectionTrainingArtifactPolicyRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_artifact_record_repository = SqlAlchemyDetectionTrainingArtifactRecordRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_artifact_issue_repository = SqlAlchemyDetectionTrainingArtifactIssueRepository(
             self.session, auto_commit=False
         )
         self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)

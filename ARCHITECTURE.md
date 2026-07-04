@@ -1790,3 +1790,156 @@ frontend/autenticacion/taxonomia/diagnostico, no integra
 MLflow/TensorBoard/W&B y no reemplaza `MockInferenceEngine`. Un spec
 `environment_ready` no certifica que exista un entorno de entrenamiento
 real provisionado — solo que los gates tecnicos configurados pasaron.
+
+## 43. Fase 27 - Training Artifact Policy & Registry
+
+Objetivo: definir, validar y persistir una politica de artefactos para un
+futuro entrenamiento real de deteccion, dado un `DetectionTrainingRun` con
+`DetectionTrainingReadinessReport` (Fase 25) y
+`DetectionTrainingEnvironmentSpec` (Fase 26) — sin entrenar, sin crear pesos
+reales y sin escribir archivos de artefactos en disco.
+
+**Entidades.** `DetectionTrainingArtifactPolicy` referencia
+`DetectionTrainingRun`, `DetectionTrainingReadinessReport`,
+`DetectionTrainingEnvironmentSpec`, `AnnotationBundleRun` y
+`DatasetRelease`; guarda `decision`
+(`DetectionTrainingArtifactPolicyDecision`: `artifact_policy_ready`,
+`needs_external_storage`, `blocked_by_repo_storage`,
+`blocked_by_missing_output_dir`, `blocked_by_forbidden_extension`,
+`blocked_by_policy_violation`, `blocked_by_environment`), `status`
+(`DetectionTrainingArtifactPolicyStatus`: `ready`/`warning`/`blocked`/
+`failed`), `is_policy_ready`, `artifact_root_dir` opcional, y siete
+resumenes/politicas JSON (`planned_output_summary`, `storage_policy`,
+`git_policy`, `checksum_policy`, `registry_summary`, `risk_summary`,
+`recommendation_summary`). Igual que en Fases 25-26, el invariante de la
+entidad permite `status=warning` con `is_policy_ready=true`, pero
+`is_policy_ready=true` exige siempre `decision=artifact_policy_ready`.
+`DetectionTrainingArtifactRecord` representa un artefacto planificado o
+(en el futuro) real: `artifact_kind`
+(`DetectionTrainingArtifactKind`: `planned_weights`, `planned_metrics`,
+`planned_predictions`, `planned_logs`, `planned_run_dir`, `planned_config`,
+`planned_manifest`, `actual_weights`, `actual_metrics`,
+`actual_predictions`, `actual_logs`, `actual_manifest`, `other`),
+`artifact_state` (`DetectionTrainingArtifactState`: `planned`,
+`registered`, `missing`, `forbidden`, `ignored`, `deleted`, `unknown`),
+`location_type` (`DetectionTrainingArtifactLocationType`: `local_path`,
+`external_uri`, `relative_path`, `unresolved`), rutas opcionales
+(`artifact_path`, `relative_path`, `external_uri`), `file_extension`,
+`size_bytes`, `checksum_sha256` y `metadata` JSON opcional — todos
+opcionales porque en esta fase ningun artefacto real existe.
+`DetectionTrainingArtifactIssue` guarda hallazgos `error`/`warning`/`info`
+con codigos fijos (17 sugeridos: `output_dir_missing`,
+`output_dir_inside_repo`, `output_dir_not_absolute`,
+`external_storage_not_configured`, `artifact_path_missing`,
+`artifact_extension_forbidden`, `model_weight_in_repo_not_allowed`,
+`checksum_missing_for_actual_artifact`, `checksum_algorithm_not_allowed`,
+`artifact_size_unknown`, `artifact_size_exceeds_policy`,
+`gitignore_missing`, `gitignore_does_not_exclude_weights`,
+`actual_artifact_registration_not_allowed_yet`, `planned_artifact_only`,
+`no_training_executed`, `taxonomy_not_allowed`). Ninguna de las tres
+entidades guarda contenido binario, pesos, imagenes ni labels completos.
+
+**Config.** `DetectionTrainingArtifactPolicyConfig`
+(`ml/configs/detection_training_artifact_policy_config.py`) trae 22 campos:
+`artifact_root_dir` opcional, `require_artifact_root_dir=true`,
+`allow_artifacts_inside_repo=false`/`allow_artifacts_outside_repo=true`,
+`allow_external_uri=false` con `allowed_external_uri_schemes=[]`,
+`forbidden_extensions` (`.pt`/`.pth`/`.onnx`/`.h5`/`.ckpt`/`.pb`/`.tflite`
+por defecto), `allowed_metadata_extensions`
+(`.json`/`.yaml`/`.yml`/`.txt`/`.csv`/`.md`), `require_gitignore_rules=true`
+con `required_gitignore_patterns` (`*.pt`, `*.pth`, `*.onnx`, `*.h5`,
+`*.ckpt`, `runs/`, `training_outputs/`), `require_checksums_for_actual_artifacts=true`,
+`checksum_algorithm="sha256"`, `max_artifact_size_mb` opcional,
+`allow_actual_artifact_registration=false`, `register_planned_artifacts=true`,
+`register_actual_artifacts=false`, `allow_missing_planned_paths=true`,
+`strict_mode=false`, `notes` opcional. Nunca crea `artifact_root_dir` por
+defecto, nunca escribe artefactos, nunca calcula checksums de pesos
+inexistentes.
+
+**Evaluador.** `DetectionTrainingArtifactPolicyEvaluator`
+(`application/services/detection_training_artifact_policy_evaluator.py`)
+recibe `DetectionTrainingRun`, `DetectionTrainingEnvironmentSpec`,
+`AnnotationBundleRun`, sus archivos y la config — deliberadamente no recibe
+`DetectionTrainingReadinessReport` porque sus reglas solo dependen del
+estado/decision del `EnvironmentSpec`; la pertenencia del readiness report
+se valida en el caso de uso, no en el evaluador (evita duplicar una
+validacion ya aplicada en otra capa). Evalua: (A) si el `EnvironmentSpec`
+esta `blocked`/`failed` o su decision no es aceptable
+(`environment_ready`/`needs_manual_setup`), bloquea con
+`blocked_by_environment` antes de seguir; (B) los cuatro
+`expected_outputs` del run (`weights_path_planned`, `metrics_path_planned`,
+`predictions_path_planned`, `run_dir_planned`), generando un
+`DetectionTrainingArtifactRecord` planificado por cada uno si
+`register_planned_artifacts=true`; (C) si `artifact_root_dir` falta,
+esta dentro del repo, o no es absoluto; (D) si algun `expected_output`
+apunta dentro del repo con extension prohibida (bloquea) o fuera con URI
+externa no autorizada (warning); (E) si `.gitignore` existe y contiene los
+patrones de peso requeridos (solo lectura, nunca escribe); (F) reglas de
+checksum (solo aplicables a artefactos reales, que esta fase nunca crea);
+(G) si se pidiera registrar un artefacto real sin autorizacion
+(`actual_artifact_registration_not_allowed_yet`); (H) siempre agrega el
+issue `no_training_executed`, y `planned_artifact_only` si existe algun
+`planned_weights`. Nunca llama `subprocess`, nunca importa
+`torch`/`ultralytics`, nunca instala dependencias, nunca modifica
+`.gitignore`, nunca escribe archivos de artefactos ni crea pesos, nunca
+descarga nada. La prioridad de decision ante multiples bloqueos es
+`blocked_by_environment` > `blocked_by_missing_output_dir` >
+`blocked_by_repo_storage` > `blocked_by_forbidden_extension` >
+`blocked_by_policy_violation`; sin bloqueos pero con warnings, cae en
+`needs_external_storage`.
+
+**Caso de uso.** `CreateDetectionTrainingArtifactPolicyUseCase` busca
+`DetectionTrainingRun`, `DetectionTrainingReadinessReport` y
+`DetectionTrainingEnvironmentSpec` (404 si falta alguno), verifica que el
+readiness report pertenezca al run, que el environment spec pertenezca al
+run, y que el environment spec pertenezca al readiness report (si no,
+`DetectionTrainingArtifactPolicyNotAllowedError` -> 409), busca el
+`AnnotationBundleRun` asociado y sus archivos, ejecuta el evaluador y
+persiste `DetectionTrainingArtifactPolicy` + sus
+`DetectionTrainingArtifactRecord`s + `DetectionTrainingArtifactIssue`s en
+una unica transaccion via `UnitOfWorkPort`. Nunca modifica
+`DetectionTrainingRun`, `DetectionTrainingReadinessReport` ni
+`DetectionTrainingEnvironmentSpec`. Un fallo interno de evaluacion se
+convierte en una policy `status=failed` persistida (mismo patron que fases
+24-26), nunca en una excepcion sin persistir.
+
+**Persistencia.** Alembic `0020_detection_training_artifact_policies.py`
+crea `detection_training_artifact_policies`,
+`detection_training_artifact_records` y `detection_training_artifact_issues`,
+con FKs a `detection_training_runs`, `detection_training_readiness_reports`,
+`detection_training_environment_specs`, `annotation_bundle_runs` y
+`dataset_releases`; CHECKs de `decision`/`status`/`artifact_kind`/
+`artifact_state`/`location_type`/`severity`; indices de consulta con
+prefijos abreviados `ix_dta_policies_*`/`ix_dta_records_*`/`ix_dta_issues_*`
+(para mantenerse bajo el limite de 63 caracteres de PostgreSQL, verificado
+antes de aplicar la migracion); y JSONB para config y las siete
+politicas/resumenes. La columna de metadata del registro se llama
+`artifact_metadata` a nivel de modelo/columna (no `metadata`, reservado por
+SQLAlchemy en clases declarativas), mapeada explicitamente hacia/desde el
+campo `metadata` de la entidad.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/detection-training-artifact-policies` | Genera una politica de artefactos |
+| GET | `/api/v1/ml/detection-training-artifact-policies` | Lista politicas |
+| GET | `/api/v1/ml/detection-training-artifact-policies/{id}` | Detalle de la politica |
+| GET | `/api/v1/ml/detection-training-artifact-policies/{id}/records` | Artefactos registrados |
+| GET | `/api/v1/ml/detection-training-artifact-policies/{id}/issues` | Issues de la politica |
+| GET | `/api/v1/ml/detection-training-runs/{id}/artifact-policies` | Politicas por run |
+| GET | `/api/v1/ml/detection-training-readiness-reports/{id}/artifact-policies` | Politicas por readiness report |
+| GET | `/api/v1/ml/detection-training-environment-specs/{id}/artifact-policies` | Politicas por environment spec |
+| GET | `/api/v1/ml/annotation-bundles/{id}/detection-training-artifact-policies` | Politicas por bundle |
+| GET | `/api/v1/datasets/releases/{id}/detection-training-artifact-policies` | Politicas por release |
+
+Fase 27 no entrena YOLO ni ningun modelo, no instala `ultralytics`, no
+importa `torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no
+descarga pesos ni datasets externos, no copia ni modifica imagenes, no
+escribe artefactos ni crea pesos `.pt`/`.pth`/`.onnx`/`.h5`/`.ckpt`, no sube
+binarios al repositorio, no agrega frontend/autenticacion/taxonomia/
+diagnostico, no integra MLflow/TensorBoard/W&B y no reemplaza
+`MockInferenceEngine`. Una policy `artifact_policy_ready` no certifica que
+exista un artefacto real, un peso entrenado, ni que el entorno de
+entrenamiento este realmente provisionado — solo que los gates tecnicos de
+politica de artefactos configurados pasaron.

@@ -9,6 +9,20 @@ from blueberry_microid.domain.enums.baseline_model_type import BaselineModelType
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
 from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
+from blueberry_microid.domain.enums.detection_training_artifact_issue_severity import (
+    DetectionTrainingArtifactIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_kind import DetectionTrainingArtifactKind
+from blueberry_microid.domain.enums.detection_training_artifact_location_type import (
+    DetectionTrainingArtifactLocationType,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_policy_decision import (
+    DetectionTrainingArtifactPolicyDecision,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_policy_status import (
+    DetectionTrainingArtifactPolicyStatus,
+)
+from blueberry_microid.domain.enums.detection_training_artifact_state import DetectionTrainingArtifactState
 from blueberry_microid.domain.enums.detection_training_environment_decision import (
     DetectionTrainingEnvironmentDecision,
 )
@@ -47,6 +61,12 @@ __all__ = [
     "ComparisonPrimaryMetric",
     "ComparisonSelectionPolicy",
     "DetectionTrainingAlgorithm",
+    "DetectionTrainingArtifactIssueSeverity",
+    "DetectionTrainingArtifactKind",
+    "DetectionTrainingArtifactLocationType",
+    "DetectionTrainingArtifactPolicyDecision",
+    "DetectionTrainingArtifactPolicyStatus",
+    "DetectionTrainingArtifactState",
     "DetectionTrainingEnvironmentDecision",
     "DetectionTrainingEnvironmentIssueSeverity",
     "DetectionTrainingEnvironmentStatus",
