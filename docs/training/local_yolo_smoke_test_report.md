@@ -420,3 +420,85 @@ Final inspector command:
 ```text
 python scripts/inspect_local_yolo_training_run.py --local-training-run-id 9b4e75f4-7ef1-4438-ab4e-e3fa6fde3383
 ```
+
+## Fase 37 YOLO Label Export Fix and Runtime Asset Control
+
+- Date: 2026-07-04
+- Pending commit at execution time
+- Decision: `smoke_training_blocked` for the real training rerun because the permission/usage reviewer rejected the external training command before execution.
+- Code/data fix status: completed locally.
+
+Root cause:
+
+- The original bundle `dataset.yaml` was not directly trainable by Ultralytics because it did not define `train` or `val`; it only pointed `test` to `external_image_paths`.
+- The original YOLO label file existed but was empty.
+- Code root cause: `AnnotationBundleWriter._yolo_lines()` only read `manifest["labels"]`. The seed used `blueberry_manifest`, which stores `annotations`/`bbox` rather than a `labels` section, so YOLO `.txt` files were emitted empty.
+- A canonical YOLO `images/` and `labels/` training view was also missing.
+
+Fixes added:
+
+- `AnnotationBundleWriter` now derives YOLO label lines from `blueberry_manifest` image dimensions and reviewed bbox data when a YOLO `labels` section is absent.
+- `scripts/validate_yolo_training_dataset.py` validates trainable YOLO datasets without importing `ultralytics` or `torch`.
+- `scripts/build_yolo_training_view.py` builds an external Ultralytics-compatible `images/{split}` and `labels/{split}` view from a reviewed bundle.
+- `LocalYoloTrainingRunner` now passes `plots=false` and `pretrained=false` to reduce runtime asset downloads and avoid implicit pretrained weights.
+
+Original dataset validation:
+
+```json
+{
+  "is_trainable": false,
+  "issues": [
+    {"code": "train_missing"},
+    {"code": "val_missing"},
+    {"code": "split_path_missing"},
+    {"code": "train_labels_missing"},
+    {"code": "val_labels_missing"}
+  ]
+}
+```
+
+External YOLO view built:
+
+```text
+D:\BlueberryMicroID_training_artifacts\yolo_training_views\fase37_smoke\dataset.yaml
+```
+
+Validated view result:
+
+```json
+{
+  "is_trainable": true,
+  "image_count": 3,
+  "label_file_count": 3,
+  "non_empty_label_file_count": 3,
+  "annotation_count": 3
+}
+```
+
+Dry-run validation against persisted records:
+
+```json
+{
+  "summary": {
+    "metadata_persisted": false,
+    "training_would_run": true,
+    "ultralytics_imported": false,
+    "validation_only": true,
+    "training_kwargs": {
+      "plots": false,
+      "pretrained": false
+    }
+  }
+}
+```
+
+Real training rerun:
+
+```text
+blocked before execution by permission/usage reviewer:
+Automatic approval review failed: You've hit your usage limit.
+```
+
+No Fase 37 training weights were generated. No Fase 37 binaries were stored in
+the database. No external datasets, taxonomy, diagnosis, genus/species labels,
+or CI training steps were added.

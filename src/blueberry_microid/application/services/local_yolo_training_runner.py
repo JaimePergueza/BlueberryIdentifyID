@@ -223,6 +223,7 @@ class LocalYoloTrainingRunner:
             "name": run_name,
             "exist_ok": config.allow_existing_output_dir,
             "pretrained": False,
+            "plots": False,
         }
         for config_name, yolo_name in (
             ("epochs", "epochs"),

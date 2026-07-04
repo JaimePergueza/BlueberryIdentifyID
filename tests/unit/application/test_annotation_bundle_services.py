@@ -40,7 +40,9 @@ def _export_run(items=None, *, manifest=None, export_format=PetriAnnotationExpor
         manifest = {
             "format": "blueberry_manifest",
             "category": {"id": 1, "name": "candidate_region"},
-            "images": [{"image_id": items[0].petri_image_path, "petri_image_path": items[0].petri_image_path}],
+            "images": [
+                {"image_id": items[0].petri_image_path, "petri_image_path": items[0].petri_image_path, "width": 100, "height": 100}
+            ],
             "annotations": [
                 {
                     "annotation_id": str(items[0].id),
@@ -140,6 +142,25 @@ def test_writer_real_bundle_is_deterministic_and_has_checksums(tmp_path):
     manifest = json.loads((tmp_path / "bundle" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["copy_images"] is False
     assert "pytorch" not in json.dumps(manifest).lower()
+
+
+def test_writer_derives_non_empty_yolo_labels_from_blueberry_manifest(tmp_path):
+    items = [_item()]
+    export_run = _export_run(items)
+    config = AnnotationBundleConfig(output_dir=str(tmp_path / "bundle"), dry_run=False)
+    report = AnnotationBundleValidator().validate(export_run, items, config)
+
+    result = AnnotationBundleWriter().write(
+        bundle_run_id=uuid4(),
+        export_run=export_run,
+        items=items,
+        config=config,
+        validation_report=report,
+    )
+
+    yolo_file = next(file for file in result.files if file.relative_path.startswith("annotations/yolo/"))
+    label_text = (tmp_path / "bundle" / yolo_file.relative_path).read_text(encoding="utf-8").strip()
+    assert label_text == "0 0.200000 0.230000 0.200000 0.220000"
 
 
 def test_writer_rejects_copy_images_mode():

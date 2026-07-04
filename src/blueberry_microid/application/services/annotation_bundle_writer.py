@@ -176,7 +176,7 @@ class AnnotationBundleWriter:
         if role == AnnotationBundleFileRole.COCO_ANNOTATIONS:
             return json.dumps(self._coco_manifest(export_run, items), indent=2, sort_keys=True)
         if role == AnnotationBundleFileRole.YOLO_LABEL:
-            return "\n".join(self._yolo_lines(export_run, entry["image_path"])) + "\n"
+            return "\n".join(self._yolo_lines(export_run, items, entry["image_path"])) + "\n"
         if role == AnnotationBundleFileRole.DATASET_YAML:
             return self._dataset_yaml(items, config)
         return json.dumps(self._bundle_manifest(export_run, items, config, validation_report, files, dry_run=False), indent=2, sort_keys=True)
@@ -238,11 +238,34 @@ class AnnotationBundleWriter:
         }
 
     @staticmethod
-    def _yolo_lines(export_run: PetriAnnotationExportRun, image_path: str) -> list[str]:
+    def _yolo_lines(export_run: PetriAnnotationExportRun, items: list[PetriAnnotationExportItem], image_path: str) -> list[str]:
         manifest = export_run.output_manifest or {}
         for label in manifest.get("labels", []):
             if label.get("image_path") == image_path:
                 return sorted(label.get("lines", []))
+        lines: list[str] = []
+        for item in items:
+            if item.petri_image_path != image_path:
+                continue
+            image_payload = next(
+                (
+                    image
+                    for image in manifest.get("images", [])
+                    if image.get("petri_image_path") == image_path or image.get("image_id") == image_path
+                ),
+                {},
+            )
+            width = image_payload.get("width")
+            height = image_payload.get("height")
+            if not width or not height:
+                continue
+            x_center = (item.bbox_x + item.bbox_width / 2) / width
+            y_center = (item.bbox_y + item.bbox_height / 2) / height
+            bbox_width = item.bbox_width / width
+            bbox_height = item.bbox_height / height
+            lines.append(f"0 {x_center:.6f} {y_center:.6f} {bbox_width:.6f} {bbox_height:.6f}")
+        if lines:
+            return sorted(lines)
         return []
 
     @staticmethod
