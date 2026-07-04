@@ -26,8 +26,10 @@ from tests.unit.application.test_local_yolo_training_runner import (
 from blueberry_microid.application.services.local_yolo_training_runner import LocalYoloTrainingRunner
 
 
-def test_use_case_runs_local_training_and_persists_metadata_records(tmp_path):
+def test_use_case_runs_local_training_and_persists_metadata_records(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, dataset_yaml, execution_run, policy, _ = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     execution_repo = InMemoryDetectionTrainingExecutionRunRepository()
     policy_repo = InMemoryDetectionTrainingArtifactPolicyRepository()
     bundle_file_repo = InMemoryAnnotationBundleFileRepository()

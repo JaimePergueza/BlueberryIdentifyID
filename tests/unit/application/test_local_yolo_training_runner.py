@@ -148,8 +148,10 @@ def _setup(tmp_path):
     return repo_root, artifact_root, base_model, dataset_yaml, execution_run, policy, [_bundle_file(bundle_id, dataset_yaml)]
 
 
-def test_runs_local_yolo_and_returns_metadata_only_records(tmp_path):
+def test_runs_local_yolo_and_returns_metadata_only_records(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     _FakeYolo.calls = []
 
     result = LocalYoloTrainingRunner(repo_root=repo_root, yolo_class_factory=lambda: _FakeYolo).run(
@@ -189,8 +191,10 @@ def test_blocks_in_ci_before_importing_ultralytics(tmp_path, monkeypatch):
         )
 
 
-def test_requires_exact_manual_confirmation_before_importing_ultralytics(tmp_path):
+def test_requires_exact_manual_confirmation_before_importing_ultralytics(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
 
     with pytest.raises(LocalYoloTrainingRunnerError, match="manual confirmation"):
         LocalYoloTrainingRunner(
@@ -204,8 +208,10 @@ def test_requires_exact_manual_confirmation_before_importing_ultralytics(tmp_pat
         )
 
 
-def test_blocks_when_execution_run_is_not_ready(tmp_path):
+def test_blocks_when_execution_run_is_not_ready(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     execution_run.status = DetectionTrainingExecutionStatus.MANUAL_REQUIRED
 
     with pytest.raises(LocalYoloTrainingRunnerError, match="ready_to_execute"):
@@ -217,8 +223,10 @@ def test_blocks_when_execution_run_is_not_ready(tmp_path):
         )
 
 
-def test_blocks_when_policy_does_not_allow_actual_registration(tmp_path):
+def test_blocks_when_policy_does_not_allow_actual_registration(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     policy.config["register_actual_artifacts"] = False
 
     with pytest.raises(LocalYoloTrainingRunnerError, match="does not allow actual"):
@@ -230,8 +238,10 @@ def test_blocks_when_policy_does_not_allow_actual_registration(tmp_path):
         )
 
 
-def test_blocks_artifact_root_inside_repository(tmp_path):
+def test_blocks_artifact_root_inside_repository(tmp_path, monkeypatch):
     repo_root, _, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     inside_root = repo_root / "runs"
     policy.artifact_root_dir = str(inside_root)
 
@@ -244,8 +254,10 @@ def test_blocks_artifact_root_inside_repository(tmp_path):
         )
 
 
-def test_blocks_base_model_inside_repository(tmp_path):
+def test_blocks_base_model_inside_repository(tmp_path, monkeypatch):
     repo_root, artifact_root, _, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     base_model = repo_root / "best.pt"
     base_model.write_bytes(b"bad")
 
@@ -258,8 +270,10 @@ def test_blocks_base_model_inside_repository(tmp_path):
         )
 
 
-def test_requires_dataset_yaml_from_bundle(tmp_path):
+def test_requires_dataset_yaml_from_bundle(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, _, execution_run, policy, _ = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
 
     with pytest.raises(LocalYoloTrainingRunnerError, match="no dataset_yaml"):
         LocalYoloTrainingRunner(repo_root=repo_root, yolo_class_factory=lambda: _FakeYolo).run(
