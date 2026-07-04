@@ -16,6 +16,7 @@ class LocalYoloTrainingRunnerConfig:
     manual_confirmation_text: str
     artifact_root_dir: str
     base_model_path: str
+    dataset_yaml_path: Optional[str] = None
     run_name: Optional[str] = None
     epochs: Optional[int] = None
     image_size: Optional[int] = None
@@ -26,7 +27,7 @@ class LocalYoloTrainingRunnerConfig:
     patience: Optional[int] = None
     allow_existing_output_dir: bool = False
     require_policy_allows_actual_registration: bool = True
-    required_confirmation_text: str = "I understand this will run local YOLO training outside CI"
+    required_confirmation_text: str = "I confirm local YOLO training outside CI"
 
     def __post_init__(self) -> None:
         if not self.manual_confirmation_text:
@@ -47,6 +48,7 @@ class LocalYoloTrainingRunnerConfig:
             "manual_confirmation_text_present": bool(self.manual_confirmation_text),
             "artifact_root_dir": self.artifact_root_dir,
             "base_model_path": self.base_model_path,
+            "dataset_yaml_path": self.dataset_yaml_path,
             "run_name": self.run_name,
             "epochs": self.epochs,
             "image_size": self.image_size,

@@ -35,9 +35,12 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     parser.add_argument("--execution-run-id", required=True)
+    parser.add_argument("--dataset-yaml")
     parser.add_argument("--artifact-root-dir", required=True)
     parser.add_argument("--base-model-path", required=True)
-    parser.add_argument("--manual-confirmation-text", required=True)
+    confirmation_group = parser.add_mutually_exclusive_group(required=True)
+    confirmation_group.add_argument("--manual-confirmation-text")
+    confirmation_group.add_argument("--confirmation-text")
     parser.add_argument("--run-name")
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--image-size", type=int)
@@ -54,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Validate persisted gates and local paths without importing ultralytics, training, or registering artifacts.",
     )
     args = parser.parse_args(argv)
+    manual_confirmation_text = args.manual_confirmation_text or args.confirmation_text
 
     settings = Settings()
     engine = create_db_engine(settings.database_url)
@@ -67,9 +71,10 @@ def main(argv: list[str] | None = None) -> int:
             unit_of_work=SqlAlchemyUnitOfWork(session_factory),
         )
         config = LocalYoloTrainingRunnerConfig(
-            manual_confirmation_text=args.manual_confirmation_text,
+            manual_confirmation_text=manual_confirmation_text,
             artifact_root_dir=args.artifact_root_dir,
             base_model_path=args.base_model_path,
+            dataset_yaml_path=args.dataset_yaml,
             run_name=args.run_name,
             epochs=args.epochs,
             image_size=args.image_size,

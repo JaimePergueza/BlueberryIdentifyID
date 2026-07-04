@@ -28,7 +28,7 @@ from blueberry_microid.domain.enums.detection_training_execution_status import D
 from blueberry_microid.ml.configs.local_yolo_training_runner_config import LocalYoloTrainingRunnerConfig
 from blueberry_microid.ml.configs.training_safety_defaults import default_required_gitignore_patterns
 
-_CONFIRMATION = "I understand this will run local YOLO training outside CI"
+_CONFIRMATION = "I confirm local YOLO training outside CI"
 _SOURCE = Path("src/blueberry_microid/application/services/local_yolo_training_runner.py")
 
 
@@ -196,6 +196,28 @@ def test_validate_only_checks_gates_without_importing_or_training(tmp_path, monk
     assert result.summary["ultralytics_imported"] is False
     assert result.summary["metadata_persisted"] is False
     assert result.summary["training_kwargs"]["data"].endswith("dataset.yaml")
+
+
+def test_dataset_yaml_config_override_is_used_for_training_kwargs(tmp_path, monkeypatch):
+    repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    override_yaml = tmp_path / "external-view" / "dataset.yaml"
+    override_yaml.parent.mkdir()
+    override_yaml.write_text("path: .\ntrain: train.txt\nval: val.txt\nnames: [candidate_region]\n", encoding="utf-8")
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+
+    result = LocalYoloTrainingRunner(
+        repo_root=repo_root,
+        yolo_class_factory=lambda: pytest.fail("validate_only must not import ultralytics"),
+    ).validate_only(
+        execution_run=execution_run,
+        artifact_policy=policy,
+        bundle_files=bundle_files,
+        config=_config(artifact_root, base_model, dataset_yaml_path=str(override_yaml)),
+    )
+
+    assert result.dataset_yaml_path == str(override_yaml.resolve())
+    assert result.summary["training_kwargs"]["data"] == str(override_yaml.resolve())
 
 
 def test_blocks_in_ci_before_importing_ultralytics(tmp_path, monkeypatch):

@@ -141,7 +141,11 @@ class LocalYoloTrainingRunner:
         self._validate_prerequisites(execution_run, artifact_policy, config)
         artifact_root = Path(config.artifact_root_dir).resolve()
         base_model_path = Path(config.base_model_path).resolve()
-        dataset_yaml_path = self._find_dataset_yaml(bundle_files).resolve()
+        dataset_yaml_path = (
+            Path(config.dataset_yaml_path).resolve()
+            if config.dataset_yaml_path
+            else self._find_dataset_yaml(bundle_files).resolve()
+        )
         self._validate_paths(artifact_root, base_model_path, dataset_yaml_path, artifact_policy)
 
         candidate_paths = [str(artifact_root), str(base_model_path)]
@@ -218,6 +222,7 @@ class LocalYoloTrainingRunner:
             "project": str(artifact_root),
             "name": run_name,
             "exist_ok": config.allow_existing_output_dir,
+            "pretrained": False,
         }
         for config_name, yolo_name in (
             ("epochs", "epochs"),

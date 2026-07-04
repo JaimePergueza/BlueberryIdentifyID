@@ -22,7 +22,7 @@ from blueberry_microid.interfaces.api.app import create_app
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXECUTION_CONFIRMATION = "I understand this will only create a scaffold and will not train a model"
-RUNNER_CONFIRMATION = "I understand this will run local YOLO training outside CI"
+RUNNER_CONFIRMATION = "I confirm local YOLO training outside CI"
 
 SUMMARY_KEYS = (
     "sample_id",
