@@ -111,8 +111,8 @@ def validate_docs(repo_root: Path) -> list[str]:
         errors.append("prohibited_actions.md must prohibit weights in Git")
 
     readme = contents.get("README.md", "").lower()
-    if "no real yolo training" not in readme and "no real training" not in readme:
-        errors.append("docs/training/README.md must say there is no real training")
+    if "local/manual" not in readme or "ci still does not train" not in readme:
+        errors.append("docs/training/README.md must say training is local/manual only and not in CI")
 
     return errors
 

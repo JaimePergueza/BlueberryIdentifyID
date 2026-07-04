@@ -1,6 +1,6 @@
 # Training Operations Documentation
 
-This folder was created in Fase 30 as preventive operational documentation for a future manual object-detection training attempt. It does not enable real training.
+This folder was created in Fase 30 as preventive operational documentation for a future manual object-detection training attempt. Fase 31 adds an experimental local/manual runner, but this folder remains the operator guidance for keeping that runner outside CI and outside the repository.
 
 ## Reading Order
 
@@ -12,6 +12,6 @@ This folder was created in Fase 30 as preventive operational documentation for a
 
 ## Current Boundary
 
-There is no real YOLO training in this phase. The project does not install `ultralytics`, does not import `torch`, does not use PyTorch/TensorFlow, does not download weights, does not generate weights, and does not train in CI.
+Fase 31 may run real YOLO training only through the local/manual runner, after all gates pass and after the exact manual confirmation is provided. CI still does not train, does not require `ultralytics`, does not require `torch`, does not require GPU, does not download weights, and does not generate weights.
 
-Any future training must happen outside CI, under a later approved phase, with artifacts stored under an external `artifact_root_dir`. Weights and generated training outputs must not enter the Git repository or PostgreSQL.
+Any local training must happen outside CI, with artifacts stored under an external `artifact_root_dir`. Weights and generated training outputs must not enter the Git repository or PostgreSQL; only metadata such as path, size, checksum, kind, state, and related execution run may be registered.

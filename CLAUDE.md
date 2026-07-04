@@ -805,3 +805,27 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   guardar binarios en DB, subir artefactos binarios al repo, frontend,
   autenticacion, taxonomia, diagnostico, herramientas externas de tracking y
   reemplazar `MockInferenceEngine`.
+
+## 31. Local Experimental YOLO Training Runner (Fase 31)
+
+- Fase 31 permite entrenamiento YOLO real solo por runner local/manual,
+  nunca en CI, nunca automatico y nunca desde FastAPI/Celery.
+- `pyproject.toml` agrega el extra opcional `training` con
+  `ultralytics>=8.3,<9.0`; CI no debe instalar ese extra ni requerir GPU.
+- `LocalYoloTrainingRunner` es el unico modulo que puede importar
+  `ultralytics`, y lo hace lazy dentro de `run()` despues de validar no CI,
+  confirmacion manual exacta, execution run `ready_to_execute`, artifact
+  policy ready, permiso de registro actual, dataset YAML, artifact root
+  externo, base model local externo y `RepositorySafetyValidator`.
+- El runner no llama `subprocess`; usa la API Python de `ultralytics`.
+- `RunLocalYoloTrainingUseCase` registra solo metadata en
+  `DetectionTrainingArtifactRecord`: path, relative path, extension, size,
+  `checksum_sha256`, kind, state y `training_execution_run_id`; no guarda
+  bytes de pesos, imagenes, labels completos ni binarios en DB.
+- `scripts/run_local_yolo_training.py` es CLI local/manual; requiere
+  `--manual-confirmation-text`, `--artifact-root-dir` y `--base-model-path`.
+- Sigue prohibido entrenamiento en CI, entrenamiento automatico, datasets
+  externos, descargas de pesos sin policy, outputs dentro del repo, pesos en
+  Git, binarios en DB, modificar imagenes originales, taxonomia, diagnostico,
+  frontend, autenticacion, MLflow/TensorBoard/W&B y reemplazar
+  `MockInferenceEngine`.

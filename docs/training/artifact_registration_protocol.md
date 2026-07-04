@@ -69,3 +69,9 @@ Do not copy artifacts into `docs/`, `src/`, `tests/`, `.github/`, `storage/`, or
 Before and after future manual training, confirm Git cannot stage weights or generated training outputs. `.gitignore` must cover `.pt`, `.pth`, `.onnx`, `.h5`, `.ckpt`, run directories, and local training scratch paths.
 
 If Git reports generated weights, stop and follow the rollback protocol.
+
+## Fase 31 Local Runner Registration
+
+The Fase 31 local runner may register actual artifacts only as metadata-only `DetectionTrainingArtifactRecord` rows. It records local paths under the approved external `artifact_root_dir`, `relative_path`, file extension, size, `checksum_sha256`, artifact kind, artifact state, and the related `DetectionTrainingExecutionRun`.
+
+The runner must not copy artifact bytes into the repository and must not store artifact bytes in the database.

@@ -120,3 +120,10 @@ def test_training_docs_validator_does_not_modify_files(tmp_path):
         if path.is_file()
     }
     assert after == before
+
+
+def test_training_docs_readme_keeps_fase31_local_manual_boundary():
+    readme = (_REPO_ROOT / "docs" / "training" / "README.md").read_text(encoding="utf-8").lower()
+
+    assert "local/manual" in readme
+    assert "ci still does not train" in readme

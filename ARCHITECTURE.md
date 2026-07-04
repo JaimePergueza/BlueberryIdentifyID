@@ -2179,3 +2179,33 @@ no crea pesos `.pt`/`.onnx`/`.h5`/`.pth`/`.ckpt`, no copia ni modifica
 imagenes, no guarda binarios en DB, no sube artefactos binarios al repo, no
 agrega frontend/autenticacion/taxonomia/diagnostico, no integra MLflow,
 TensorBoard o Weights & Biases y no reemplaza `MockInferenceEngine`.
+
+## Fase 31 - Local Experimental YOLO Training Runner
+
+Fase 31 introduce un runner experimental real, pero solo local/manual. No se
+expone por FastAPI, no se invoca desde Celery, no se agrega al workflow de
+GitHub Actions y no permite ejecucion automatica. La dependencia
+`ultralytics` vive en el extra opcional `training`; CI no instala ese extra y
+no requiere `torch` ni GPU.
+
+`LocalYoloTrainingRunner` (`application/services/`) valida primero: no CI,
+confirmacion manual exacta, `DetectionTrainingExecutionRun`
+`ready_to_execute`, `DetectionTrainingArtifactPolicy` ready con
+`allow_actual_artifact_registration` y `register_actual_artifacts`, dataset
+YAML del `AnnotationBundleRun`, `artifact_root_dir` absoluto fuera del repo,
+`base_model_path` local fuera del repo, y `RepositorySafetyValidator` safe.
+Solo despues importa `ultralytics` de forma lazy y llama `YOLO(...).train`.
+Nunca llama `subprocess`.
+
+`RunLocalYoloTrainingUseCase` registra los outputs como
+`DetectionTrainingArtifactRecord` metadata-only: path, relative path,
+extension, size, `checksum_sha256`, kind, state y
+`training_execution_run_id` en metadata. No guarda pesos, imagenes, labels
+completos ni binarios en DB. `scripts/run_local_yolo_training.py` es la ruta
+CLI local/manual; exige `--manual-confirmation-text`,
+`--artifact-root-dir` y `--base-model-path`.
+
+Fase 31 sigue prohibiendo entrenamiento en CI, ejecucion automatica,
+datasets externos, pesos dentro del repo, binarios en DB, modificacion de
+imagenes originales, taxonomia, diagnostico microbiologico, frontend,
+autenticacion, MLflow/TensorBoard/W&B y reemplazo de `MockInferenceEngine`.

@@ -10,10 +10,14 @@ from blueberry_microid.application.use_cases.detection_training_execution.list_d
 from blueberry_microid.application.use_cases.detection_training_execution.list_detection_training_execution_runs import (
     ListDetectionTrainingExecutionRunsUseCase,
 )
+from blueberry_microid.application.use_cases.detection_training_execution.run_local_yolo_training import (
+    RunLocalYoloTrainingUseCase,
+)
 
 __all__ = [
     "CreateDetectionTrainingExecutionRunUseCase",
     "GetDetectionTrainingExecutionRunUseCase",
     "ListDetectionTrainingExecutionIssuesUseCase",
     "ListDetectionTrainingExecutionRunsUseCase",
+    "RunLocalYoloTrainingUseCase",
 ]

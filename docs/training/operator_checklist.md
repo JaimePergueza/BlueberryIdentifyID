@@ -24,6 +24,9 @@ Use this checklist before any future manual object-detection training attempt. E
 - [ ] Confirm no weights will be pushed to Git.
 - [ ] Confirm rollback protocol.
 - [ ] Confirm evidence registration.
+- [ ] Confirm optional `training` dependencies were installed locally, not in CI.
+- [ ] Confirm `base_model_path` is a local approved file outside the repository.
+- [ ] Confirm exact Fase 31 manual confirmation text is available.
 
 ## Criteria To Not Continue
 
@@ -34,6 +37,8 @@ Do not continue if CI is detected, if the working tree is dirty, if `.gitignore`
 Do not continue if the only available instruction is an unreviewed `command_preview`. A `command_preview` is not an executable procedure in Fase 30.
 
 Do not continue if the plan requires taxonomy, microbiological diagnosis, original-image modification, external datasets, downloaded weights, repository-stored weights, or database-stored binaries.
+
+Do not continue with the Fase 31 local runner if `ultralytics` is unavailable locally, if `base_model_path` is missing, if the artifact policy does not allow actual artifact registration, or if the execution run is not `ready_to_execute`.
 
 ## Evidence To Record
 

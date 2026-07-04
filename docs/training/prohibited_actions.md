@@ -16,6 +16,8 @@ The following actions are prohibited for Fase 30 and remain prohibited for any f
 - Do not implement CNN, ViT, or deep learning real code.
 - Do not require GPU for this repository phase.
 
+Fase 31 exception: `ultralytics` may be installed as an optional local dependency only by a human operator outside CI via the `training` extra. This exception does not permit CI training, automatic execution, `torch` imports outside the dependency stack, or weight downloads without policy approval.
+
 ## Artifacts
 
 - Do not upload weights to Git.

@@ -2068,3 +2068,30 @@ require GPU, create weights, copy or modify images, store binaries in DB,
 upload binary artifacts to the repo, add frontend/authentication/taxonomy/
 diagnosis, integrate external experiment tools, or replace
 `MockInferenceEngine`.
+
+## 41. Local experimental YOLO training runner (Fase 31)
+
+Fase 31 adds the first real training runner, but only for local/manual use.
+It is not wired into FastAPI, Celery, Redis, or GitHub Actions.
+
+- `pyproject.toml` defines the optional `training` extra with
+  `ultralytics>=8.3,<9.0`. CI does not install this extra.
+- `LocalYoloTrainingRunner` validates no CI, exact manual confirmation,
+  `ready_to_execute` execution run, ready artifact policy, actual artifact
+  registration permission, external artifact root, local base model path,
+  dataset YAML from the approved bundle, and repository safety before it
+  lazily imports `ultralytics`.
+- `RunLocalYoloTrainingUseCase` persists only metadata-only
+  `DetectionTrainingArtifactRecord` rows for actual artifacts.
+- `scripts/run_local_yolo_training.py` is the local operator entry point.
+
+The runner may create real YOLO outputs only under the approved external
+`artifact_root_dir`. It records path, relative path, extension, size,
+`checksum_sha256`, artifact kind/state, and execution-run metadata. It does
+not store binary content in PostgreSQL and does not copy outputs into the
+repository.
+
+Fase 31 still forbids CI training, automatic training, external datasets,
+unapproved weight downloads, repository-stored weights, DB-stored binaries,
+original image modification, taxonomy, diagnosis claims, frontend,
+authentication, external tracking tools, and replacing `MockInferenceEngine`.

@@ -107,4 +107,12 @@ The full prohibited action list is in `docs/training/prohibited_actions.md`. The
 
 At closure, the operator must record whether the future manual attempt was not started, stopped before training, failed, or completed in a later authorized phase. The repository must remain clean, CI must remain green for code changes, and any artifact metadata must point outside the repository.
 
-This runbook is complete for Fase 30 when it can guide a human review without executing any training.
+This runbook was preventive-only in Fase 30. In Fase 31, the only permitted execution path is the local/manual runner (`scripts/run_local_yolo_training.py`) after every gate is approved and the exact confirmation text is supplied. CI and FastAPI must not invoke the runner.
+
+## 17. Fase 31 Local Runner Boundary
+
+The local runner may import `ultralytics` only after CI, manual confirmation, repository safety, artifact policy, execution run, dataset YAML, and external artifact-root checks pass. It must use a local `base_model_path`; it must not download weights automatically.
+
+The optional dependency is installed only by a human operator with the `training` extra, for example `pip install -e .[training]`, outside CI. The command remains an operator action, not part of GitHub Actions.
+
+The runner registers only artifact metadata in the database: path, relative path, size, `checksum_sha256`, artifact kind, artifact state, timestamp, and associated training execution. It must never store model bytes, images, or generated labels in PostgreSQL.

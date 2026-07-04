@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 30)
+## MVP status (as of Fase 31)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -76,10 +76,14 @@ separately-approved phase. Fase 30 adds versioned operator documentation
 under `docs/training/`: a manual training runbook, operator checklist,
 artifact registration protocol, rollback protocol, prohibited-actions list,
 and a folder README, plus `scripts/check_training_docs.py` to validate the
-documents. These are preventive runbooks only: they do not train YOLO, do
-not execute `command_preview`, do not install `ultralytics`, do not import
-`torch`, do not use PyTorch/TensorFlow/deep learning, do not download or
-generate weights, do not add datasets, and do not add taxonomy. The CI workflow runs
+documents. Fase 31 adds an experimental local/manual YOLO runner behind
+strict gates: it is not exposed through FastAPI, does not run in CI, requires
+the `training` optional dependency, requires exact manual confirmation,
+requires a `ready_to_execute` execution run, requires a ready artifact policy
+with actual registration enabled, uses an external `artifact_root_dir`, and
+registers only metadata for generated artifacts. CI still does not install
+`ultralytics`, import `torch`, require GPU, train YOLO, download weights,
+generate weights, add datasets, or add taxonomy. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on

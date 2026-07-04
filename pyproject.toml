@@ -29,6 +29,9 @@ dev = [
     "pytest>=9.0,<10.0",
     "httpx>=0.28,<1.0",
 ]
+training = [
+    "ultralytics>=8.3,<9.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
