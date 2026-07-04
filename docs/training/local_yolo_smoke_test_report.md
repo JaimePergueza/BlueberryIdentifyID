@@ -93,3 +93,63 @@ no binaries were written to the database.
 - Provide an external local `base_model_path` or an approved local model YAML path that does not download weights.
 - Run `--dry-run-validation-only` against the generated `execution_run_id`.
 - Only then consider a one-epoch local YOLO smoke run outside CI.
+
+## Fase 34 Local PostgreSQL Bootstrap Attempt
+
+- Date: 2026-07-04
+- Commit at start: `307ea8d934d272019674f8e2de8182997859ce08`
+- Operating system: Microsoft Windows NT 10.0.26200.0
+- Existing local compose config: `docker-compose.yml`
+- Docker availability: unavailable (`docker` command not found)
+- Docker Compose availability: unavailable (`docker` command not found)
+- Local `psql` availability: unavailable
+- `localhost:5432`: not reachable
+- `DATABASE_URL`: `postgresql+psycopg://blueberry:***@localhost:5432/blueberry_microid`
+- External storage root prepared: `D:\BlueberryMicroID_local_storage`
+- External artifact root prepared: `D:\BlueberryMicroID_training_artifacts`
+
+Repository safety:
+
+```json
+{
+  "gitignore_exists": true,
+  "is_safe": true,
+  "missing_gitignore_patterns": [],
+  "path_violations": [],
+  "recommendations": []
+}
+```
+
+Training docs validation:
+
+```text
+training docs validation passed
+```
+
+Alembic status:
+
+```text
+alembic current timed out after 30 seconds because PostgreSQL was not reachable at localhost:5432
+```
+
+Seed dry-run:
+
+```text
+passed; emitted expected JSON keys with would_persist=false and would_train=false
+```
+
+Persisted seed attempt:
+
+```text
+seed_local_training_fixture failed: PostgreSQL is not reachable at localhost:5432; start the local database before seeding
+```
+
+Fase 34 closes as Cierre C in this workstation environment. The project
+already has a local PostgreSQL service definition in `docker-compose.yml`, but
+Docker/PostgreSQL are not available to start it here. No persisted seed IDs
+were generated, no `dataset.yaml` was created, and `dry_run_validation_only`
+against real persisted records was not run.
+
+No YOLO training was executed. No weights were created, no binaries were
+stored in the database, no datasets were downloaded, no taxonomy was added,
+and CI remains a non-training workflow.
