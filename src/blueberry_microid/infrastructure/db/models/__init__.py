@@ -28,6 +28,12 @@ from blueberry_microid.infrastructure.db.models.detection_training_environment_i
 from blueberry_microid.infrastructure.db.models.detection_training_environment_spec import (
     DetectionTrainingEnvironmentSpecModel,
 )
+from blueberry_microid.infrastructure.db.models.detection_training_execution_issue import (
+    DetectionTrainingExecutionIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_execution_run import (
+    DetectionTrainingExecutionRunModel,
+)
 from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
 from blueberry_microid.infrastructure.db.models.detection_training_readiness_issue import (
     DetectionTrainingReadinessIssueModel,
@@ -74,6 +80,8 @@ __all__ = [
     "DetectionTrainingArtifactRecordModel",
     "DetectionTrainingEnvironmentIssueModel",
     "DetectionTrainingEnvironmentSpecModel",
+    "DetectionTrainingExecutionIssueModel",
+    "DetectionTrainingExecutionRunModel",
     "DetectionTrainingIssueModel",
     "DetectionTrainingReadinessIssueModel",
     "DetectionTrainingReadinessReportModel",

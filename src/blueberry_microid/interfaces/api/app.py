@@ -23,6 +23,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     detection_training,
     detection_training_artifacts,
     detection_training_environment,
+    detection_training_execution,
     detection_training_readiness,
     human_reviews,
     image_audits,
@@ -106,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(detection_training_readiness.router, prefix=API_V1_PREFIX)
     app.include_router(detection_training_environment.router, prefix=API_V1_PREFIX)
     app.include_router(detection_training_artifacts.router, prefix=API_V1_PREFIX)
+    app.include_router(detection_training_execution.router, prefix=API_V1_PREFIX)
     app.include_router(tasks.router, prefix=API_V1_PREFIX)
 
     register_exception_handlers(app)

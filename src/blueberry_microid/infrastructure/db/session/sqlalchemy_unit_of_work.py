@@ -46,6 +46,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_train
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_spec_repository import (
     SqlAlchemyDetectionTrainingEnvironmentSpecRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_execution_issue_repository import (
+    SqlAlchemyDetectionTrainingExecutionIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_execution_run_repository import (
+    SqlAlchemyDetectionTrainingExecutionRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_issue_repository import (
     SqlAlchemyDetectionTrainingIssueRepository,
 )
@@ -174,6 +180,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.detection_training_artifact_issue_repository = SqlAlchemyDetectionTrainingArtifactIssueRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_execution_run_repository = SqlAlchemyDetectionTrainingExecutionRunRepository(
+            self.session, auto_commit=False
+        )
+        self.detection_training_execution_issue_repository = SqlAlchemyDetectionTrainingExecutionIssueRepository(
             self.session, auto_commit=False
         )
         self.human_review_repository = SqlAlchemyHumanReviewRepository(self.session, auto_commit=False)

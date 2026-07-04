@@ -31,6 +31,8 @@ from blueberry_microid.infrastructure.db.models import (
     DetectionTrainingArtifactRecordModel,
     DetectionTrainingEnvironmentIssueModel,
     DetectionTrainingEnvironmentSpecModel,
+    DetectionTrainingExecutionIssueModel,
+    DetectionTrainingExecutionRunModel,
     DetectionTrainingIssueModel,
     DetectionTrainingReadinessIssueModel,
     DetectionTrainingReadinessReportModel,
@@ -100,6 +102,8 @@ _SQLITE_TABLES = [
     DetectionTrainingArtifactPolicyModel.__table__,
     DetectionTrainingArtifactRecordModel.__table__,
     DetectionTrainingArtifactIssueModel.__table__,
+    DetectionTrainingExecutionRunModel.__table__,
+    DetectionTrainingExecutionIssueModel.__table__,
 ]
 
 

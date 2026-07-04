@@ -28,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 # CASCADE the order is not strictly required, but keeping it explicit
 # documents the dependency graph.
 _ALL_TABLES = (
+    "detection_training_execution_issues",
+    "detection_training_execution_runs",
     "detection_training_artifact_issues",
     "detection_training_artifact_records",
     "detection_training_artifact_policies",

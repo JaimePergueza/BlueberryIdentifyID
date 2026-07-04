@@ -108,6 +108,10 @@ class DetectionTrainingArtifactPolicyNotFoundError(NotFoundError):
     """Raised when a requested DetectionTrainingArtifactPolicy does not exist."""
 
 
+class DetectionTrainingExecutionRunNotFoundError(NotFoundError):
+    """Raised when a requested DetectionTrainingExecutionRun does not exist."""
+
+
 class ConflictError(ApplicationError):
     """Base class for "the operation conflicts with existing state" failures."""
 
@@ -217,6 +221,15 @@ class DetectionTrainingArtifactPolicyNotAllowedError(ConflictError):
     DetectionTrainingEnvironmentSpec does not belong to the referenced
     DetectionTrainingRun, or the EnvironmentSpec does not belong to the
     referenced ReadinessReport."""
+
+
+class DetectionTrainingExecutionRunNotAllowedError(ConflictError):
+    """Raised when a DetectionTrainingExecutionRun cannot be created safely:
+    the referenced DetectionTrainingReadinessReport, DetectionTrainingEnvironmentSpec,
+    or DetectionTrainingArtifactPolicy does not belong to the referenced
+    DetectionTrainingRun, or one of them does not belong to another (e.g.
+    the EnvironmentSpec does not belong to the ReadinessReport, or the
+    ArtifactPolicy does not belong to the EnvironmentSpec)."""
 
 
 class AnalysisRunNotReviewableError(ConflictError):

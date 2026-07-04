@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 28)
+## MVP status (as of Fase 29)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -64,7 +64,15 @@ and training-output directories, `RepositorySafetyValidator` gives a
 standalone, read-only way to confirm the repository can never accidentally
 receive weights or heavy artifacts (independent of any persisted
 `DetectionTrainingRun`), and `scripts/check_repository_safety.py` is a
-zero-dependency CLI gate for that same check. The CI workflow runs
+zero-dependency CLI gate for that same check. Fase 29 adds a persisted
+`DetectionTrainingExecutionRun`/`DetectionTrainingExecutionIssue` execution
+gate: `DetectionTrainingExecutionGateEvaluator` checks every upstream
+prerequisite (readiness, environment, artifact policy, repository safety,
+CI detection, manual confirmation text) and `ManualYoloTrainingRunnerScaffold`
+turns the result into a human-readable manual execution plan — a
+`ready_to_execute` status still never trains anything or executes a
+command; it only means a human could manually trigger training in a future,
+separately-approved phase. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
@@ -436,6 +444,19 @@ Detection training artifact policy endpoints (Fase 27 - artifact policy/registry
 - `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}/artifact-policies`
 - `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-artifact-policies`
 - `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-artifact-policies`
+
+Detection training execution gate endpoints (Fase 29 - manual runner scaffold only, never trains a model):
+
+- `POST /api/v1/ml/detection-training-execution-runs`
+- `GET /api/v1/ml/detection-training-execution-runs`
+- `GET /api/v1/ml/detection-training-execution-runs/{execution_run_id}`
+- `GET /api/v1/ml/detection-training-execution-runs/{execution_run_id}/issues`
+- `GET /api/v1/ml/detection-training-runs/{detection_training_run_id}/execution-runs`
+- `GET /api/v1/ml/detection-training-readiness-reports/{readiness_report_id}/execution-runs`
+- `GET /api/v1/ml/detection-training-environment-specs/{environment_spec_id}/execution-runs`
+- `GET /api/v1/ml/detection-training-artifact-policies/{artifact_policy_id}/execution-runs`
+- `GET /api/v1/ml/annotation-bundles/{annotation_bundle_run_id}/detection-training-execution-runs`
+- `GET /api/v1/datasets/releases/{dataset_release_id}/detection-training-execution-runs`
 
 Async processing endpoints:
 

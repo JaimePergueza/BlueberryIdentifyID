@@ -43,6 +43,12 @@ from blueberry_microid.application.ports.detection_training_environment_issue_re
 from blueberry_microid.application.ports.detection_training_environment_spec_repository import (
     DetectionTrainingEnvironmentSpecRepositoryPort,
 )
+from blueberry_microid.application.ports.detection_training_execution_issue_repository import (
+    DetectionTrainingExecutionIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_execution_run_repository import (
+    DetectionTrainingExecutionRunRepositoryPort,
+)
 from blueberry_microid.application.ports.detection_training_issue_repository import (
     DetectionTrainingIssueRepositoryPort,
 )
@@ -107,6 +113,12 @@ from blueberry_microid.application.services.detection_training_artifact_policy_e
 )
 from blueberry_microid.application.services.detection_training_environment_evaluator import (
     DetectionTrainingEnvironmentEvaluator,
+)
+from blueberry_microid.application.services.detection_training_execution_gate_evaluator import (
+    DetectionTrainingExecutionGateEvaluator,
+)
+from blueberry_microid.application.services.manual_yolo_training_runner_scaffold import (
+    ManualYoloTrainingRunnerScaffold,
 )
 from blueberry_microid.application.services.detection_training_readiness_evaluator import (
     DetectionTrainingReadinessEvaluator,
@@ -192,6 +204,18 @@ from blueberry_microid.application.use_cases.detection_training_artifacts.list_d
 )
 from blueberry_microid.application.use_cases.detection_training_artifacts.list_detection_training_artifact_records import (
     ListDetectionTrainingArtifactRecordsUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_execution.create_detection_training_execution_run import (
+    CreateDetectionTrainingExecutionRunUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_execution.get_detection_training_execution_run import (
+    GetDetectionTrainingExecutionRunUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_execution.list_detection_training_execution_issues import (
+    ListDetectionTrainingExecutionIssuesUseCase,
+)
+from blueberry_microid.application.use_cases.detection_training_execution.list_detection_training_execution_runs import (
+    ListDetectionTrainingExecutionRunsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
@@ -346,6 +370,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_train
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_artifact_record_repository import (
     SqlAlchemyDetectionTrainingArtifactRecordRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_execution_issue_repository import (
+    SqlAlchemyDetectionTrainingExecutionIssueRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_execution_run_repository import (
+    SqlAlchemyDetectionTrainingExecutionRunRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_detection_training_environment_issue_repository import (
     SqlAlchemyDetectionTrainingEnvironmentIssueRepository,
@@ -721,6 +751,18 @@ def get_detection_training_artifact_issue_repository(
     return SqlAlchemyDetectionTrainingArtifactIssueRepository(session)
 
 
+def get_detection_training_execution_run_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingExecutionRunRepositoryPort:
+    return SqlAlchemyDetectionTrainingExecutionRunRepository(session)
+
+
+def get_detection_training_execution_issue_repository(
+    session: Session = Depends(get_db_session),
+) -> DetectionTrainingExecutionIssueRepositoryPort:
+    return SqlAlchemyDetectionTrainingExecutionIssueRepository(session)
+
+
 # --- dataset splitting service ------------------------------------------------
 
 
@@ -770,6 +812,14 @@ def get_detection_training_environment_evaluator() -> DetectionTrainingEnvironme
 
 def get_detection_training_artifact_policy_evaluator() -> DetectionTrainingArtifactPolicyEvaluator:
     return DetectionTrainingArtifactPolicyEvaluator()
+
+
+def get_detection_training_execution_gate_evaluator() -> DetectionTrainingExecutionGateEvaluator:
+    return DetectionTrainingExecutionGateEvaluator()
+
+
+def get_manual_yolo_training_runner_scaffold() -> ManualYoloTrainingRunnerScaffold:
+    return ManualYoloTrainingRunnerScaffold()
 
 
 def get_image_feature_extractor() -> ImageFeatureExtractor:
@@ -1647,6 +1697,61 @@ def get_list_detection_training_artifact_issues_use_case(
     ),
 ) -> ListDetectionTrainingArtifactIssuesUseCase:
     return ListDetectionTrainingArtifactIssuesUseCase(policy_repository, issue_repository)
+
+
+def get_create_detection_training_execution_run_use_case(
+    detection_training_run_repository: DetectionTrainingRunRepositoryPort = Depends(
+        get_detection_training_run_repository
+    ),
+    readiness_report_repository: DetectionTrainingReadinessReportRepositoryPort = Depends(
+        get_detection_training_readiness_report_repository
+    ),
+    environment_spec_repository: DetectionTrainingEnvironmentSpecRepositoryPort = Depends(
+        get_detection_training_environment_spec_repository
+    ),
+    artifact_policy_repository: DetectionTrainingArtifactPolicyRepositoryPort = Depends(
+        get_detection_training_artifact_policy_repository
+    ),
+    evaluator: DetectionTrainingExecutionGateEvaluator = Depends(get_detection_training_execution_gate_evaluator),
+    scaffold: ManualYoloTrainingRunnerScaffold = Depends(get_manual_yolo_training_runner_scaffold),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDetectionTrainingExecutionRunUseCase:
+    return CreateDetectionTrainingExecutionRunUseCase(
+        detection_training_run_repository,
+        readiness_report_repository,
+        environment_spec_repository,
+        artifact_policy_repository,
+        evaluator,
+        scaffold,
+        unit_of_work,
+    )
+
+
+def get_get_detection_training_execution_run_use_case(
+    execution_run_repository: DetectionTrainingExecutionRunRepositoryPort = Depends(
+        get_detection_training_execution_run_repository
+    ),
+) -> GetDetectionTrainingExecutionRunUseCase:
+    return GetDetectionTrainingExecutionRunUseCase(execution_run_repository)
+
+
+def get_list_detection_training_execution_runs_use_case(
+    execution_run_repository: DetectionTrainingExecutionRunRepositoryPort = Depends(
+        get_detection_training_execution_run_repository
+    ),
+) -> ListDetectionTrainingExecutionRunsUseCase:
+    return ListDetectionTrainingExecutionRunsUseCase(execution_run_repository)
+
+
+def get_list_detection_training_execution_issues_use_case(
+    execution_run_repository: DetectionTrainingExecutionRunRepositoryPort = Depends(
+        get_detection_training_execution_run_repository
+    ),
+    execution_issue_repository: DetectionTrainingExecutionIssueRepositoryPort = Depends(
+        get_detection_training_execution_issue_repository
+    ),
+) -> ListDetectionTrainingExecutionIssuesUseCase:
+    return ListDetectionTrainingExecutionIssuesUseCase(execution_run_repository, execution_issue_repository)
 
 
 def get_list_detection_training_issues_use_case(

@@ -27,6 +27,12 @@ from blueberry_microid.application.ports.detection_training_environment_issue_re
 from blueberry_microid.application.ports.detection_training_environment_spec_repository import (
     DetectionTrainingEnvironmentSpecRepositoryPort,
 )
+from blueberry_microid.application.ports.detection_training_execution_issue_repository import (
+    DetectionTrainingExecutionIssueRepositoryPort,
+)
+from blueberry_microid.application.ports.detection_training_execution_run_repository import (
+    DetectionTrainingExecutionRunRepositoryPort,
+)
 from blueberry_microid.application.ports.detection_training_issue_repository import (
     DetectionTrainingIssueRepositoryPort,
 )
@@ -104,6 +110,8 @@ class UnitOfWorkPort(ABC):
     detection_training_artifact_record_repository: DetectionTrainingArtifactRecordRepositoryPort
     detection_training_environment_issue_repository: DetectionTrainingEnvironmentIssueRepositoryPort
     detection_training_environment_spec_repository: DetectionTrainingEnvironmentSpecRepositoryPort
+    detection_training_execution_issue_repository: DetectionTrainingExecutionIssueRepositoryPort
+    detection_training_execution_run_repository: DetectionTrainingExecutionRunRepositoryPort
     detection_training_issue_repository: DetectionTrainingIssueRepositoryPort
     detection_training_readiness_issue_repository: DetectionTrainingReadinessIssueRepositoryPort
     detection_training_readiness_report_repository: DetectionTrainingReadinessReportRepositoryPort

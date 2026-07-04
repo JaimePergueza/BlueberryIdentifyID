@@ -2013,3 +2013,121 @@ guarda binarios en base de datos, no sube artefactos binarios al
 repositorio, no ejecuta entrenamiento en CI, no requiere GPU obligatoria,
 no agrega frontend/autenticacion/taxonomia/diagnostico, no integra
 MLflow/TensorBoard/W&B y no reemplaza `MockInferenceEngine`.
+
+## 45. Fase 29 - Training Execution Gate & Manual Runner Scaffold
+
+Objetivo: crear la puerta de ejecucion formal para un futuro entrenamiento
+de deteccion de objetos real, manual y separado de este sistema — sin
+ejecutar entrenamiento en esta fase.
+
+**Entidades.** `DetectionTrainingExecutionRun` referencia
+`DetectionTrainingRun`, `DetectionTrainingReadinessReport`,
+`DetectionTrainingEnvironmentSpec`, `DetectionTrainingArtifactPolicy`,
+`AnnotationBundleRun` y `DatasetRelease`; guarda `status`
+(`DetectionTrainingExecutionStatus`: `blocked`, `manual_required`,
+`ready_to_execute`, `failed` — deliberadamente sin `running`/`completed`/
+`trained`/`model_created`), `decision`
+(`DetectionTrainingExecutionDecision`: 9 valores
+`blocked_by_prerequisites`/`blocked_by_ci`/`blocked_by_repository_safety`/
+`blocked_by_artifact_policy`/`blocked_by_environment`/
+`blocked_by_readiness`/`blocked_by_configuration`/
+`manual_confirmation_required`/`ready_for_manual_execution`), `mode`
+(`DetectionTrainingExecutionMode`: `scaffold_only`/`manual_gate`),
+`is_executable` (invariante de entidad: siempre `False`, construir con
+`True` lanza `ValueError`) y siete resumenes/planes JSON
+(`prerequisite_summary`, `repository_safety_summary`, `execution_plan`,
+`command_preview`, `expected_outputs`, `risk_summary`,
+`recommendation_summary`). `DetectionTrainingExecutionIssue` guarda
+hallazgos `error`/`warning`/`info` con 18 codigos fijos (ver CLAUDE.md
+§26). Ninguna de las dos guarda pesos, imagenes ni labels completos.
+
+**Config.** `DetectionTrainingExecutionConfig`
+(`ml/configs/detection_training_execution_config.py`) trata
+`enable_real_training=false`/`dry_run_only=true` como rieles de seguridad,
+no feature flags: activarlos siempre bloquea
+(`training_execution_disabled`), nunca desbloquea. `require_manual_confirmation=true`
+exige que `manual_confirmation_text` coincida exactamente con
+`required_confirmation_text` ("I understand this will only create a
+scaffold and will not train a model" por defecto); sin coincidencia,
+`status=manual_required`. `allow_ready_to_execute_status=false` limita el
+status maximo alcanzable a `manual_required` incluso si todo lo demas es
+correcto. `block_in_ci=true` bloquea si se detecta `CI`/`GITHUB_ACTIONS`.
+
+**Evaluador.** `DetectionTrainingExecutionGateEvaluator`
+(`application/services/detection_training_execution_gate_evaluator.py`)
+recibe las cuatro entidades upstream ya cargadas mas un
+`RepositorySafetyReport` ya calculado (el caso de uso instancia
+`RepositorySafetyValidator`, el evaluador nunca lo hace el mismo). Valida
+en orden de prioridad de bloqueo: prerequisitos del run (`planned`,
+`is_runnable`, `command_preview`, `expected_outputs`) > readiness
+(`ready_for_training`) > environment (`environment_ready`) > artifact
+policy (`artifact_policy_ready`) > seguridad del repositorio (
+`RepositorySafetyValidator.is_safe` y
+`artifact_policy.storage_policy.artifact_root_dir_inside_repo`) > CI >
+configuracion (`enable_real_training`/`dry_run_only`). Siempre agrega
+`no_training_executed` y `real_runner_not_implemented`. Nunca llama
+`subprocess`, nunca importa `torch`/`ultralytics`, nunca instala
+dependencias, nunca modifica archivos, nunca crea pesos, nunca descarga
+nada.
+
+**Scaffold.** `ManualYoloTrainingRunnerScaffold`
+(`application/services/manual_yolo_training_runner_scaffold.py`) traduce
+una `DetectionTrainingExecutionGateEvaluation` en un `execution_plan` JSON
+legible por humanos: `preconditions`, `manual_steps`, `command_preview`
+(copiado del run, nunca ejecutado), `output_expectations`,
+`artifact_policy_reminders`, `rollback_notes`, `safety_notes`,
+`prohibited_actions` y un `checklist`. Solo texto/JSON derivado de la
+evaluacion; nunca ejecuta nada, nunca escribe archivos.
+
+**Caso de uso.** `CreateDetectionTrainingExecutionRunUseCase` busca las
+cuatro entidades upstream (404 si falta alguna) y verifica seis relaciones
+de pertenencia (readiness-run, environment-run, environment-readiness,
+artifact_policy-run, artifact_policy-readiness, artifact_policy-environment)
+antes de evaluar; cualquier violacion es
+`DetectionTrainingExecutionRunNotAllowedError` (409). Instancia
+`RepositorySafetyValidator` directamente (mismo patron que
+`CreateImageDatasetAuditRunUseCase` con `ImageDatasetAuditor`), ejecuta el
+evaluador, enriquece `execution_plan` con `ManualYoloTrainingRunnerScaffold`,
+y persiste `DetectionTrainingExecutionRun` + issues en una unica
+transaccion via `UnitOfWorkPort`. Nunca modifica ninguna de las cuatro
+entidades upstream. Un fallo interno de evaluacion se convierte en un
+execution run `status=failed` persistido, nunca en una excepcion sin
+persistir.
+
+**Persistencia.** Alembic `0021_detection_training_execution_runs.py` crea
+`detection_training_execution_runs` y `detection_training_execution_issues`,
+con FKs a `detection_training_runs`, `detection_training_readiness_reports`,
+`detection_training_environment_specs`, `detection_training_artifact_policies`,
+`annotation_bundle_runs` y `dataset_releases`; CHECKs de
+`status`/`decision`/`mode`/`severity`; indices con prefijos abreviados
+`ix_dtex_runs_*`/`ix_dtex_issues_*` (maximo 38 caracteres, verificado antes
+de aplicar la migracion); y JSONB para config y los siete
+resumenes/planes.
+
+**API.**
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| POST | `/api/v1/ml/detection-training-execution-runs` | Genera una puerta de ejecucion |
+| GET | `/api/v1/ml/detection-training-execution-runs` | Lista execution runs |
+| GET | `/api/v1/ml/detection-training-execution-runs/{id}` | Detalle del execution run |
+| GET | `/api/v1/ml/detection-training-execution-runs/{id}/issues` | Issues del execution run |
+| GET | `/api/v1/ml/detection-training-runs/{id}/execution-runs` | Execution runs por run |
+| GET | `/api/v1/ml/detection-training-readiness-reports/{id}/execution-runs` | Execution runs por readiness report |
+| GET | `/api/v1/ml/detection-training-environment-specs/{id}/execution-runs` | Execution runs por environment spec |
+| GET | `/api/v1/ml/detection-training-artifact-policies/{id}/execution-runs` | Execution runs por artifact policy |
+| GET | `/api/v1/ml/annotation-bundles/{id}/detection-training-execution-runs` | Execution runs por bundle |
+| GET | `/api/v1/datasets/releases/{id}/detection-training-execution-runs` | Execution runs por release |
+
+Fase 29 no entrena YOLO, no ejecuta YOLO, no ejecuta comandos de
+entrenamiento, no llama `subprocess`, no instala `ultralytics`, no importa
+`torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no descarga
+pesos ni datasets externos, no ejecuta entrenamiento en CI, no requiere GPU
+obligatoria, no crea pesos reales `.pt`/`.onnx`/`.h5`/`.pth`/`.ckpt`, no
+copia ni modifica imagenes, no guarda binarios en base de datos, no sube
+artefactos binarios al repositorio, no agrega frontend/autenticacion/
+taxonomia/diagnostico, no integra MLflow/TensorBoard/W&B y no reemplaza
+`MockInferenceEngine`. Un execution run `ready_to_execute` nunca certifica
+que se entreno un modelo — solo que los gates tecnicos configurados
+pasaron y que un humano aun tendria que disparar el entrenamiento el mismo,
+en una fase futura y separada.

@@ -19,6 +19,8 @@ from blueberry_microid.domain.entities.detection_training_artifact_policy import
 from blueberry_microid.domain.entities.detection_training_artifact_record import DetectionTrainingArtifactRecord
 from blueberry_microid.domain.entities.detection_training_environment_issue import DetectionTrainingEnvironmentIssue
 from blueberry_microid.domain.entities.detection_training_environment_spec import DetectionTrainingEnvironmentSpec
+from blueberry_microid.domain.entities.detection_training_execution_issue import DetectionTrainingExecutionIssue
+from blueberry_microid.domain.entities.detection_training_execution_run import DetectionTrainingExecutionRun
 from blueberry_microid.domain.entities.detection_training_issue import DetectionTrainingIssue
 from blueberry_microid.domain.entities.detection_training_readiness_issue import DetectionTrainingReadinessIssue
 from blueberry_microid.domain.entities.detection_training_readiness_report import DetectionTrainingReadinessReport
@@ -76,6 +78,12 @@ from blueberry_microid.domain.enums.detection_training_environment_issue_severit
     DetectionTrainingEnvironmentIssueSeverity,
 )
 from blueberry_microid.domain.enums.detection_training_environment_status import DetectionTrainingEnvironmentStatus
+from blueberry_microid.domain.enums.detection_training_execution_decision import DetectionTrainingExecutionDecision
+from blueberry_microid.domain.enums.detection_training_execution_issue_severity import (
+    DetectionTrainingExecutionIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_execution_mode import DetectionTrainingExecutionMode
+from blueberry_microid.domain.enums.detection_training_execution_status import DetectionTrainingExecutionStatus
 from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
 from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
 from blueberry_microid.domain.enums.detection_training_readiness_decision import DetectionTrainingReadinessDecision
@@ -122,6 +130,12 @@ from blueberry_microid.infrastructure.db.models.detection_training_environment_i
 )
 from blueberry_microid.infrastructure.db.models.detection_training_environment_spec import (
     DetectionTrainingEnvironmentSpecModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_execution_issue import (
+    DetectionTrainingExecutionIssueModel,
+)
+from blueberry_microid.infrastructure.db.models.detection_training_execution_run import (
+    DetectionTrainingExecutionRunModel,
 )
 from blueberry_microid.infrastructure.db.models.detection_training_issue import DetectionTrainingIssueModel
 from blueberry_microid.infrastructure.db.models.detection_training_readiness_issue import (
@@ -931,6 +945,54 @@ def detection_training_artifact_issue_to_entity(
         message=model.message,
         id=model.id,
         artifact_path=model.artifact_path,
+        details=model.details,
+        created_at=model.created_at,
+    )
+
+
+def detection_training_execution_run_to_entity(
+    model: DetectionTrainingExecutionRunModel,
+) -> DetectionTrainingExecutionRun:
+    return DetectionTrainingExecutionRun(
+        detection_training_run_id=model.detection_training_run_id,
+        readiness_report_id=model.readiness_report_id,
+        environment_spec_id=model.environment_spec_id,
+        artifact_policy_id=model.artifact_policy_id,
+        annotation_bundle_run_id=model.annotation_bundle_run_id,
+        dataset_release_id=model.dataset_release_id,
+        status=DetectionTrainingExecutionStatus(model.status),
+        decision=DetectionTrainingExecutionDecision(model.decision),
+        mode=DetectionTrainingExecutionMode(model.mode),
+        is_executable=model.is_executable,
+        config=model.config,
+        prerequisite_summary=model.prerequisite_summary,
+        repository_safety_summary=model.repository_safety_summary,
+        execution_plan=model.execution_plan,
+        command_preview=model.command_preview,
+        expected_outputs=model.expected_outputs,
+        risk_summary=model.risk_summary,
+        recommendation_summary=model.recommendation_summary,
+        error_count=model.error_count,
+        warning_count=model.warning_count,
+        info_count=model.info_count,
+        id=model.id,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+        created_by=model.created_by,
+        notes=model.notes,
+        error_message=model.error_message,
+    )
+
+
+def detection_training_execution_issue_to_entity(
+    model: DetectionTrainingExecutionIssueModel,
+) -> DetectionTrainingExecutionIssue:
+    return DetectionTrainingExecutionIssue(
+        execution_run_id=model.execution_run_id,
+        severity=DetectionTrainingExecutionIssueSeverity(model.severity),
+        code=model.code,
+        message=model.message,
+        id=model.id,
         details=model.details,
         created_at=model.created_at,
     )

@@ -30,6 +30,12 @@ from blueberry_microid.domain.enums.detection_training_environment_issue_severit
     DetectionTrainingEnvironmentIssueSeverity,
 )
 from blueberry_microid.domain.enums.detection_training_environment_status import DetectionTrainingEnvironmentStatus
+from blueberry_microid.domain.enums.detection_training_execution_decision import DetectionTrainingExecutionDecision
+from blueberry_microid.domain.enums.detection_training_execution_issue_severity import (
+    DetectionTrainingExecutionIssueSeverity,
+)
+from blueberry_microid.domain.enums.detection_training_execution_mode import DetectionTrainingExecutionMode
+from blueberry_microid.domain.enums.detection_training_execution_status import DetectionTrainingExecutionStatus
 from blueberry_microid.domain.enums.detection_training_issue_severity import DetectionTrainingIssueSeverity
 from blueberry_microid.domain.enums.detection_training_mode import DetectionTrainingMode
 from blueberry_microid.domain.enums.detection_training_readiness_decision import DetectionTrainingReadinessDecision
@@ -70,6 +76,10 @@ __all__ = [
     "DetectionTrainingEnvironmentDecision",
     "DetectionTrainingEnvironmentIssueSeverity",
     "DetectionTrainingEnvironmentStatus",
+    "DetectionTrainingExecutionDecision",
+    "DetectionTrainingExecutionIssueSeverity",
+    "DetectionTrainingExecutionMode",
+    "DetectionTrainingExecutionStatus",
     "DetectionTrainingIssueSeverity",
     "DetectionTrainingMode",
     "DetectionTrainingReadinessDecision",
