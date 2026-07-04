@@ -153,3 +153,123 @@ against real persisted records was not run.
 No YOLO training was executed. No weights were created, no binaries were
 stored in the database, no datasets were downloaded, no taxonomy was added,
 and CI remains a non-training workflow.
+
+## Fase 35 Local PostgreSQL Runtime Setup
+
+- Date: 2026-07-04
+- Pending commit at execution time
+- PostgreSQL strategy: native Windows PostgreSQL 16 installed with `winget install PostgreSQL.PostgreSQL.16 --accept-package-agreements --accept-source-agreements`
+- Docker used: no
+- PostgreSQL service: `postgresql-x64-16`, running
+- `DATABASE_URL`: `postgresql+psycopg://blueberry:***@localhost:5432/blueberry_microid`
+- External storage root: `D:\BlueberryMicroID_local_storage`
+- External artifact root: `D:\BlueberryMicroID_training_artifacts`
+
+Connection check:
+
+```text
+{'database_url': 'postgresql+psycopg://blueberry:***@localhost:5432/blueberry_microid', 'select_1': 1}
+```
+
+Alembic:
+
+```text
+alembic upgrade head: succeeded through revision 0021
+alembic current: 0021 (head)
+```
+
+Seed command:
+
+```text
+python scripts/seed_local_training_fixture.py --storage-root-dir D:/BlueberryMicroID_local_storage --artifact-root-dir D:/BlueberryMicroID_training_artifacts --created-by fase35-local-seed --dataset-name fase35_local_training_fixture --emit-json
+```
+
+Seed result:
+
+```json
+{
+  "analysis_run_id": "26693386-f6b7-43a6-9cf7-d78e97e69437",
+  "annotation_bundle_run_id": "d5651a5e-1184-4ac1-82c2-20bf7e63bbb2",
+  "annotation_quality_gate_run_id": "151becce-efb1-472c-97a2-df13b2c5458c",
+  "artifact_policy_id": "afc1f01c-47bd-4248-a2fe-26e42fd88d7a",
+  "artifact_root_dir": "D:\\BlueberryMicroID_training_artifacts",
+  "dataset_release_id": "3d4e555f-1936-4b6c-bd9f-e04df74f8922",
+  "dataset_snapshot_id": "40f16d13-d8f0-46cc-804f-2ea21fd9045d",
+  "dataset_yaml_path": "D:\\BlueberryMicroID_training_artifacts\\bundle\\fase35_local_training_fixture-20260704134328\\dataset.yaml",
+  "detection_training_run_id": "acf9a111-3f53-4fd4-bffb-fbf1ebbce162",
+  "environment_spec_id": "0305e33d-fe7a-4c99-a456-d55c3a5d71a0",
+  "execution_run_id": "b5eb9008-ee86-4dfe-a35e-e7e4c33517c1",
+  "human_review_id": "7909d3ba-4034-48ce-b492-b29ed7c4ccf9",
+  "image_audit_run_id": "3b7cdc4d-15d6-4b05-aa0d-f8b3d835e621",
+  "petri_annotation_export_run_id": "b9d39d68-84b0-4dd8-ad56-e9eabedc69f0",
+  "petri_region_review_id": "b07f026d-7f9e-47fa-8a1c-763dfe620959",
+  "petri_segmentation_run_id": "a9587e00-7ef1-4d6a-83f7-f87e98c16037",
+  "readiness_report_id": "a7fd1183-51d8-429a-a9d1-ce4ee61cef16",
+  "sample_id": "e8aa18cf-6b52-4420-8c11-e2ccb842cb3c"
+}
+```
+
+Bundle validation:
+
+- `dataset.yaml`: exists outside the repository.
+- Bundle directory: exists outside the repository.
+- COCO JSON: exists.
+- Blueberry manifest: exists.
+- YOLO labels: exist.
+- README: exists.
+- `manifest.json`: exists.
+- No generated weights or training outputs appeared in the repository.
+
+Inspection command:
+
+```text
+python scripts/inspect_local_training_fixture.py --execution-run-id b5eb9008-ee86-4dfe-a35e-e7e4c33517c1
+```
+
+Inspection result:
+
+```json
+{
+  "annotation_bundle_status": "completed",
+  "annotation_quality_gate_status": "passed",
+  "artifact_policy_decision": "artifact_policy_ready",
+  "artifact_policy_status": "ready",
+  "detection_training_status": "planned",
+  "environment_decision": "environment_ready",
+  "environment_status": "ready",
+  "execution_decision": "ready_for_manual_execution",
+  "execution_status": "ready_to_execute",
+  "readiness_decision": "ready_for_training",
+  "readiness_status": "warning"
+}
+```
+
+Dry-run validation command:
+
+```text
+python scripts/run_local_yolo_training.py --execution-run-id b5eb9008-ee86-4dfe-a35e-e7e4c33517c1 --artifact-root-dir D:/BlueberryMicroID_training_artifacts --base-model-path D:/BlueberryMicroID_training_artifacts/base_models/phase35-local-yolo-model.yaml --manual-confirmation-text "I understand this will run local YOLO training outside CI" --dry-run-validation-only
+```
+
+Dry-run validation result:
+
+```json
+{
+  "summary": {
+    "metadata_persisted": false,
+    "training_would_run": true,
+    "ultralytics_imported": false,
+    "validation_only": true
+  }
+}
+```
+
+Real YOLO training was not executed in Fase 35. The exact reason is that this
+phase stops after proving local PostgreSQL persistence and runner validation
+against real records; the base model used here is an external local YAML
+placeholder for validation only, not downloaded weights. Fase 36 can perform a
+minimal real local training attempt only after an approved external local base
+model policy is selected.
+
+No weights were created, no binaries were stored in the database, no external
+datasets were downloaded, no taxonomy was added, and CI remains a
+non-training workflow.

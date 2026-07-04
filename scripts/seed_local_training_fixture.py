@@ -141,7 +141,7 @@ def _create_seed(client: TestClient, *, artifact_root: Path, storage_root: Path,
     summary = _empty_summary()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     prefix = f"{dataset_name}-{stamp}"
-    bundle_dir = artifact_root / "bundle"
+    bundle_dir = artifact_root / "bundle" / prefix
     bundle_dir.mkdir(parents=True, exist_ok=True)
     storage_root.mkdir(parents=True, exist_ok=True)
 
@@ -290,13 +290,13 @@ def _create_seed(client: TestClient, *, artifact_root: Path, storage_root: Path,
             "detection_training_run_id": training["id"],
             "readiness_report_id": readiness["id"],
             "config": {
-                "allow_cpu_training": True,
+                "allow_cpu_training": False,
                 "require_gpu": False,
                 "require_cuda": False,
                 "require_ultralytics": False,
                 "require_torch": False,
                 "artifact_output_dir": str(artifact_root),
-                "pretrained_weights_policy": "local_only",
+                "pretrained_weights_policy": "not_applicable",
                 "allow_ci_training": False,
                 "allow_artifacts_inside_repo": False,
             },
