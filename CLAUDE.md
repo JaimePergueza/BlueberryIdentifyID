@@ -756,3 +756,52 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   o modificar imagenes, guardar binarios en base de datos, subir artefactos
   binarios al repositorio, frontend, autenticacion, taxonomia, diagnostico,
   MLflow/TensorBoard/W&B y reemplazar `MockInferenceEngine`.
+## 30. Manual Training Runbook & Operator Checklist (Fase 30)
+
+- Fase 30 es documentacion operativa preventiva para una futura ejecucion
+  manual de entrenamiento de deteccion. No implementa runner real, no
+  ejecuta entrenamiento, no cambia FastAPI/Celery/Redis/PostgreSQL y no
+  modifica la logica de negocio.
+- `docs/training/manual_training_runbook.md` documenta proposito, alcance,
+  limites, prerequisitos, validacion de entorno/repositorio/
+  `artifact_root_dir`, interpretacion de `command_preview`, checklist,
+  evidencias, registro posterior de artefactos, errores, rollback, acciones
+  prohibidas y cierre.
+- `docs/training/operator_checklist.md` contiene casillas Markdown para el
+  operador y criterios explicitos para no continuar.
+- `docs/training/artifact_registration_protocol.md` describe el registro
+  futuro metadata-only de artefactos: paths/URI, tipo, estado, tamano,
+  `checksum_sha256`, fecha, training run y policy. No guarda pesos, imagenes,
+  labels completos ni binarios en DB.
+- `docs/training/rollback_protocol.md` cubre fallos futuros, pesos
+  incompletos, artefactos dentro del repo, `artifact_root_dir` roto, dataset
+  mismatch, metricas invalidas, labels incorrectos y trazabilidad de
+  artefactos `deleted`/`ignored`.
+- `docs/training/prohibited_actions.md` prohibe entrenar en CI, subir pesos
+  a Git, guardar pesos en DB, modificar imagenes originales, cambiar labels
+  despues del quality gate sin nuevo bundle, usar taxonomia, afirmar
+  diagnostico, descargar pesos sin policy, instalar dependencias pesadas sin
+  environment spec, ejecutar `command_preview` sin revision, ignorar artifact
+  policy/repository safety, reemplazar `MockInferenceEngine` y mezclar
+  datasets externos sin evaluacion formal.
+- `scripts/check_training_docs.py` valida los seis documentos y sus secciones
+  minimas. Es read-only, sin dependencias externas; no importa
+  `torch`/`ultralytics`, no llama `subprocess`, no modifica archivos y no
+  ejecuta entrenamiento.
+- Los gates que el runbook exige revisar son `AnnotationBundleRun`
+  `completed`, `AnnotationQualityGateRun` `passed`, `DetectionTrainingRun`
+  `planned`, `DetectionTrainingReadinessReport` `ready`,
+  `DetectionTrainingEnvironmentSpec` `ready`,
+  `DetectionTrainingArtifactPolicy` `ready`, `RepositorySafetyValidator`
+  passed/safe y `DetectionTrainingExecutionRun` `manual_required` o
+  `ready_to_execute`.
+- `ready_to_execute` sigue sin significar que hubo entrenamiento; solo indica
+  que la puerta manual configurada paso y que una persona aun tendria que
+  ejecutar un procedimiento en una fase futura y separada.
+- Sigue prohibido entrenar YOLO, ejecutar YOLO, instalar `ultralytics`,
+  importar `torch`, usar PyTorch/TensorFlow/CNN/ViT/deep learning real,
+  descargar pesos o datasets externos, ejecutar entrenamiento en CI, crear
+  pesos `.pt`/`.onnx`/`.h5`/`.pth`/`.ckpt`, copiar/modificar imagenes,
+  guardar binarios en DB, subir artefactos binarios al repo, frontend,
+  autenticacion, taxonomia, diagnostico, herramientas externas de tracking y
+  reemplazar `MockInferenceEngine`.

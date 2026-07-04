@@ -2131,3 +2131,51 @@ taxonomia/diagnostico, no integra MLflow/TensorBoard/W&B y no reemplaza
 que se entreno un modelo — solo que los gates tecnicos configurados
 pasaron y que un humano aun tendria que disparar el entrenamiento el mismo,
 en una fase futura y separada.
+## Fase 30 - Manual Training Runbook & Operator Checklist
+
+Fase 30 agrega documentacion operativa versionada para una futura ejecucion
+manual de entrenamiento de deteccion de objetos. No agrega runner real, no
+ejecuta entrenamiento, no instala dependencias y no cambia ningun flujo de
+negocio.
+
+**Documentos.** `docs/training/` contiene:
+
+- `manual_training_runbook.md`: procedimiento humano para revisar los gates
+  previos antes de cualquier intento futuro.
+- `operator_checklist.md`: checklist con casillas Markdown y criterios para
+  no continuar.
+- `artifact_registration_protocol.md`: protocolo futuro de registro
+  metadata-only de artefactos (`path`, `relative_path`, `external_uri`,
+  tipo, estado, tamano, `checksum_sha256`, fecha, training run y policy),
+  sin guardar binarios.
+- `rollback_protocol.md`: pasos humanos para fallos, pesos incompletos,
+  artefactos dentro del repo, mismatch de dataset, metricas invalidas o
+  labels incorrectos.
+- `prohibited_actions.md`: lista explicita de acciones prohibidas.
+- `README.md`: orden de lectura y limites de la carpeta.
+
+**Gates documentados.** El runbook exige revisar `AnnotationBundleRun`
+`completed`, `AnnotationQualityGateRun` `passed`, `DetectionTrainingRun`
+`planned`, `DetectionTrainingReadinessReport` `ready`,
+`DetectionTrainingEnvironmentSpec` `ready`,
+`DetectionTrainingArtifactPolicy` `ready`, `RepositorySafetyValidator`
+safe/passed, y `DetectionTrainingExecutionRun` `manual_required` o
+`ready_to_execute`. `ready_to_execute` sigue significando solo que la puerta
+manual esta satisfecha; no significa que el entrenamiento ocurrio.
+
+**Validador documental.** `scripts/check_training_docs.py` es un script
+read-only, sin dependencias externas, que valida la existencia y secciones
+minimas de los seis documentos, los gates requeridos, casillas del checklist,
+`checksum_sha256`, rollback/artefactos fallidos, prohibicion de entrenar en
+CI y prohibicion de subir pesos a Git. Devuelve exit code `0` si pasa y `1`
+si falla. No importa `torch`/`ultralytics`, no llama `subprocess`, no
+modifica archivos y no ejecuta entrenamiento.
+
+Fase 30 no entrena YOLO, no ejecuta YOLO, no ejecuta comandos de
+entrenamiento, no llama `subprocess`, no instala `ultralytics`, no importa
+`torch`, no usa PyTorch/TensorFlow/CNN/ViT/deep learning real, no descarga
+pesos ni datasets externos, no ejecuta entrenamiento en CI, no requiere GPU,
+no crea pesos `.pt`/`.onnx`/`.h5`/`.pth`/`.ckpt`, no copia ni modifica
+imagenes, no guarda binarios en DB, no sube artefactos binarios al repo, no
+agrega frontend/autenticacion/taxonomia/diagnostico, no integra MLflow,
+TensorBoard o Weights & Biases y no reemplaza `MockInferenceEngine`.

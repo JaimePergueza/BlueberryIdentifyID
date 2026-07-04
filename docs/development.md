@@ -2019,3 +2019,52 @@ MLflow/TensorBoard/W&B, and does not replace `MockInferenceEngine`. A
 trained — only that the configured technical gates passed and a human
 would still have to trigger training manually, in a future and separately
 approved phase.
+## 40. Manual training runbook and operator checklist (Fase 30)
+
+Fase 30 adds preventive operations documentation for a future manual object
+detection training attempt. It is documentation only: no real YOLO runner,
+no training execution, no dependency installation, no artifact generation,
+and no business-logic changes.
+
+The new folder `docs/training/` contains:
+
+- `manual_training_runbook.md` for the full human procedure and required
+  upstream gates.
+- `operator_checklist.md` for operator checkboxes and stop criteria.
+- `artifact_registration_protocol.md` for future metadata-only registration
+  of weights, metrics, predictions, logs, run directories, config, and
+  manifests.
+- `rollback_protocol.md` for failed future training attempts and unsafe
+  artifacts.
+- `prohibited_actions.md` for forbidden execution, artifact, data, and
+  product-boundary actions.
+- `README.md` for folder purpose and reading order.
+
+The runbook requires these gates to be reviewed before any later authorized
+manual training attempt: `AnnotationBundleRun` completed,
+`AnnotationQualityGateRun` passed, `DetectionTrainingRun` planned,
+`DetectionTrainingReadinessReport` ready,
+`DetectionTrainingEnvironmentSpec` ready,
+`DetectionTrainingArtifactPolicy` ready, `RepositorySafetyValidator`
+passed/safe, and `DetectionTrainingExecutionRun` `manual_required` or
+`ready_to_execute`. It explicitly states that `command_preview` is not an
+executable instruction and that `ready_to_execute` does not mean a model was
+trained.
+
+`scripts/check_training_docs.py` validates the training documents in
+read-only mode. It checks that all six Markdown files exist, required
+sections are present, all gates are mentioned, the checklist has `- [ ]`
+items, the artifact protocol mentions `checksum_sha256`, rollback covers
+failed artifacts, prohibited actions forbid training in CI and weights in
+Git, and the README says there is no real training. The script has no
+external dependencies, does not import `torch` or `ultralytics`, does not
+call `subprocess`, does not modify files, and exits `0` on success or `1`
+on validation failure.
+
+Fase 30 does not train YOLO, execute YOLO, execute training commands, install
+`ultralytics`, import `torch`, use PyTorch, TensorFlow, CNN, ViT, or real
+deep learning, download external weights or datasets, run training in CI,
+require GPU, create weights, copy or modify images, store binaries in DB,
+upload binary artifacts to the repo, add frontend/authentication/taxonomy/
+diagnosis, integrate external experiment tools, or replace
+`MockInferenceEngine`.

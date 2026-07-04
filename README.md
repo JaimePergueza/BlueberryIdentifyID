@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 29)
+## MVP status (as of Fase 30)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -72,7 +72,14 @@ CI detection, manual confirmation text) and `ManualYoloTrainingRunnerScaffold`
 turns the result into a human-readable manual execution plan — a
 `ready_to_execute` status still never trains anything or executes a
 command; it only means a human could manually trigger training in a future,
-separately-approved phase. The CI workflow runs
+separately-approved phase. Fase 30 adds versioned operator documentation
+under `docs/training/`: a manual training runbook, operator checklist,
+artifact registration protocol, rollback protocol, prohibited-actions list,
+and a folder README, plus `scripts/check_training_docs.py` to validate the
+documents. These are preventive runbooks only: they do not train YOLO, do
+not execute `command_preview`, do not install `ultralytics`, do not import
+`torch`, do not use PyTorch/TensorFlow/deep learning, do not download or
+generate weights, do not add datasets, and do not add taxonomy. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on
