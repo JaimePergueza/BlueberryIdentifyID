@@ -2209,3 +2209,25 @@ Fase 31 sigue prohibiendo entrenamiento en CI, ejecucion automatica,
 datasets externos, pesos dentro del repo, binarios en DB, modificacion de
 imagenes originales, taxonomia, diagnostico microbiologico, frontend,
 autenticacion, MLflow/TensorBoard/W&B y reemplazo de `MockInferenceEngine`.
+
+## Fase 32 - Local YOLO Training Smoke Test
+
+Fase 32 valida operativamente el runner local/manual sin conectarlo a CI,
+FastAPI ni Celery. El extra opcional `training` puede instalarse localmente
+con `pip install -e .[training]`; CI sigue sin instalarlo. La CLI
+`scripts/run_local_yolo_training.py` agrega `--dry-run-validation-only`, que
+usa los mismos gates persistidos y validaciones de rutas que el runner real:
+`DetectionTrainingExecutionRun` en `ready_to_execute`,
+`DetectionTrainingArtifactPolicy` ready con registro real permitido,
+`dataset.yaml` del bundle, `base_model_path` local externo,
+`artifact_root_dir` externo y `RepositorySafetyValidator`.
+
+El modo `dry-run-validation-only` no importa `ultralytics`, no entrena, no
+crea pesos, no escanea outputs y no registra metadata de artefactos. Sirve
+para confirmar que una ejecucion local real podria comenzar si existen los
+registros persistidos y rutas aprobadas. En la validacion local de Fase 32 se
+instalo el extra `training` y se valido el import de `ultralytics` con
+`YOLO_CONFIG_DIR` apuntando a una carpeta escribible. No se ejecuto
+entrenamiento real porque la estacion no tenia PostgreSQL local, un
+`DetectionTrainingExecutionRun` persistido, una policy ready ni un
+`dataset.yaml` generado disponibles.

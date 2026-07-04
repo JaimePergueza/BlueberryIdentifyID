@@ -812,6 +812,23 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   nunca en CI, nunca automatico y nunca desde FastAPI/Celery.
 - `pyproject.toml` agrega el extra opcional `training` con
   `ultralytics>=8.3,<9.0`; CI no debe instalar ese extra ni requerir GPU.
+
+## 32. Local YOLO Training Smoke Test (Fase 32)
+
+- Fase 32 permite instalar localmente el extra `training` y validar import de
+  `ultralytics`, pero GitHub Actions sigue sin entrenar y sin instalar ese
+  extra.
+- `scripts/run_local_yolo_training.py --dry-run-validation-only` debe validar
+  los mismos gates que una ejecucion real: execution run `ready_to_execute`,
+  artifact policy ready, registro real permitido, `dataset.yaml` del bundle,
+  `base_model_path` externo, `artifact_root_dir` externo, confirmacion manual
+  exacta y `RepositorySafetyValidator`.
+- El modo `dry-run-validation-only` no importa `ultralytics`, no entrena, no
+  crea pesos, no registra metadata y no guarda binarios.
+- La validacion local de Fase 32 cerro como Cierre B: se instalo `training` y
+  se valido import, pero no se ejecuto entrenamiento porque faltaban
+  PostgreSQL local, execution run persistido, artifact policy ready y
+  `dataset.yaml` generado.
 - `LocalYoloTrainingRunner` es el unico modulo que puede importar
   `ultralytics`, y lo hace lazy dentro de `run()` despues de validar no CI,
   confirmacion manual exacta, execution run `ready_to_execute`, artifact

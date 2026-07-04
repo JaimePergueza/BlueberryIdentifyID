@@ -116,3 +116,21 @@ The local runner may import `ultralytics` only after CI, manual confirmation, re
 The optional dependency is installed only by a human operator with the `training` extra, for example `pip install -e .[training]`, outside CI. The command remains an operator action, not part of GitHub Actions.
 
 The runner registers only artifact metadata in the database: path, relative path, size, `checksum_sha256`, artifact kind, artifact state, timestamp, and associated training execution. It must never store model bytes, images, or generated labels in PostgreSQL.
+
+## 18. Fase 32 Local Smoke Validation
+
+Fase 32 introduces a local smoke path for the runner. Install the optional dependencies outside CI with:
+
+```text
+pip install -e .[training]
+```
+
+If a real persisted bundle and execution gate are available, run the local CLI without `--dry-run-validation-only` only after providing the exact manual confirmation text and approved external paths. If the workstation does not have the required persisted records, use:
+
+```text
+python scripts/run_local_yolo_training.py --dry-run-validation-only ...
+```
+
+The dry-run validation mode reuses the same execution gates, artifact policy, `dataset.yaml`, `base_model_path`, external `artifact_root_dir`, and repository safety checks. It does not import `ultralytics`, does not train, does not create weights, and does not register artifact metadata. It is an operational readiness check, not model training.
+
+The Fase 32 local validation completed as Cierre B: the `training` extra installed successfully and `ultralytics` imported when `YOLO_CONFIG_DIR` was pointed to a writable local config directory. Real training remained pending because no usable local PostgreSQL service, persisted `DetectionTrainingExecutionRun`, ready `DetectionTrainingArtifactPolicy`, or generated `dataset.yaml` bundle was available on the workstation.

@@ -48,6 +48,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--patience", type=int)
     parser.add_argument("--allow-existing-output-dir", action="store_true")
     parser.add_argument("--allow-policy-without-actual-registration", action="store_true")
+    parser.add_argument(
+        "--dry-run-validation-only",
+        action="store_true",
+        help="Validate persisted gates and local paths without importing ultralytics, training, or registering artifacts.",
+    )
     args = parser.parse_args(argv)
 
     settings = Settings()
@@ -61,24 +66,28 @@ def main(argv: list[str] | None = None) -> int:
             runner=LocalYoloTrainingRunner(repo_root=_REPO_ROOT),
             unit_of_work=SqlAlchemyUnitOfWork(session_factory),
         )
-        result = use_case.execute(
-            UUID(args.execution_run_id),
-            LocalYoloTrainingRunnerConfig(
-                manual_confirmation_text=args.manual_confirmation_text,
-                artifact_root_dir=args.artifact_root_dir,
-                base_model_path=args.base_model_path,
-                run_name=args.run_name,
-                epochs=args.epochs,
-                image_size=args.image_size,
-                batch_size=args.batch_size,
-                device=args.device,
-                workers=args.workers,
-                seed=args.seed,
-                patience=args.patience,
-                allow_existing_output_dir=args.allow_existing_output_dir,
-                require_policy_allows_actual_registration=not args.allow_policy_without_actual_registration,
-            ),
+        config = LocalYoloTrainingRunnerConfig(
+            manual_confirmation_text=args.manual_confirmation_text,
+            artifact_root_dir=args.artifact_root_dir,
+            base_model_path=args.base_model_path,
+            run_name=args.run_name,
+            epochs=args.epochs,
+            image_size=args.image_size,
+            batch_size=args.batch_size,
+            device=args.device,
+            workers=args.workers,
+            seed=args.seed,
+            patience=args.patience,
+            allow_existing_output_dir=args.allow_existing_output_dir,
+            require_policy_allows_actual_registration=not args.allow_policy_without_actual_registration,
         )
+        if args.dry_run_validation_only:
+            result = use_case.validate_only(UUID(args.execution_run_id), config)
+        else:
+            result = use_case.execute(
+                UUID(args.execution_run_id),
+                config,
+            )
     print(
         json.dumps(
             {

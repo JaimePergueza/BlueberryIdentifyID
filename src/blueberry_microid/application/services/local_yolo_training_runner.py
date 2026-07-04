@@ -68,22 +68,15 @@ class LocalYoloTrainingRunner:
         bundle_files: list[AnnotationBundleFile],
         config: LocalYoloTrainingRunnerConfig,
     ) -> LocalYoloTrainingResult:
-        self._validate_prerequisites(execution_run, artifact_policy, config)
-        artifact_root = Path(config.artifact_root_dir).resolve()
-        base_model_path = Path(config.base_model_path).resolve()
-        dataset_yaml_path = self._find_dataset_yaml(bundle_files).resolve()
-        self._validate_paths(artifact_root, base_model_path, dataset_yaml_path, artifact_policy)
-
-        candidate_paths = [str(artifact_root), str(base_model_path)]
-        safety_report = RepositorySafetyValidator().validate(
-            self._repo_root, RepositorySafetyConfig(), candidate_paths=candidate_paths
+        artifact_root, dataset_yaml_path, training_kwargs = self._validate_for_execution(
+            execution_run=execution_run,
+            artifact_policy=artifact_policy,
+            bundle_files=bundle_files,
+            config=config,
         )
-        if not safety_report.is_safe:
-            raise LocalYoloTrainingRunnerError("RepositorySafetyValidator did not pass")
 
         yolo_class = self._yolo_class_factory()
-        model = yolo_class(str(base_model_path))
-        training_kwargs = self._training_kwargs(config, dataset_yaml_path, artifact_root, execution_run)
+        model = yolo_class(str(Path(config.base_model_path).resolve()))
         raw_result = model.train(**training_kwargs)
         save_dir = self._resolve_save_dir(raw_result, artifact_root, training_kwargs["name"])
         records = self._scan_artifacts(
@@ -105,6 +98,61 @@ class LocalYoloTrainingRunner:
                 "no_binary_content_stored": True,
             },
         )
+
+    def validate_only(
+        self,
+        *,
+        execution_run: DetectionTrainingExecutionRun,
+        artifact_policy: DetectionTrainingArtifactPolicy,
+        bundle_files: list[AnnotationBundleFile],
+        config: LocalYoloTrainingRunnerConfig,
+    ) -> LocalYoloTrainingResult:
+        """Validate all local execution gates without importing or running YOLO."""
+        artifact_root, dataset_yaml_path, training_kwargs = self._validate_for_execution(
+            execution_run=execution_run,
+            artifact_policy=artifact_policy,
+            bundle_files=bundle_files,
+            config=config,
+        )
+        save_dir = (artifact_root / training_kwargs["name"]).resolve()
+        return LocalYoloTrainingResult(
+            execution_run_id=str(execution_run.id),
+            artifact_root_dir=str(artifact_root),
+            dataset_yaml_path=str(dataset_yaml_path),
+            save_dir=str(save_dir),
+            records=[],
+            summary={
+                "validation_only": True,
+                "training_would_run": True,
+                "ultralytics_imported": False,
+                "metadata_persisted": False,
+                "training_kwargs": training_kwargs,
+            },
+        )
+
+    def _validate_for_execution(
+        self,
+        *,
+        execution_run: DetectionTrainingExecutionRun,
+        artifact_policy: DetectionTrainingArtifactPolicy,
+        bundle_files: list[AnnotationBundleFile],
+        config: LocalYoloTrainingRunnerConfig,
+    ) -> tuple[Path, Path, dict[str, Any]]:
+        self._validate_prerequisites(execution_run, artifact_policy, config)
+        artifact_root = Path(config.artifact_root_dir).resolve()
+        base_model_path = Path(config.base_model_path).resolve()
+        dataset_yaml_path = self._find_dataset_yaml(bundle_files).resolve()
+        self._validate_paths(artifact_root, base_model_path, dataset_yaml_path, artifact_policy)
+
+        candidate_paths = [str(artifact_root), str(base_model_path)]
+        safety_report = RepositorySafetyValidator().validate(
+            self._repo_root, RepositorySafetyConfig(), candidate_paths=candidate_paths
+        )
+        if not safety_report.is_safe:
+            raise LocalYoloTrainingRunnerError("RepositorySafetyValidator did not pass")
+
+        training_kwargs = self._training_kwargs(config, dataset_yaml_path, artifact_root, execution_run)
+        return artifact_root, dataset_yaml_path, training_kwargs
 
     def _validate_prerequisites(
         self,

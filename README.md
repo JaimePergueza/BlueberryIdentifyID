@@ -14,7 +14,7 @@ Preliminary, non-diagnostic support for recognizing microorganisms associated wi
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and phase history, and [CLAUDE.md](CLAUDE.md) for the development rules that govern this repository.
 
-## MVP status (as of Fase 31)
+## MVP status (as of Fase 32)
 
 **What works today:** the full synchronous pipeline — sample intake, Petri
 dish + microscopy image upload with strict validation, `AnalysisRun`
@@ -83,7 +83,14 @@ requires a `ready_to_execute` execution run, requires a ready artifact policy
 with actual registration enabled, uses an external `artifact_root_dir`, and
 registers only metadata for generated artifacts. CI still does not install
 `ultralytics`, import `torch`, require GPU, train YOLO, download weights,
-generate weights, add datasets, or add taxonomy. The CI workflow runs
+generate weights, add datasets, or add taxonomy. Fase 32 validates the local
+`training` dependency path and adds `--dry-run-validation-only` to the local
+CLI so the same runner gates can be checked without importing `ultralytics`,
+training, creating weights, or registering artifact metadata. The local smoke
+closed as Cierre B on this workstation: dependency installation and import
+were verified, but real YOLO training remained pending because no usable
+local PostgreSQL service, persisted execution run, ready artifact policy, or
+generated `dataset.yaml` bundle was available. The CI workflow runs
 the fast suite on SQLite, applies
 migrations and PostgreSQL-only tests against a real PostgreSQL service, and
 runs an operational Celery smoke against real PostgreSQL + Redis services on

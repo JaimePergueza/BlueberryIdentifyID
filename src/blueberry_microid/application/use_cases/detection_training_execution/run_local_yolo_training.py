@@ -43,6 +43,28 @@ class RunLocalYoloTrainingUseCase:
         self._unit_of_work = unit_of_work
 
     def execute(self, execution_run_id: UUID, config: LocalYoloTrainingRunnerConfig) -> LocalYoloTrainingResult:
+        execution_run, artifact_policy, bundle_files = self._load_inputs(execution_run_id)
+        result = self._runner.run(
+            execution_run=execution_run,
+            artifact_policy=artifact_policy,
+            bundle_files=bundle_files,
+            config=config,
+        )
+        with self._unit_of_work as uow:
+            uow.detection_training_artifact_record_repository.add_many(result.records)
+            uow.commit()
+        return result
+
+    def validate_only(self, execution_run_id: UUID, config: LocalYoloTrainingRunnerConfig) -> LocalYoloTrainingResult:
+        execution_run, artifact_policy, bundle_files = self._load_inputs(execution_run_id)
+        return self._runner.validate_only(
+            execution_run=execution_run,
+            artifact_policy=artifact_policy,
+            bundle_files=bundle_files,
+            config=config,
+        )
+
+    def _load_inputs(self, execution_run_id: UUID):
         execution_run = self._execution_run_repository.get_by_id(execution_run_id)
         if execution_run is None:
             raise DetectionTrainingExecutionRunNotFoundError(
@@ -54,13 +76,4 @@ class RunLocalYoloTrainingUseCase:
                 f"detection_training_artifact_policy '{execution_run.artifact_policy_id}' does not exist"
             )
         bundle_files = self._bundle_file_repository.list_by_bundle_run_id(execution_run.annotation_bundle_run_id)
-        result = self._runner.run(
-            execution_run=execution_run,
-            artifact_policy=artifact_policy,
-            bundle_files=bundle_files,
-            config=config,
-        )
-        with self._unit_of_work as uow:
-            uow.detection_training_artifact_record_repository.add_many(result.records)
-            uow.commit()
-        return result
+        return execution_run, artifact_policy, bundle_files

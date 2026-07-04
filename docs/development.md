@@ -2095,3 +2095,27 @@ Fase 31 still forbids CI training, automatic training, external datasets,
 unapproved weight downloads, repository-stored weights, DB-stored binaries,
 original image modification, taxonomy, diagnosis claims, frontend,
 authentication, external tracking tools, and replacing `MockInferenceEngine`.
+
+## 42. Local YOLO training smoke validation (Fase 32)
+
+Fase 32 makes the local/manual runner operationally testable without adding
+training to CI. Local operators may install the optional dependency group with
+`pip install -e .[training]`; GitHub Actions must not install it or require
+GPU/YOLO.
+
+- `scripts/run_local_yolo_training.py --dry-run-validation-only` validates
+  the same execution run, artifact policy, bundle `dataset.yaml`,
+  `base_model_path`, external `artifact_root_dir`, manual confirmation, and
+  repository safety checks used by the real runner.
+- Dry-run validation does not import `ultralytics`, does not train, does not
+  create weights, and does not persist artifact metadata.
+- Real local training remains available only through the same CLI without
+  `--dry-run-validation-only`, after all persisted gates and external paths
+  are present and approved.
+
+The Fase 32 workstation validation installed the `training` extra and
+confirmed `ultralytics` import with `YOLO_CONFIG_DIR` redirected to a writable
+local directory. It closed as Cierre B because no usable local PostgreSQL
+service, persisted `DetectionTrainingExecutionRun`, ready
+`DetectionTrainingArtifactPolicy`, or generated `dataset.yaml` bundle was
+available for real training.

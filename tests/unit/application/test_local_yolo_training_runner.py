@@ -175,6 +175,29 @@ def test_runs_local_yolo_and_returns_metadata_only_records(tmp_path, monkeypatch
     assert weight_record.metadata["training_execution_run_id"] == str(execution_run.id)
 
 
+def test_validate_only_checks_gates_without_importing_or_training(tmp_path, monkeypatch):
+    repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+
+    result = LocalYoloTrainingRunner(
+        repo_root=repo_root,
+        yolo_class_factory=lambda: pytest.fail("validate_only must not import ultralytics"),
+    ).validate_only(
+        execution_run=execution_run,
+        artifact_policy=policy,
+        bundle_files=bundle_files,
+        config=_config(artifact_root, base_model),
+    )
+
+    assert result.records == []
+    assert result.summary["validation_only"] is True
+    assert result.summary["training_would_run"] is True
+    assert result.summary["ultralytics_imported"] is False
+    assert result.summary["metadata_persisted"] is False
+    assert result.summary["training_kwargs"]["data"].endswith("dataset.yaml")
+
+
 def test_blocks_in_ci_before_importing_ultralytics(tmp_path, monkeypatch):
     repo_root, artifact_root, base_model, _, execution_run, policy, bundle_files = _setup(tmp_path)
     monkeypatch.setenv("CI", "true")
