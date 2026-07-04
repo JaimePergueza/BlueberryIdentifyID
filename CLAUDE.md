@@ -829,6 +829,23 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   se valido import, pero no se ejecuto entrenamiento porque faltaban
   PostgreSQL local, execution run persistido, artifact policy ready y
   `dataset.yaml` generado.
+
+## 33. Local Seed Data & End-to-End Training Fixture (Fase 33)
+
+- `scripts/seed_local_training_fixture.py` crea, solo en ejecucion local, un
+  fixture tecnico sintetico para desbloquear el runner YOLO: imagen Petri
+  sintetica, imagen micro placeholder, `AnalysisRun` mock procesado, revision
+  humana final, dataset/release/audit/segmentacion/revision de region,
+  bundle real con `dataset.yaml`, quality gate, dry-run de training,
+  readiness, environment, artifact policy y execution run.
+- El seed no entrena, no importa `ultralytics`, no importa `torch`, no
+  descarga datasets, no descarga pesos, no crea pesos y no guarda binarios.
+- Las imagenes generadas por el seed son fixtures tecnicos para smoke test;
+  no son datos cientificos, no representan microorganismos reales y no
+  autorizan claims taxonomicos o diagnosticos.
+- El seed requiere PostgreSQL local disponible y rutas externas para storage
+  y artefactos. Si PostgreSQL no esta disponible, debe bloquear antes de
+  migraciones con un error claro.
 - `LocalYoloTrainingRunner` es el unico modulo que puede importar
   `ultralytics`, y lo hace lazy dentro de `run()` despues de validar no CI,
   confirmacion manual exacta, execution run `ready_to_execute`, artifact

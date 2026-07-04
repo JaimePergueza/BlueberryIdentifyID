@@ -9,6 +9,7 @@ This folder was created in Fase 30 as preventive operational documentation for a
 3. `artifact_registration_protocol.md` describes future metadata-only registration of artifacts.
 4. `rollback_protocol.md` explains how to stop and preserve traceability after a failed or unsafe attempt.
 5. `prohibited_actions.md` lists actions that remain forbidden.
+6. `local_yolo_smoke_test_report.md` records the latest local seed/smoke status and blockers.
 
 ## Current Boundary
 
