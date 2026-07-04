@@ -502,3 +502,114 @@ Automatic approval review failed: You've hit your usage limit.
 No Fase 37 training weights were generated. No Fase 37 binaries were stored in
 the database. No external datasets, taxonomy, diagnosis, genus/species labels,
 or CI training steps were added.
+
+## Fase 38 YOLO Labels-Fixed Smoke Training Rerun
+
+- Date: 2026-07-04
+- Pending commit at execution time
+- Decision: `smoke_training_completed_with_labels`.
+- Detection training execution run used for the final post-test smoke: `c3239bbe-869a-4e22-90c5-427e568328bf`.
+- Requested historical execution id `b5eb9008-ee86-4dfe-a35e-e7e4c33517c1` was not present in the local PostgreSQL database at rerun time.
+- Intermediate execution id `9b4e75f4-7ef1-4438-ab4e-e3fa6fde3383` was used before final tests, then removed when `pytest -m postgres` reset local PostgreSQL state.
+- Dataset YAML: `D:\BlueberryMicroID_training_artifacts\yolo_training_views\fase37_smoke\dataset.yaml`.
+- YOLO training view: `D:\BlueberryMicroID_training_artifacts\yolo_training_views\fase37_smoke`.
+- Artifact root: `D:\BlueberryMicroID_training_artifacts`.
+- Base model path: `D:\BlueberryMicroID_training_artifacts\base_models\yolov8n_blueberry_smoke.yaml`.
+- YOLO config dir: `D:\BlueberryMicroID_training_artifacts\ultralytics_config`.
+- Run name: `fase38_smoke_labels_fixed_final`.
+- Run dir: `D:\BlueberryMicroID_training_artifacts\fase38_smoke_labels_fixed_final`.
+
+Pre-run validation:
+
+```json
+{
+  "is_trainable": true,
+  "image_count": 3,
+  "label_file_count": 3,
+  "non_empty_label_file_count": 3,
+  "annotation_count": 3,
+  "issues": []
+}
+```
+
+Dry-run validation:
+
+```json
+{
+  "summary": {
+    "metadata_persisted": false,
+    "training_would_run": true,
+    "ultralytics_imported": false,
+    "validation_only": true,
+    "training_kwargs": {
+      "plots": false,
+      "pretrained": false
+    }
+  }
+}
+```
+
+Training command configuration:
+
+```text
+epochs=1
+image_size=320
+batch_size=1
+device=cpu
+workers=0
+plots=false
+pretrained=false
+```
+
+Ultralytics label evidence:
+
+```text
+train: Scanning ... labels\train... 1 images, 0 backgrounds, 0 corrupt
+Epoch 1/1 ... Instances 3
+val: Scanning ... labels\val... 1 images, 0 backgrounds, 0 corrupt
+Class all Images 1 Instances 1
+```
+
+No `no labels found` or `labels empty` message was observed. The metrics were
+computed as a smoke test only and are not scientifically useful:
+
+```text
+metrics/precision(B)=0
+metrics/recall(B)=0
+metrics/mAP50(B)=0
+metrics/mAP50-95(B)=0
+```
+
+Generated artifacts:
+
+```text
+D:\BlueberryMicroID_training_artifacts\fase38_smoke_labels_fixed_final\args.yaml
+D:\BlueberryMicroID_training_artifacts\fase38_smoke_labels_fixed_final\results.csv
+D:\BlueberryMicroID_training_artifacts\fase38_smoke_labels_fixed_final\weights\best.pt
+D:\BlueberryMicroID_training_artifacts\fase38_smoke_labels_fixed_final\weights\last.pt
+```
+
+Registered metadata-only checksums:
+
+```text
+results.csv sha256=ee72b8f808e94e580792d2b4ec194f09f5e4803c6bebd4ebaf5b1b83b156ac50
+best.pt sha256=abc791316fa719b11092038fdb0dfeba918f488e607c22c194f1505c0255a65d
+last.pt sha256=983eac9260c8442ced6477e3dec8e75828fb55ed1133049c938d6914f15216b6
+args.yaml sha256=c9807edc9a203664b8a4b669fd69ae427f58f86942d492df7f159e9cf09f21f8
+```
+
+Runtime assets before and after were unchanged and stayed outside the
+repository:
+
+```text
+D:\BlueberryMicroID_training_artifacts\ultralytics_config\Ultralytics\Arial.ttf
+D:\BlueberryMicroID_training_artifacts\ultralytics_config\Ultralytics\persistent_cache.json
+D:\BlueberryMicroID_training_artifacts\ultralytics_config\Ultralytics\settings.json
+```
+
+`Arial.ttf` was already present from the earlier smoke run and did not appear
+as a new repository artifact. No model weights were created inside the
+repository. No binary content was stored in the database; only paths, kinds,
+states, sizes, and checksums were registered. No external dataset, taxonomy,
+genus/species claim, microbiological diagnosis, frontend, authentication, or
+CI training step was added.
