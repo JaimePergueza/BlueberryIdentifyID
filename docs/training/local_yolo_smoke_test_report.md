@@ -613,3 +613,24 @@ repository. No binary content was stored in the database; only paths, kinds,
 states, sizes, and checksums were registered. No external dataset, taxonomy,
 genus/species claim, microbiological diagnosis, frontend, authentication, or
 CI training step was added.
+## Fase 39 Smoke Model Evaluation and Promotion Gate
+
+- Date: 2026-07-04
+- Source local training execution run: `d2d0c627-d5b2-4528-888e-af899e4f4537`
+- Model candidate id: `84496312-01aa-4d00-a2a0-affa415fd255`
+- Model evaluation run id: `055414c1-756b-45cb-8afd-66d4c768c2d3`
+- Promotion gate run id: `0218bfc9-ed50-47a8-bc27-eb4f9761e18a`
+- Evaluation decision: `smoke_only`
+- Promotion decision: `not_promotable`
+- Metrics: precision `0`, recall `0`, mAP50 `0`, mAP50-95 `0`.
+- Blocking reasons: `smoke_only`, `metrics_zero`, `dataset_insufficient`.
+
+Fase 39 did not train, did not run inference, did not load weights, did not
+copy artifacts, and did not store binary content in PostgreSQL. It created
+metadata-only candidate/evaluation/gate records so the Fase 38 smoke weights
+are explicitly classified as smoke-only and not promotable. The smoke model
+is not a scientific model and must not be used for production inference.
+After the PostgreSQL integration test reset, the existing Fase 38 external
+artifacts were re-registered as metadata-only records against the local Fase
+39 execution policy before evaluation; no files were copied and no new
+training run was executed for this evaluation.

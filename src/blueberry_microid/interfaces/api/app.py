@@ -30,6 +30,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     image_features,
     ml_preflight,
     micro_images,
+    model_evaluation,
     model_versions,
     petri_annotation_exports,
     petri_region_reviews,
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
 
     app.include_router(samples.router, prefix=API_V1_PREFIX)
     app.include_router(model_versions.router, prefix=API_V1_PREFIX)
+    app.include_router(model_evaluation.router, prefix=API_V1_PREFIX)
     app.include_router(petri_images.router, prefix=API_V1_PREFIX)
     app.include_router(micro_images.router, prefix=API_V1_PREFIX)
     app.include_router(analysis_runs.router, prefix=API_V1_PREFIX)

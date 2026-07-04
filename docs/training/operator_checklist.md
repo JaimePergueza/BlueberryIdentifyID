@@ -49,3 +49,11 @@ Do not continue with the Fase 31 local runner if `ultralytics` is unavailable lo
 - [ ] Repository safety result recorded.
 - [ ] Operator name or identifier recorded if policy allows it.
 - [ ] Stop/go decision recorded.
+## Fase 39 smoke model evaluation
+
+- [ ] Run `scripts/evaluate_smoke_model_candidate.py` for any local YOLO
+      smoke training output before considering promotion.
+- [ ] Confirm `promotion_decision` is not `promotable` for smoke fixtures
+      with insufficient data or zero metrics.
+- [ ] Confirm weights remain outside the repository and only metadata is
+      stored in the database.

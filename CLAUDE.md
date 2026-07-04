@@ -863,3 +863,18 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   Git, binarios en DB, modificar imagenes originales, taxonomia, diagnostico,
   frontend, autenticacion, MLflow/TensorBoard/W&B y reemplazar
   `MockInferenceEngine`.
+## Fase 39 - Smoke model evaluation and promotion gate
+
+- Fase 39 evaluates local/manual YOLO smoke outputs as metadata-only model
+  candidates.
+- `ModelCandidate` points at external weights by path/checksum/size only.
+- `ModelEvaluationRun` stores summarized metrics and thresholds, not full
+  artifacts or binary content.
+- `ModelPromotionGateRun` must block Fase 38 smoke weights as
+  `not_promotable` unless future datasets and metrics satisfy explicit
+  thresholds.
+- The smoke model is not a scientific model and must not be used for
+  production inference.
+- This phase does not train, does not infer, does not load weights, does not
+  add frontend/authentication/taxonomy/diagnosis, and does not replace
+  `MockInferenceEngine`.

@@ -49,6 +49,10 @@ from blueberry_microid.infrastructure.db.models.image_feature_extraction_run imp
 from blueberry_microid.infrastructure.db.models.image_feature_vector import ImageFeatureVectorModel
 from blueberry_microid.infrastructure.db.models.micro_image import MicroImageModel
 from blueberry_microid.infrastructure.db.models.model_version import ModelVersionModel
+from blueberry_microid.infrastructure.db.models.model_candidate import ModelCandidateModel
+from blueberry_microid.infrastructure.db.models.model_evaluation_issue import ModelEvaluationIssueModel
+from blueberry_microid.infrastructure.db.models.model_evaluation_run import ModelEvaluationRunModel
+from blueberry_microid.infrastructure.db.models.model_promotion_gate_run import ModelPromotionGateRunModel
 from blueberry_microid.infrastructure.db.models.petri_image import PetriImageModel
 from blueberry_microid.infrastructure.db.models.petri_annotation_export_item import PetriAnnotationExportItemModel
 from blueberry_microid.infrastructure.db.models.petri_annotation_export_run import PetriAnnotationExportRunModel
@@ -93,6 +97,10 @@ __all__ = [
     "ImageFeatureVectorModel",
     "MicroImageModel",
     "ModelVersionModel",
+    "ModelCandidateModel",
+    "ModelEvaluationIssueModel",
+    "ModelEvaluationRunModel",
+    "ModelPromotionGateRunModel",
     "PetriImageModel",
     "PetriAnnotationExportItemModel",
     "PetriAnnotationExportRunModel",

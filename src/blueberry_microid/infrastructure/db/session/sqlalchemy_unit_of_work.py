@@ -82,6 +82,12 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_image_feature_v
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_region_review_repository import (
     SqlAlchemyPetriRegionReviewRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_model_evaluation_repository import (
+    SqlAlchemyModelCandidateRepository,
+    SqlAlchemyModelEvaluationIssueRepository,
+    SqlAlchemyModelEvaluationRunRepository,
+    SqlAlchemyModelPromotionGateRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_annotation_export_item_repository import (
     SqlAlchemyPetriAnnotationExportItemRepository,
 )
@@ -199,6 +205,16 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.image_feature_vector_repository = SqlAlchemyImageFeatureVectorRepository(
+            self.session, auto_commit=False
+        )
+        self.model_candidate_repository = SqlAlchemyModelCandidateRepository(self.session, auto_commit=False)
+        self.model_evaluation_issue_repository = SqlAlchemyModelEvaluationIssueRepository(
+            self.session, auto_commit=False
+        )
+        self.model_evaluation_run_repository = SqlAlchemyModelEvaluationRunRepository(
+            self.session, auto_commit=False
+        )
+        self.model_promotion_gate_run_repository = SqlAlchemyModelPromotionGateRunRepository(
             self.session, auto_commit=False
         )
         self.petri_annotation_export_item_repository = SqlAlchemyPetriAnnotationExportItemRepository(

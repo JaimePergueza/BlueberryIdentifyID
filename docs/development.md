@@ -1,5 +1,21 @@
 # Development guide
 
+## Fase 39 - Smoke Model Evaluation & Promotion Gate
+
+- `scripts/evaluate_smoke_model_candidate.py` creates a metadata-only
+  `ModelCandidate`, evaluates external `results.csv`, and runs a promotion
+  gate for a local YOLO smoke run.
+- The Fase 38 smoke candidate is expected to produce
+  `evaluation_decision=smoke_only` and `promotion_decision=not_promotable`
+  because the fixture is tiny and core metrics are zero.
+- The evaluator does not import `ultralytics` or `torch`, does not train,
+  does not run inference, does not load `.pt` files, and does not store
+  binary content in DB.
+- Promotion to a future usable model requires sufficient dataset support,
+  non-zero metrics, threshold compliance, external artifact paths,
+  checksums, and an explicit gate decision. Smoke weights are never treated
+  as scientific or production models.
+
 ## Prerequisites
 
 - Python 3.10+

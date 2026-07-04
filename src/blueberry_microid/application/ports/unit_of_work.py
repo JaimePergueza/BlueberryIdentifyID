@@ -57,6 +57,12 @@ from blueberry_microid.application.ports.image_feature_extraction_run_repository
     ImageFeatureExtractionRunRepositoryPort,
 )
 from blueberry_microid.application.ports.image_feature_vector_repository import ImageFeatureVectorRepositoryPort
+from blueberry_microid.application.ports.model_evaluation_repository import (
+    ModelCandidateRepositoryPort,
+    ModelEvaluationIssueRepositoryPort,
+    ModelEvaluationRunRepositoryPort,
+    ModelPromotionGateRunRepositoryPort,
+)
 from blueberry_microid.application.ports.petri_region_review_repository import PetriRegionReviewRepositoryPort
 from blueberry_microid.application.ports.petri_annotation_export_item_repository import (
     PetriAnnotationExportItemRepositoryPort,
@@ -121,6 +127,10 @@ class UnitOfWorkPort(ABC):
     image_dataset_audit_run_repository: ImageDatasetAuditRunRepositoryPort
     image_feature_extraction_run_repository: ImageFeatureExtractionRunRepositoryPort
     image_feature_vector_repository: ImageFeatureVectorRepositoryPort
+    model_candidate_repository: ModelCandidateRepositoryPort
+    model_evaluation_issue_repository: ModelEvaluationIssueRepositoryPort
+    model_evaluation_run_repository: ModelEvaluationRunRepositoryPort
+    model_promotion_gate_run_repository: ModelPromotionGateRunRepositoryPort
     petri_annotation_export_item_repository: PetriAnnotationExportItemRepositoryPort
     petri_annotation_export_run_repository: PetriAnnotationExportRunRepositoryPort
     petri_region_review_repository: PetriRegionReviewRepositoryPort

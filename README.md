@@ -1,5 +1,15 @@
 # BlueberryMicroID
 
+## Fase 39 - Smoke Model Evaluation & Promotion Gate
+
+Fase 39 adds metadata-only model candidate evaluation for local/manual YOLO
+smoke artifacts. It reads registered artifact metadata and summarized
+`results.csv` values, classifies the Fase 38 smoke model as `smoke_only`,
+and blocks promotion as `not_promotable`.
+
+This phase does not train, run inference, load weights, expose downloads,
+store binaries in DB, add taxonomy, or claim diagnostic/scientific validity.
+
 Preliminary, non-diagnostic support for recognizing microorganisms associated with **blueberries**, from two kinds of lab imagery per sample:
 
 - **Petri dish image** ("macro" only by relative scale) — a photograph of the Petri dish where microbial growth is observed. **Never** a photograph of the blueberry fruit itself.

@@ -2231,3 +2231,22 @@ instalo el extra `training` y se valido el import de `ultralytics` con
 entrenamiento real porque la estacion no tenia PostgreSQL local, un
 `DetectionTrainingExecutionRun` persistido, una policy ready ni un
 `dataset.yaml` generado disponibles.
+## Fase 39 - Smoke model evaluation and promotion gate
+
+Fase 39 adds a metadata-only distinction between a completed smoke training
+run, an evaluable model candidate, and a promotable model. It introduces
+`ModelCandidate`, `ModelEvaluationRun`, `ModelEvaluationIssue`, and
+`ModelPromotionGateRun` records. These rows store paths, checksums, sizes,
+summaries, thresholds, decisions, and blocking reasons only; model weights
+and binary artifacts stay outside the repository and outside PostgreSQL.
+
+`ResultsCsvParser` reads the external Ultralytics `results.csv` summary
+without importing `ultralytics` or `torch`. `ModelCandidateBuilder` selects
+registered metadata for `best.pt` or `last.pt` without loading weights.
+`SmokeModelEvaluator` marks the Fase 38 smoke model as `smoke_only` because
+the fixture is intentionally tiny and core metrics are zero.
+`PromotionGateEvaluator` converts that evaluation into `not_promotable`.
+
+This phase does not train, run inference, create a demo, create frontend,
+create image-upload endpoints, replace `MockInferenceEngine`, add taxonomy,
+or make genus/species/diagnostic claims.

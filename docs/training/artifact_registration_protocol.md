@@ -75,3 +75,9 @@ If Git reports generated weights, stop and follow the rollback protocol.
 The Fase 31 local runner may register actual artifacts only as metadata-only `DetectionTrainingArtifactRecord` rows. It records local paths under the approved external `artifact_root_dir`, `relative_path`, file extension, size, `checksum_sha256`, artifact kind, artifact state, and the related `DetectionTrainingExecutionRun`.
 
 The runner must not copy artifact bytes into the repository and must not store artifact bytes in the database.
+## Fase 39 model candidate metadata
+
+Model candidate evaluation records may reference registered YOLO weights by
+external path, size, and `checksum_sha256`, but they must not copy weights,
+store binary content, or expose artifacts as downloads. Promotion gates must
+record blocking reasons when a smoke model is not promotable.

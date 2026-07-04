@@ -134,3 +134,10 @@ python scripts/run_local_yolo_training.py --dry-run-validation-only ...
 The dry-run validation mode reuses the same execution gates, artifact policy, `dataset.yaml`, `base_model_path`, external `artifact_root_dir`, and repository safety checks. It does not import `ultralytics`, does not train, does not create weights, and does not register artifact metadata. It is an operational readiness check, not model training.
 
 The Fase 32 local validation completed as Cierre B: the `training` extra installed successfully and `ultralytics` imported when `YOLO_CONFIG_DIR` was pointed to a writable local config directory. Real training remained pending because no usable local PostgreSQL service, persisted `DetectionTrainingExecutionRun`, ready `DetectionTrainingArtifactPolicy`, or generated `dataset.yaml` bundle was available on the workstation.
+## Fase 39 promotion gate note
+
+After a local YOLO smoke run, operators must run the metadata-only model
+evaluation before treating any weights as candidates. Smoke weights with
+zero metrics or insufficient fixture data must remain `smoke_only` /
+`not_promotable`; they are not valid for production inference, diagnosis, or
+genus/species claims.
