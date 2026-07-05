@@ -53,12 +53,38 @@ def test_two_image_upload_always_requires_human_review(api_client):
     assert response.json()["requires_human_review"] is True
 
 
+def test_two_image_upload_response_has_prediction_id(api_client):
+    body = _upload(api_client).json()
+    assert "prediction_id" in body
+    assert body["prediction_id"]
+
+
 def test_two_image_upload_persists_sample(api_client):
     body = _upload(api_client).json()
     sample_id = body["sample_id"]
     sample_response = api_client.get(f"/api/v1/samples/{sample_id}")
     assert sample_response.status_code == 200
     assert sample_response.json()["id"] == sample_id
+
+
+def test_two_image_upload_persists_petri_and_micro_images(api_client):
+    body = _upload(api_client).json()
+    run_id = body["analysis_run_id"]
+    run_response = api_client.get(f"/api/v1/analysis-runs/{run_id}")
+    assert run_response.status_code == 200
+    run = run_response.json()
+    assert run["petri_image_id"] == body["petri_image_id"]
+    assert run["micro_image_id"] == body["micro_image_id"]
+
+
+def test_two_image_upload_no_automatic_human_review(api_client):
+    body = _upload(api_client).json()
+    run_id = body["analysis_run_id"]
+    hr_response = api_client.get(f"/api/v1/analysis-runs/{run_id}/reviews")
+    assert hr_response.status_code == 200
+    body = hr_response.json()
+    reviews = body.get("reviews", body) if isinstance(body, dict) else body
+    assert reviews == []
 
 
 def test_two_image_upload_with_custom_sample_code(api_client):

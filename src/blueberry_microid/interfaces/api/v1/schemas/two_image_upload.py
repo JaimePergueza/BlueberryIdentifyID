@@ -14,6 +14,7 @@ class TwoImageUploadAnalysisRead(BaseModel):
     """
 
     analysis_run_id: UUID = Field(description="Persisted AnalysisRun identifier.")
+    prediction_id: UUID = Field(description="Persisted Prediction identifier.")
     sample_id: UUID = Field(description="Persisted Sample identifier.")
     petri_image_id: UUID = Field(description="Persisted PetriImage identifier.")
     micro_image_id: UUID = Field(description="Persisted MicroImage identifier.")

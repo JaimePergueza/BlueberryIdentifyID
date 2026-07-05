@@ -92,6 +92,7 @@ async def analyze_two_uploaded_images(
 
     return TwoImageUploadAnalysisRead(
         analysis_run_id=result.analysis_run_id,
+        prediction_id=result.prediction_id,
         sample_id=result.sample_id,
         petri_image_id=result.petri_image_id,
         micro_image_id=result.micro_image_id,

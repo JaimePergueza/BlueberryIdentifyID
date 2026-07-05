@@ -28,6 +28,7 @@ class TwoImageUploadResult:
     """
 
     analysis_run_id: UUID
+    prediction_id: UUID
     sample_id: UUID
     petri_image_id: UUID
     micro_image_id: UUID

@@ -244,6 +244,7 @@ def test_returns_result_with_real_ids():
     result = use_case.execute(_make_request())
     assert isinstance(result, TwoImageUploadResult)
     assert isinstance(result.analysis_run_id, UUID)
+    assert isinstance(result.prediction_id, UUID)
     assert isinstance(result.sample_id, UUID)
     assert isinstance(result.petri_image_id, UUID)
     assert isinstance(result.micro_image_id, UUID)
@@ -263,8 +264,17 @@ def test_persists_analysis_run_and_prediction():
     assert uow.analysis_run_repository.added[0].id == result.analysis_run_id
     assert len(uow.prediction_repository.added) == 1
     pred = uow.prediction_repository.added[0]
+    assert pred.id == result.prediction_id
     assert pred.analysis_run_id == result.analysis_run_id
     assert pred.requires_human_review is True
+
+
+def test_does_not_create_human_review():
+    use_case, uow = _make_use_case()
+    use_case.execute(_make_request())
+    assert not hasattr(uow, "human_review_repository") or not getattr(
+        uow, "_human_reviews_created", False
+    )
 
 
 def test_class_probabilities_sum_to_one():

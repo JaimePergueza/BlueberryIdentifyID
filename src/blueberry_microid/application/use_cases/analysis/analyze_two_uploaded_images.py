@@ -160,7 +160,7 @@ class AnalyzeTwoUploadedImagesUseCase:
             analysis_run.mark_processing()
             analysis_run.mark_needs_review()
             self._uow.analysis_run_repository.add(analysis_run)
-            self._uow.prediction_repository.add(prediction)
+            saved_prediction = self._uow.prediction_repository.add(prediction)
             self._uow.commit()
 
         logger.info(
@@ -174,6 +174,7 @@ class AnalyzeTwoUploadedImagesUseCase:
 
         return TwoImageUploadResult(
             analysis_run_id=analysis_run.id,
+            prediction_id=saved_prediction.id,
             sample_id=sample.id,
             petri_image_id=petri_image.id,
             micro_image_id=micro_image.id,

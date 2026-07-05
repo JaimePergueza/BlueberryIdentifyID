@@ -879,12 +879,14 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   add frontend/authentication/taxonomy/diagnosis, and does not replace
   `MockInferenceEngine`.
 
-## 40. Two-Image Upload Preliminary Analysis (Fase 40)
+## 40. Two-Image Upload Preliminary Analysis (Fase 40 + 40.1)
 
-- `POST /api/v1/analysis/two-image-upload` accepts two raw image uploads (Petri + microscopy) and returns a preliminary visual label immediately, without requiring prior sample registration or an AnalysisRun. It uses `PreliminaryTwoImageAnalysisEngine` (same label logic as `MockInferenceEngine`, no pixel inspection).
+- `POST /api/v1/analysis/two-image-upload` (HTTP 201) accepts two raw image uploads (Petri + microscopy) plus optional `sample_code` and `notes` form fields. It persists Sample, PetriImage, MicroImage, AnalysisRun (status `needs_review`) and Prediction, and returns their real DB UUIDs (`sample_id`, `petri_image_id`, `micro_image_id`, `analysis_run_id`, `prediction_id`). Uses `PreliminaryTwoImageAnalysisEngine` (no pixel inspection, always `requires_human_review=true`).
 - `GET /api/v1/analysis-runs/{id}/preliminary-result` exposes an existing `Prediction` in the same "preliminary result" schema.
 - Uploaded images are stored in `upload_storage_dir` (env: `BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR`, default `storage/uploads`). Internal paths are **never** returned in API responses.
-- `AnalyzeTwoUploadedImagesUseCase` validates both images before storing; if micro storage fails, the petri file is deleted (no orphans).
-- No new DB tables, no new migrations, no new domain entities. The engine is stateless and non-diagnostic.
+- `AnalyzeTwoUploadedImagesUseCase` validates both images before storing; if micro storage fails, the petri file is deleted (no orphans). Sample/PetriImage/MicroImage use individual repo commits; AnalysisRun+Prediction are written atomically via `UnitOfWork`.
+- `requires_human_review` is always `true` for this endpoint. `HumanReview` is **never** created automatically.
+- Uploaded images are **never** added to training datasets automatically.
+- No new DB tables, no new migrations, no new domain entities beyond the existing ones.
 - Labels are the same five preliminary visual categories. No taxonomic labels, species, genus, or diagnostic claims.
 - Sigue prohibido frontend, autenticacion, taxonomia, diagnostico, entrenamiento y reemplazar `MockInferenceEngine`.
