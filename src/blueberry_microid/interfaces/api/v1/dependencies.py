@@ -458,10 +458,17 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_re
 )
 from blueberry_microid.infrastructure.db.session.sqlalchemy_unit_of_work import SqlAlchemyUnitOfWork
 from blueberry_microid.infrastructure.storage.local_image_storage import LocalImageStorage
+from blueberry_microid.infrastructure.storage.local_upload_storage import LocalUploadStorage
 from blueberry_microid.infrastructure.storage.pillow_image_validator import PillowImageValidator
 from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.ml.inference_engine.mock_inference_engine import MockInferenceEngine
+from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine import (
+    PreliminaryTwoImageAnalysisEngine,
+)
+from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_images import (
+    AnalyzeTwoUploadedImagesUseCase,
+)
 from blueberry_microid.ml.preprocessing.classical_petri_segmenter import ClassicalPetriSegmenter
 from blueberry_microid.ml.preprocessing.image_feature_extractor import ImageFeatureExtractor
 from blueberry_microid.ml.training.classical_tabular_baseline import ClassicalTabularBaselineTrainer
@@ -536,6 +543,24 @@ def get_image_intake_service(
     # — never hardcoded in a router — so it is one source of truth and one
     # environment variable to change it.
     return ImageIntakeService(image_validator, image_storage, settings.max_upload_size_bytes)
+
+
+def get_upload_storage(settings: Settings = Depends(get_settings_dependency)) -> ImageStoragePort:
+    return LocalUploadStorage(settings.upload_storage_path)
+
+
+def get_analyze_two_uploaded_images_use_case(
+    settings: Settings = Depends(get_settings_dependency),
+    image_validator: ImageValidatorPort = Depends(get_image_validator),
+    upload_storage: ImageStoragePort = Depends(get_upload_storage),
+) -> AnalyzeTwoUploadedImagesUseCase:
+    engine = PreliminaryTwoImageAnalysisEngine()
+    return AnalyzeTwoUploadedImagesUseCase(
+        image_validator=image_validator,
+        upload_storage=upload_storage,
+        engine=engine,
+        max_upload_size_bytes=settings.max_upload_size_bytes,
+    )
 
 
 # --- repositories ----------------------------------------------------------

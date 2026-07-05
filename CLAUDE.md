@@ -878,3 +878,13 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - This phase does not train, does not infer, does not load weights, does not
   add frontend/authentication/taxonomy/diagnosis, and does not replace
   `MockInferenceEngine`.
+
+## 40. Two-Image Upload Preliminary Analysis (Fase 40)
+
+- `POST /api/v1/analysis/two-image-upload` accepts two raw image uploads (Petri + microscopy) and returns a preliminary visual label immediately, without requiring prior sample registration or an AnalysisRun. It uses `PreliminaryTwoImageAnalysisEngine` (same label logic as `MockInferenceEngine`, no pixel inspection).
+- `GET /api/v1/analysis-runs/{id}/preliminary-result` exposes an existing `Prediction` in the same "preliminary result" schema.
+- Uploaded images are stored in `upload_storage_dir` (env: `BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR`, default `storage/uploads`). Internal paths are **never** returned in API responses.
+- `AnalyzeTwoUploadedImagesUseCase` validates both images before storing; if micro storage fails, the petri file is deleted (no orphans).
+- No new DB tables, no new migrations, no new domain entities. The engine is stateless and non-diagnostic.
+- Labels are the same five preliminary visual categories. No taxonomic labels, species, genus, or diagnostic claims.
+- Sigue prohibido frontend, autenticacion, taxonomia, diagnostico, entrenamiento y reemplazar `MockInferenceEngine`.

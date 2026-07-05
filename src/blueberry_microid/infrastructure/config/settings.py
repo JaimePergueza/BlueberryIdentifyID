@@ -44,6 +44,22 @@ class Settings(BaseSettings):
     celery_task_eager_propagates: bool = Field(default=True)
     celery_task_time_limit: int | None = Field(default=300)
     celery_task_soft_time_limit: int | None = Field(default=240)
+    upload_storage_dir: Path | None = Field(
+        default=None,
+        validation_alias="BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR",
+    )
+
+    @property
+    def upload_storage_path(self) -> Path:
+        """Resolved upload storage directory.
+
+        Defaults to ``storage_root / 'uploads'`` so tests that override
+        ``storage_root`` (via ``Settings(storage_root=tmp_path)``) automatically
+        get an upload dir inside their tmp sandbox without extra config.
+        Override explicitly via the ``BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR``
+        environment variable.
+        """
+        return self.upload_storage_dir if self.upload_storage_dir is not None else self.storage_root / "uploads"
 
     @property
     def petri_image_path(self) -> Path:

@@ -19,6 +19,7 @@ venv/
 logs/
 storage/petri_images/*
 storage/micro_images/*
+storage/uploads/
 !storage/petri_images/.gitkeep
 !storage/micro_images/.gitkeep
 .claude/settings.local.json

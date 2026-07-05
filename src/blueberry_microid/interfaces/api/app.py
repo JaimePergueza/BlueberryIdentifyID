@@ -16,6 +16,7 @@ from blueberry_microid.infrastructure.logging.middleware import RequestLoggingMi
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.interfaces.api.error_handlers import register_exception_handlers
 from blueberry_microid.interfaces.api.v1.routers import (
+    analysis,
     analysis_runs,
     annotation_bundles,
     annotation_quality_gates,
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     # infrastructure/logging/middleware.py.
     app.add_middleware(RequestLoggingMiddleware)
 
+    app.include_router(analysis.router, prefix=API_V1_PREFIX)
     app.include_router(samples.router, prefix=API_V1_PREFIX)
     app.include_router(model_versions.router, prefix=API_V1_PREFIX)
     app.include_router(model_evaluation.router, prefix=API_V1_PREFIX)
