@@ -244,3 +244,64 @@ def test_dataset_release_persists_with_by_origin_lot_strategy(pg_session):
         {"id": release.id},
     ).scalar_one()
     assert stored == "by_origin_lot"
+
+
+def test_dataset_release_persists_snapshot_release_metadata(pg_session):
+    item = _create_dataset_item(pg_session, sample_code="S-PG-SNAPSHOT-RELEASE")
+    manifest = {
+        "dataset_snapshot_id": str(item.dataset_snapshot_id),
+        "items": [{"dataset_item_id": str(item.id), "ground_truth_label": "suspicious_growth"}],
+    }
+
+    release = _create_release(
+        pg_session,
+        item.dataset_snapshot_id,
+        release_kind="snapshot_release",
+        status="completed",
+        description="metadata-only release",
+        item_count=1,
+        train_count=0,
+        validation_count=0,
+        test_count=0,
+        label_distribution={"suspicious_growth": 1},
+        split_distribution=None,
+        manifest=manifest,
+        provenance={"eligible_item_count": 1, "skipped_item_count": 0, "split_oriented": False},
+    )
+    pg_session.refresh(release)
+
+    stored = pg_session.execute(
+        text(
+            "SELECT release_kind, status, description, manifest, provenance "
+            "FROM dataset_releases WHERE id = :id"
+        ),
+        {"id": release.id},
+    ).one()
+
+    assert stored.release_kind == "snapshot_release"
+    assert stored.status == "completed"
+    assert stored.description == "metadata-only release"
+    assert stored.manifest == manifest
+    assert stored.provenance["eligible_item_count"] == 1
+    assert stored.provenance["skipped_item_count"] == 0
+    assert stored.provenance["split_oriented"] is False
+
+
+def test_dataset_release_release_kind_check_constraint_rejects_unknown_value(pg_session):
+    item = _create_dataset_item(pg_session, sample_code="S-PG-RELEASE-BADKIND")
+    release = DatasetReleaseModel(
+        dataset_snapshot_id=item.dataset_snapshot_id,
+        name="pg-bad-kind-release",
+        version="0.1.0",
+        release_kind="not_a_real_release_kind",
+        status="completed",
+        split_strategy="by_sample",
+        random_seed=1,
+        train_ratio=0.7,
+        validation_ratio=0.15,
+        test_ratio=0.15,
+    )
+    pg_session.add(release)
+
+    with pytest.raises(IntegrityError):
+        pg_session.flush()

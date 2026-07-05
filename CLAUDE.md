@@ -108,6 +108,21 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
   YOLO, no copia imagenes, no guarda binarios y no agrega taxonomia,
   diagnostico, frontend ni autenticacion.
 
+## 5.1.3. DatasetRelease snapshot-only (Fase 45)
+
+- `POST /api/v1/datasets/releases/from-snapshot` crea un
+  `DatasetRelease` con `release_kind=snapshot_release` desde un
+  `DatasetSnapshot` curado.
+- Este flujo persiste `manifest` y `provenance` metadata-only en
+  `DatasetRelease`, calculando `label_distribution` desde los `DatasetItem`
+  elegibles.
+- Nunca debe llamar `DatasetSplitter`, crear `DatasetSplitItem`, crear splits
+  train/validation/test, entrenar, ejecutar YOLO, exportar COCO/YOLO, copiar
+  imagenes, guardar binarios, agregar datasets externos, taxonomia ni
+  diagnostico.
+- El flujo existente `POST /api/v1/datasets/releases` sigue siendo el unico
+  camino split-oriented y debe conservar su comportamiento.
+
 ## 5.2. Dataset release y particiones train/validation/test (Fase 9)
 
 - `DatasetRelease` congela una partición reproducible (train/validation/test) de un `DatasetSnapshot` ya existente; `DatasetSplitItem` registra el split de cada `DatasetItem` dentro de esa release. Ninguno de los dos modifica ni copia el `DatasetSnapshot`/`DatasetItem` original — solo los leen.

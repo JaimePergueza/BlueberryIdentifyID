@@ -144,6 +144,10 @@ class DuplicateDatasetSnapshotError(ConflictError):
     """Raised when a dataset snapshot name/version already exists."""
 
 
+class DuplicateDatasetReleaseError(ConflictError):
+    """Raised when a dataset release name/version already exists for a snapshot."""
+
+
 class DuplicateDatasetItemError(ConflictError):
     """Raised when the same AnalysisRun is inserted twice in one DatasetSnapshot."""
 

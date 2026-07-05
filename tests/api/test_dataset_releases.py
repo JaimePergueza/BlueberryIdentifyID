@@ -167,6 +167,75 @@ def test_create_release_returns_409_for_empty_snapshot(api_client):
     assert response.json()["error"]["code"] == "empty_dataset_snapshot"
 
 
+def test_create_snapshot_release_from_snapshot_without_split_items(api_client):
+    sample_id = _create_sample(api_client, "S-SNAPSHOT-RELEASE-1")
+    model_version_id = _create_model_version(api_client, "snapshot-release-flow")
+    petri_image_id = _create_petri_image(api_client, sample_id)
+    micro_image_id = _create_micro_image(api_client, sample_id)
+    run_response = api_client.post(
+        "/api/v1/analysis-runs",
+        json={
+            "sample_id": sample_id,
+            "petri_image_id": petri_image_id,
+            "micro_image_id": micro_image_id,
+            "model_version_id": model_version_id,
+        },
+    )
+    analysis_run_id = run_response.json()["id"]
+    process_response = api_client.post(f"/api/v1/analysis-runs/{analysis_run_id}/process")
+    prediction_label = process_response.json()["prediction"]["predicted_label"]
+    api_client.post(
+        f"/api/v1/analysis-runs/{analysis_run_id}/reviews",
+        json={"reviewer_name": "Dr. Morales", "review_decision": "confirmed"},
+    )
+    snapshot_response = api_client.post(
+        "/api/v1/datasets/snapshots",
+        json={"name": "snapshot-release-api", "version": "0.1.0", "created_by": "qa"},
+    )
+    snapshot = snapshot_response.json()
+
+    release_response = api_client.post(
+        "/api/v1/datasets/releases/from-snapshot",
+        json={
+            "dataset_snapshot_id": snapshot["id"],
+            "name": "snapshot-release-api",
+            "version": "0.1.0",
+            "description": "metadata-only release",
+            "created_by": "qa",
+            "notes": "snapshot-only metadata release",
+        },
+        headers={"X-Request-ID": "snapshot-release-request-1"},
+    )
+
+    assert release_response.status_code == 201
+    assert release_response.headers["X-Request-ID"] == "snapshot-release-request-1"
+    release = release_response.json()
+    assert release["dataset_snapshot_id"] == snapshot["id"]
+    assert release["release_kind"] == "snapshot_release"
+    assert release["status"] == "completed"
+    assert release["description"] == "metadata-only release"
+    assert release["item_count"] == 1
+    assert release["train_count"] == 0
+    assert release["validation_count"] == 0
+    assert release["test_count"] == 0
+    assert release["provenance"]["eligible_item_count"] == 1
+    assert release["provenance"]["split_oriented"] is False
+    assert release["manifest"]["dataset_release_id"] == release["id"]
+    assert release["manifest"]["items"][0]["analysis_run_id"] == analysis_run_id
+    assert release["manifest"]["items"][0]["ground_truth_label"] == prediction_label
+
+    get_response = api_client.get(f"/api/v1/datasets/releases/{release['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == release["id"]
+
+    items_response = api_client.get(f"/api/v1/datasets/releases/{release['id']}/items")
+    assert items_response.status_code == 200
+    items = items_response.json()
+    assert len(items) == 1
+    assert "split" not in items[0]
+    assert items[0]["ground_truth_label"] == prediction_label
+
+
 def test_create_release_returns_422_for_invalid_ratios(api_client):
     sample_id = _create_sample(api_client, "S-RELEASE-RATIO")
     model_version_id = _create_model_version(api_client, "release-ratio-flow")

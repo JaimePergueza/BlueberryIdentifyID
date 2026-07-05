@@ -1,5 +1,18 @@
 # Development guide
 
+## Fase 45 - Snapshot-only dataset releases
+
+- `POST /api/v1/datasets/releases/from-snapshot` creates a
+  `snapshot_release` from a curated `DatasetSnapshot`.
+- The release persists `manifest` and `provenance` metadata on
+  `DatasetRelease`.
+- This path does not call `DatasetSplitter`, does not create
+  `DatasetSplitItem`, and does not create train/validation/test splits.
+- `GET /api/v1/datasets/releases/{id}/items` returns split rows for
+  `split_release` and manifest items for `snapshot_release`.
+- This flow does not train, run YOLO, copy images, store binaries, add
+  external datasets, add taxonomy, or make diagnostic claims.
+
 ## Fase 44 - Snapshot creation from curation runs
 
 - `POST /api/v1/datasets/snapshots/from-curation-run` creates a

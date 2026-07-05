@@ -132,6 +132,9 @@ from blueberry_microid.application.services.detection_training_readiness_evaluat
     DetectionTrainingReadinessEvaluator,
 )
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
+from blueberry_microid.application.services.dataset_release_from_snapshot_evaluator import (
+    DatasetReleaseFromSnapshotEvaluator,
+)
 from blueberry_microid.application.services.dataset_splitter import DatasetSplitter
 from blueberry_microid.application.services.petri_reviewed_annotation_manifest_exporter import (
     PetriReviewedAnnotationManifestExporter,
@@ -226,6 +229,9 @@ from blueberry_microid.application.use_cases.detection_training_execution.list_d
     ListDetectionTrainingExecutionRunsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
+from blueberry_microid.application.use_cases.dataset.create_dataset_release_from_snapshot import (
+    CreateDatasetReleaseFromSnapshotUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.create_dataset_curation_run import (
     CreateDatasetCurationRunUseCase,
 )
@@ -1188,6 +1194,24 @@ def get_create_dataset_release_use_case(
         dataset_item_repository,
         sample_repository,
         dataset_splitter,
+        unit_of_work,
+    )
+
+
+def get_dataset_release_from_snapshot_evaluator() -> DatasetReleaseFromSnapshotEvaluator:
+    return DatasetReleaseFromSnapshotEvaluator()
+
+
+def get_create_dataset_release_from_snapshot_use_case(
+    dataset_snapshot_repository: DatasetSnapshotRepositoryPort = Depends(get_dataset_snapshot_repository),
+    dataset_item_repository: DatasetItemRepositoryPort = Depends(get_dataset_item_repository),
+    evaluator: DatasetReleaseFromSnapshotEvaluator = Depends(get_dataset_release_from_snapshot_evaluator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDatasetReleaseFromSnapshotUseCase:
+    return CreateDatasetReleaseFromSnapshotUseCase(
+        dataset_snapshot_repository,
+        dataset_item_repository,
+        evaluator,
         unit_of_work,
     )
 

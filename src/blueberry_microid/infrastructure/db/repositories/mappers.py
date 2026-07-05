@@ -57,6 +57,7 @@ from blueberry_microid.domain.enums.annotation_quality_gate_issue_severity impor
 from blueberry_microid.domain.enums.annotation_quality_gate_status import AnnotationQualityGateStatus
 from blueberry_microid.domain.enums.comparison_primary_metric import ComparisonPrimaryMetric
 from blueberry_microid.domain.enums.comparison_selection_policy import ComparisonSelectionPolicy
+from blueberry_microid.domain.enums.dataset_release_kind import DatasetReleaseKind
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.detection_training_algorithm import DetectionTrainingAlgorithm
 from blueberry_microid.domain.enums.detection_training_artifact_issue_severity import (
@@ -369,6 +370,9 @@ def dataset_release_to_entity(model: DatasetReleaseModel) -> DatasetRelease:
         dataset_snapshot_id=model.dataset_snapshot_id,
         name=model.name,
         version=model.version,
+        release_kind=DatasetReleaseKind(model.release_kind),
+        status=model.status,
+        description=model.description,
         split_strategy=SplitStrategy(model.split_strategy),
         random_seed=model.random_seed,
         train_ratio=model.train_ratio,
@@ -381,6 +385,8 @@ def dataset_release_to_entity(model: DatasetReleaseModel) -> DatasetRelease:
         test_count=model.test_count,
         label_distribution=model.label_distribution,
         split_distribution=model.split_distribution,
+        manifest=model.manifest,
+        provenance=model.provenance,
         created_at=model.created_at,
         created_by=model.created_by,
         notes=model.notes,

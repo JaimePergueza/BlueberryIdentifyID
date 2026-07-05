@@ -45,6 +45,7 @@ from blueberry_microid.application.exceptions import (
     DetectionTrainingRunNotFoundError,
     DuplicateDatasetItemError,
     DuplicateDatasetCurationItemError,
+    DuplicateDatasetReleaseError,
     DuplicateDatasetSnapshotError,
     DuplicateDatasetSplitItemError,
     DuplicateFinalHumanReviewError,
@@ -163,6 +164,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_final_petri_region_review"
     if isinstance(exc, DuplicateDatasetSnapshotError):
         return 409, "duplicate_dataset_snapshot"
+    if isinstance(exc, DuplicateDatasetReleaseError):
+        return 409, "duplicate_dataset_release"
     if isinstance(exc, DuplicateDatasetItemError):
         return 409, "duplicate_dataset_item"
     if isinstance(exc, DuplicateDatasetCurationItemError):

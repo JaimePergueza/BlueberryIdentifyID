@@ -7,10 +7,17 @@ from blueberry_microid.application.dto.dataset_curation_dto import (
     DatasetCurationPolicy,
     SnapshotFromCurationRunRequestDTO,
 )
-from blueberry_microid.application.dto.dataset_dto import CreateDatasetReleaseRequest, CreateDatasetSnapshotRequest
+from blueberry_microid.application.dto.dataset_dto import (
+    CreateDatasetReleaseFromSnapshotRequest,
+    CreateDatasetReleaseRequest,
+    CreateDatasetSnapshotRequest,
+)
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
+from blueberry_microid.application.use_cases.dataset.create_dataset_release_from_snapshot import (
+    CreateDatasetReleaseFromSnapshotUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.create_dataset_curation_run import CreateDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot_from_curation_run import (
@@ -32,6 +39,7 @@ from blueberry_microid.application.use_cases.ml_preflight.list_training_prefligh
 from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
 from blueberry_microid.interfaces.api.v1.dependencies import (
     get_create_dataset_release_use_case,
+    get_create_dataset_release_from_snapshot_use_case,
     get_create_dataset_curation_run_use_case,
     get_create_dataset_snapshot_use_case,
     get_create_dataset_snapshot_from_curation_run_use_case,
@@ -54,6 +62,7 @@ from blueberry_microid.interfaces.api.v1.schemas.dataset import (
     DatasetCurationRunCreate,
     DatasetCurationRunRead,
     DatasetReleaseCreate,
+    DatasetReleaseCreateFromSnapshot,
     DatasetReleaseRead,
     DatasetSnapshotCreate,
     DatasetSnapshotFromCurationRunCreate,
@@ -62,6 +71,7 @@ from blueberry_microid.interfaces.api.v1.schemas.dataset import (
     DatasetSplitItemRead,
 )
 from blueberry_microid.domain.enums.dataset_curation_status import DatasetCurationStatus
+from blueberry_microid.domain.enums.dataset_release_kind import DatasetReleaseKind
 from blueberry_microid.interfaces.api.v1.schemas.ml_preflight import TrainingPreflightRunResponse
 from blueberry_microid.interfaces.api.v1.schemas.training_run import TrainingRunResponse
 
@@ -218,6 +228,32 @@ def create_dataset_release(
     return DatasetReleaseRead.model_validate(dto)
 
 
+@router.post(
+    "/releases/from-snapshot",
+    response_model=DatasetReleaseRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_dataset_release_from_snapshot(
+    payload: DatasetReleaseCreateFromSnapshot,
+    use_case: CreateDatasetReleaseFromSnapshotUseCase = Depends(
+        get_create_dataset_release_from_snapshot_use_case
+    ),
+) -> DatasetReleaseRead:
+    dto = use_case.execute(
+        CreateDatasetReleaseFromSnapshotRequest(
+            dataset_snapshot_id=payload.dataset_snapshot_id,
+            name=payload.name,
+            version=payload.version,
+            description=payload.description,
+            include_inconclusive=payload.include_inconclusive,
+            allow_empty_release=payload.allow_empty_release,
+            created_by=payload.created_by,
+            notes=payload.notes,
+        )
+    )
+    return DatasetReleaseRead.model_validate(dto)
+
+
 @router.get("/releases", response_model=list[DatasetReleaseRead])
 def list_dataset_releases(
     use_case: ListDatasetReleasesUseCase = Depends(get_list_dataset_releases_use_case),
@@ -233,12 +269,20 @@ def get_dataset_release(
     return DatasetReleaseRead.model_validate(use_case.execute(dataset_release_id))
 
 
-@router.get("/releases/{dataset_release_id}/items", response_model=list[DatasetSplitItemRead])
+@router.get("/releases/{dataset_release_id}/items")
 def list_dataset_split_items(
     dataset_release_id: UUID,
+    release_use_case: GetDatasetReleaseUseCase = Depends(get_get_dataset_release_use_case),
     use_case: ListDatasetSplitItemsUseCase = Depends(get_list_dataset_split_items_use_case),
-) -> list[DatasetSplitItemRead]:
-    return [DatasetSplitItemRead.model_validate(dto) for dto in use_case.execute(dataset_release_id)]
+) -> list[dict]:
+    release = release_use_case.execute(dataset_release_id)
+    if release.release_kind == DatasetReleaseKind.SNAPSHOT_RELEASE:
+        manifest = release.manifest or {}
+        return manifest.get("items", [])
+    return [
+        DatasetSplitItemRead.model_validate(dto).model_dump(mode="json")
+        for dto in use_case.execute(dataset_release_id)
+    ]
 
 
 @router.get("/releases/{dataset_release_id}/manifest")

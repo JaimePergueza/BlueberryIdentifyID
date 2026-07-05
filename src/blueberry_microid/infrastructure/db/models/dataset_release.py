@@ -17,13 +17,22 @@ if TYPE_CHECKING:
 
 
 class DatasetReleaseModel(Base):
-    """A reproducible train/validation/test partition of a DatasetSnapshot."""
+    """A persisted dataset release.
+
+    `split_release` rows have DatasetSplitItems. `snapshot_release` rows are
+    metadata-only freezes of a curated DatasetSnapshot and do not create
+    split rows.
+    """
 
     __tablename__ = "dataset_releases"
     __table_args__ = (
         CheckConstraint(
             "split_strategy IN ('by_sample', 'by_lot', 'by_origin_lot')",
             name="ck_dataset_releases_split_strategy",
+        ),
+        CheckConstraint(
+            "release_kind IN ('split_release', 'snapshot_release')",
+            name="ck_dataset_releases_release_kind",
         ),
     )
 
@@ -33,6 +42,9 @@ class DatasetReleaseModel(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
+    release_kind: Mapped[str] = mapped_column(String(64), nullable=False, server_default="split_release")
+    status: Mapped[str] = mapped_column(String(64), nullable=False, server_default="completed")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     split_strategy: Mapped[str] = mapped_column(String(64), nullable=False)
     random_seed: Mapped[int] = mapped_column(Integer, nullable=False)
     train_ratio: Mapped[float] = mapped_column(Float, nullable=False)
@@ -44,6 +56,8 @@ class DatasetReleaseModel(Base):
     test_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     label_distribution: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     split_distribution: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    manifest: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    provenance: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -1,5 +1,22 @@
 # BlueberryMicroID
 
+## Fase 45 - Snapshot-Only Dataset Releases
+
+Fase 45 adds `POST /api/v1/datasets/releases/from-snapshot` to create a
+metadata-only `snapshot_release` directly from a curated `DatasetSnapshot`.
+It freezes the snapshot items into `DatasetRelease.manifest` and records
+`provenance` without calling `DatasetSplitter` and without creating
+`DatasetSplitItem` rows.
+
+The existing split-oriented `POST /api/v1/datasets/releases` remains intact.
+`GET /api/v1/datasets/releases/{release_id}` returns either release kind, and
+`GET /api/v1/datasets/releases/{release_id}/items` returns split items for a
+`split_release` or manifest items for a `snapshot_release`.
+
+This phase does not train, run YOLO, export COCO/YOLO annotations, copy
+images, store binaries, add external datasets, add taxonomy, or make
+diagnostic claims.
+
 ## Fase 44 - Snapshot Creation from Dataset Curation Runs
 
 Fase 44 adds the explicit endpoint

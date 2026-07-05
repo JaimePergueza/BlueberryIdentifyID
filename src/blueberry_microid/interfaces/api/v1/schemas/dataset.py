@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
+from blueberry_microid.domain.enums.dataset_release_kind import DatasetReleaseKind
 from blueberry_microid.domain.enums.dataset_curation_run_status import DatasetCurationRunStatus
 from blueberry_microid.domain.enums.dataset_curation_status import DatasetCurationStatus
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
@@ -109,6 +110,9 @@ class DatasetReleaseRead(BaseModel):
     dataset_snapshot_id: UUID
     name: str
     version: str
+    release_kind: DatasetReleaseKind
+    status: str
+    description: Optional[str]
     split_strategy: SplitStrategy
     random_seed: int
     train_ratio: float
@@ -120,9 +124,22 @@ class DatasetReleaseRead(BaseModel):
     test_count: int
     label_distribution: Optional[dict[str, int]]
     split_distribution: Optional[dict[str, dict[str, int]]]
+    manifest: Optional[dict[str, Any]]
+    provenance: Optional[dict[str, Any]]
     created_at: datetime
     created_by: Optional[str]
     notes: Optional[str]
+
+
+class DatasetReleaseCreateFromSnapshot(BaseModel):
+    dataset_snapshot_id: UUID
+    name: str
+    version: str
+    description: Optional[str] = None
+    include_inconclusive: bool = True
+    allow_empty_release: bool = False
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class DatasetSplitItemRead(BaseModel):

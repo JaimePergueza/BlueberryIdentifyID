@@ -9,6 +9,7 @@ from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.dataset_split_item import DatasetSplitItem
+from blueberry_microid.domain.enums.dataset_release_kind import DatasetReleaseKind
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.review_decision import ReviewDecision
@@ -111,11 +112,26 @@ class CreateDatasetReleaseRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class CreateDatasetReleaseFromSnapshotRequest:
+    dataset_snapshot_id: UUID
+    name: str
+    version: str
+    description: Optional[str] = None
+    include_inconclusive: bool = True
+    allow_empty_release: bool = False
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@dataclass(frozen=True, slots=True)
 class DatasetReleaseDTO:
     id: UUID
     dataset_snapshot_id: UUID
     name: str
     version: str
+    release_kind: DatasetReleaseKind
+    status: str
+    description: Optional[str]
     split_strategy: SplitStrategy
     random_seed: int
     train_ratio: float
@@ -127,6 +143,8 @@ class DatasetReleaseDTO:
     test_count: int
     label_distribution: Optional[dict[str, int]]
     split_distribution: Optional[dict[str, dict[str, int]]]
+    manifest: Optional[dict]
+    provenance: Optional[dict]
     created_at: datetime
     created_by: Optional[str]
     notes: Optional[str]
@@ -138,6 +156,9 @@ class DatasetReleaseDTO:
             dataset_snapshot_id=release.dataset_snapshot_id,
             name=release.name,
             version=release.version,
+            release_kind=release.release_kind,
+            status=release.status,
+            description=release.description,
             split_strategy=release.split_strategy,
             random_seed=release.random_seed,
             train_ratio=release.train_ratio,
@@ -149,6 +170,8 @@ class DatasetReleaseDTO:
             test_count=release.test_count,
             label_distribution=release.label_distribution,
             split_distribution=release.split_distribution,
+            manifest=release.manifest,
+            provenance=release.provenance,
             created_at=release.created_at,
             created_by=release.created_by,
             notes=release.notes,

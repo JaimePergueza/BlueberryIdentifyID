@@ -16,6 +16,22 @@ metadata-only `provenance`, plus the original references to `Sample`,
 phase does not copy images, create a `DatasetRelease`, create splits, train,
 run YOLO, store binaries, add taxonomy, or make diagnostic claims.
 
+## Fase 45 - Snapshot-only dataset releases
+
+`POST /api/v1/datasets/releases/from-snapshot` creates a metadata-only
+`DatasetRelease` with `release_kind=snapshot_release` from an existing curated
+`DatasetSnapshot`. It reads included `DatasetItem` rows, calculates
+`label_distribution`, persists a deterministic `manifest`, and stores
+`provenance` describing the snapshot source and skipped/eligible counts.
+
+This is intentionally separate from the existing split-oriented
+`POST /api/v1/datasets/releases`. Snapshot-only releases do not call
+`DatasetSplitter`, do not create `DatasetSplitItem`, and do not create
+train/validation/test partitions. `GET /api/v1/datasets/releases/{id}/items`
+returns split rows for split releases and manifest items for snapshot
+releases. No training, YOLO, COCO/YOLO export, image copying, binary storage,
+external dataset, taxonomy, or diagnostic claim is introduced.
+
 ## 1. Propósito del sistema
 
 **BlueberryMicroID** es una plataforma de apoyo al reconocimiento preliminar de microorganismos asociados a **arándanos (blueberry)**, único producto soportado en esta etapa, a partir de dos fuentes visuales por muestra:

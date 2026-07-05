@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
+from blueberry_microid.domain.enums.dataset_release_kind import DatasetReleaseKind
 from blueberry_microid.domain.enums.split_strategy import SplitStrategy
 from blueberry_microid.domain.exceptions.errors import InvalidSplitRatiosError
 
@@ -54,18 +55,23 @@ class DatasetRelease:
     dataset_snapshot_id: UUID
     name: str
     version: str
-    split_strategy: SplitStrategy
-    random_seed: int
-    train_ratio: float
-    validation_ratio: float
-    test_ratio: float
+    split_strategy: SplitStrategy = SplitStrategy.BY_SAMPLE
+    random_seed: int = 42
+    train_ratio: float = 0.70
+    validation_ratio: float = 0.15
+    test_ratio: float = 0.15
     id: UUID = field(default_factory=uuid4)
+    release_kind: DatasetReleaseKind = DatasetReleaseKind.SPLIT_RELEASE
+    status: str = "completed"
+    description: Optional[str] = None
     item_count: int = 0
     train_count: int = 0
     validation_count: int = 0
     test_count: int = 0
     label_distribution: Optional[dict[str, int]] = None
     split_distribution: Optional[dict[str, dict[str, int]]] = None
+    manifest: Optional[dict] = None
+    provenance: Optional[dict] = None
     created_at: datetime = field(default_factory=_utcnow)
     created_by: Optional[str] = None
     notes: Optional[str] = None
