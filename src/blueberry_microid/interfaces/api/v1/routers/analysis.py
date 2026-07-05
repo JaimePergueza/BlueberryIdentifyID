@@ -1,15 +1,13 @@
-"""Router for the two-image upload preliminary analysis endpoint (Fase 40.1).
+"""Router for the two-image upload preliminary analysis endpoints (Fase 40.1 / 42).
 
 Endpoints:
-- POST /api/v1/analysis/two-image-upload
-- GET  /api/v1/analysis-runs/{analysis_run_id}/preliminary-result
+- POST /api/v1/analysis/two-image-upload            (Fase 40.1 / 41)
+- GET  /api/v1/analysis-runs/{id}/preliminary-result (Fase 40.1 / 42 enriched)
+- GET  /api/v1/analysis-runs/{id}/final-result       (Fase 42 — NEW)
 
-Both carry a mandatory disclaimer: results are produced by a mock engine
-and carry no diagnostic or taxonomic validity.
-
-Fase 40.1: the POST endpoint now persists Sample, PetriImage, MicroImage,
-AnalysisRun and Prediction; the response includes real DB identifiers.
-`requires_human_review` is always True for this endpoint.
+All endpoints carry a mandatory disclaimer: results carry no diagnostic or
+taxonomic validity.  Human expert review is mandatory before any operational
+conclusion is drawn.
 """
 
 from typing import Optional
@@ -21,20 +19,29 @@ from blueberry_microid.application.dto.two_image_upload_dto import TwoImageUploa
 from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_images import (
     AnalyzeTwoUploadedImagesUseCase,
 )
-from blueberry_microid.application.use_cases.inference.get_prediction import GetPredictionForAnalysisRunUseCase
+from blueberry_microid.application.use_cases.analysis.get_final_analysis_result import (
+    GetFinalAnalysisResultUseCase,
+)
+from blueberry_microid.application.use_cases.analysis.get_preliminary_result_with_review import (
+    GetPreliminaryResultWithReviewUseCase,
+)
 from blueberry_microid.interfaces.api.v1.dependencies import (
     get_analyze_two_uploaded_images_use_case,
-    get_get_prediction_use_case,
+    get_get_final_analysis_result_use_case,
+    get_get_preliminary_result_with_review_use_case,
 )
+from blueberry_microid.interfaces.api.v1.schemas.final_analysis_result import FinalAnalysisResultRead
 from blueberry_microid.interfaces.api.v1.schemas.two_image_upload import (
     PreliminaryResultRead,
     TwoImageUploadAnalysisRead,
 )
 
-_MOCK_DISCLAIMER = (
-    "This result was produced by a simulated (mock) inference engine, for technical "
-    "testing only.  It does not perform real image analysis, has no diagnostic "
-    "validity, and never identifies a microorganism species or genus."
+_PRELIMINARY_DISCLAIMER = (
+    "PRELIMINARY RESULT — expert review required. "
+    "This result was produced by a classical image-processing heuristic (Fase 41). "
+    "It does not perform deep learning, has no diagnostic validity, and never "
+    "identifies a microorganism species or genus. "
+    "Human expert review is mandatory."
 )
 
 router = APIRouter(tags=["analysis"])
@@ -44,7 +51,7 @@ router = APIRouter(tags=["analysis"])
     "/analysis/two-image-upload",
     response_model=TwoImageUploadAnalysisRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Preliminary two-image upload analysis — persisted (non-diagnostic, mock engine)",
+    summary="Preliminary two-image upload analysis — persisted (non-diagnostic)",
     description=(
         "Upload a Petri dish photograph and a microscopy photograph of the same "
         "sample.  Both images are validated and stored; Sample, PetriImage, "
@@ -52,8 +59,7 @@ router = APIRouter(tags=["analysis"])
         "are returned so the AnalysisRun can be retrieved or reviewed later.  "
         "``requires_human_review`` is always ``true`` — all preliminary uploads "
         "require expert review.  "
-        "**This endpoint uses a simulated (mock) inference engine.  Results carry "
-        "no diagnostic or taxonomic validity.**"
+        "**Results carry no diagnostic or taxonomic validity.**"
     ),
 )
 async def analyze_two_uploaded_images(
@@ -112,31 +118,82 @@ async def analyze_two_uploaded_images(
 @router.get(
     "/analysis-runs/{analysis_run_id}/preliminary-result",
     response_model=PreliminaryResultRead,
-    summary="Get preliminary result for an existing AnalysisRun (non-diagnostic, mock engine)",
+    summary="Get preliminary result with human review status (non-diagnostic)",
     description=(
         "Retrieve the Prediction produced by a previously processed AnalysisRun, "
-        "formatted as a preliminary result.  The AnalysisRun must have status "
-        "'completed' or 'needs_review'; if no Prediction exists yet, a 404 is "
-        "returned.  "
+        "formatted as a preliminary result.  Includes current human review status "
+        "(Fase 42): ``human_review_status``, ``human_review_completed``, "
+        "``final_label`` if a review has been submitted.  "
+        "The AnalysisRun must have a Prediction; if not, a 404 is returned.  "
         "**Results carry no diagnostic or taxonomic validity.**"
     ),
 )
 def get_preliminary_result(
     analysis_run_id: UUID,
-    use_case: GetPredictionForAnalysisRunUseCase = Depends(get_get_prediction_use_case),
+    use_case: GetPreliminaryResultWithReviewUseCase = Depends(
+        get_get_preliminary_result_with_review_use_case
+    ),
 ) -> PreliminaryResultRead:
-    prediction = use_case.execute(analysis_run_id)
+    dto = use_case.execute(analysis_run_id)
     return PreliminaryResultRead(
-        analysis_run_id=str(prediction.analysis_run_id),
-        predicted_label=prediction.predicted_label,
-        confidence_score=prediction.confidence_score,
-        class_probabilities=prediction.class_probabilities,
-        requires_human_review=prediction.requires_human_review,
-        technical_observation=prediction.technical_observation,
-        disclaimer=_MOCK_DISCLAIMER,
-        explanation=prediction.explanation,
-        feature_summary=prediction.feature_summary,
-        quality_summary=prediction.quality_summary,
-        decision_trace=prediction.decision_trace,
-        warnings=prediction.warnings,
+        analysis_run_id=str(dto.analysis_run_id),
+        predicted_label=dto.predicted_label,
+        confidence_score=dto.confidence_score,
+        class_probabilities=dto.class_probabilities,
+        requires_human_review=dto.requires_human_review,
+        technical_observation=dto.technical_observation,
+        disclaimer=_PRELIMINARY_DISCLAIMER,
+        explanation=dto.explanation,
+        feature_summary=dto.feature_summary,
+        quality_summary=dto.quality_summary,
+        decision_trace=dto.decision_trace,
+        warnings=dto.warnings,
+        human_review_status=dto.human_review_status,
+        human_review_completed=dto.human_review_completed,
+        latest_human_review_id=dto.latest_human_review_id,
+        latest_human_review_decision=dto.latest_human_review_decision,
+        final_label=dto.final_label,
+        reviewed_at=dto.reviewed_at,
+    )
+
+
+@router.get(
+    "/analysis-runs/{analysis_run_id}/final-result",
+    response_model=FinalAnalysisResultRead,
+    summary="Get the final analysis result combining automatic prediction and expert review",
+    description=(
+        "Returns the full view of the analysis result: automatic Prediction "
+        "(unchanged from when it was created) plus the current expert HumanReview "
+        "(if submitted).  ``final_label`` and ``status`` reflect the expert decision; "
+        "they are ``null``/``pending_human_review`` until a review is submitted.  "
+        "**Results carry no diagnostic or taxonomic validity.**"
+    ),
+)
+def get_final_result(
+    analysis_run_id: UUID,
+    use_case: GetFinalAnalysisResultUseCase = Depends(get_get_final_analysis_result_use_case),
+) -> FinalAnalysisResultRead:
+    dto = use_case.execute(analysis_run_id)
+    return FinalAnalysisResultRead(
+        analysis_run_id=dto.analysis_run_id,
+        sample_id=dto.sample_id,
+        prediction_id=dto.prediction_id,
+        preliminary_label=dto.preliminary_label,
+        confidence_score=dto.confidence_score,
+        explanation=dto.explanation,
+        feature_summary=dto.feature_summary,
+        quality_summary=dto.quality_summary,
+        decision_trace=dto.decision_trace,
+        automatic_warnings=dto.automatic_warnings,
+        human_review_id=dto.human_review_id,
+        human_review_decision=dto.human_review_decision,
+        corrected_label=dto.corrected_label,
+        reviewer_name=dto.reviewer_name,
+        human_comments=dto.human_comments,
+        reviewed_at=dto.reviewed_at,
+        final_label=dto.final_label,
+        status=dto.status,
+        human_review_completed=dto.human_review_completed,
+        requires_human_review=dto.requires_human_review,
+        disclaimer=dto.disclaimer,
     )

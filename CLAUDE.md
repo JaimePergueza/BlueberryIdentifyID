@@ -890,3 +890,13 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - No new DB tables, no new migrations, no new domain entities beyond the existing ones.
 - Labels are the same five preliminary visual categories. No taxonomic labels, species, genus, or diagnostic claims.
 - Sigue prohibido frontend, autenticacion, taxonomia, diagnostico, entrenamiento y reemplazar `MockInferenceEngine`.
+
+## 42. Human Review Workflow for Preliminary Analysis (Fase 42)
+
+- Conecta el resultado preliminar del two-image-upload con el flujo de revision humana existente (`HumanReview`, `SubmitHumanReviewUseCase`, etc.) de fases anteriores. No crea entidades nuevas, no crea migraciones nuevas, no duplica logica de revision.
+- `GET /api/v1/analysis-runs/{id}/final-result` (nuevo): devuelve la Prediction automatica (nunca modificada) mas el HumanReview final actual (si existe) y resuelve `final_label` y `status` segun la decision humana. Implementado por `GetFinalAnalysisResultUseCase`.
+- `GET /api/v1/analysis-runs/{id}/preliminary-result` (actualizado): ahora devuelve ademas `human_review_status`, `human_review_completed`, `latest_human_review_id`, `latest_human_review_decision`, `final_label`, `reviewed_at`. Todos son opcionales con `None` por defecto para compatibilidad hacia atras. Implementado por `GetPreliminaryResultWithReviewUseCase`.
+- `ResolveFinalAnalysisLabel` (`application/services/final_analysis_resolver.py`): funcion pura que toma `Prediction` + `Optional[HumanReview]` y devuelve `FinalLabelResolution` con `final_label`, `status` y `human_review_completed`. Las 5 reglas: sin review → `pending_human_review`; `confirmed` → `final_label=prediction.predicted_label`; `corrected` → `final_label=review.corrected_label`; `marked_inconclusive` → `final_label=inconclusive`; `rejected_invalid_sample` → `final_label=None`.
+- Invariantes: la Prediction automatica jamas se modifica; HumanReview es la fuente de `final_label`; no se crea HumanReview automaticamente durante el upload; `rejected_invalid_sample` nunca es ground truth.
+- No hay nueva migracion (tabla `human_reviews` existe desde Fase 5). No hay nuevos enums. No hay nuevas entidades de dominio.
+- Sigue prohibido frontend, autenticacion, taxonomia, diagnostico, entrenamiento real, YOLO, ultralytics, torch, PyTorch, TensorFlow, datasets externos y reemplazar `MockInferenceEngine`.

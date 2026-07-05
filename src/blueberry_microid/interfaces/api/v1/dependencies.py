@@ -469,6 +469,12 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_images import (
     AnalyzeTwoUploadedImagesUseCase,
 )
+from blueberry_microid.application.use_cases.analysis.get_final_analysis_result import (
+    GetFinalAnalysisResultUseCase,
+)
+from blueberry_microid.application.use_cases.analysis.get_preliminary_result_with_review import (
+    GetPreliminaryResultWithReviewUseCase,
+)
 from blueberry_microid.ml.preprocessing.classical_petri_segmenter import ClassicalPetriSegmenter
 from blueberry_microid.ml.preprocessing.image_feature_extractor import ImageFeatureExtractor
 from blueberry_microid.ml.training.classical_tabular_baseline import ClassicalTabularBaselineTrainer
@@ -1011,6 +1017,26 @@ def get_list_human_reviews_use_case(
     human_review_repository: HumanReviewRepositoryPort = Depends(get_human_review_repository),
 ) -> ListHumanReviewsUseCase:
     return ListHumanReviewsUseCase(analysis_run_repository, human_review_repository)
+
+
+def get_get_preliminary_result_with_review_use_case(
+    analysis_run_repository: AnalysisRunRepositoryPort = Depends(get_analysis_run_repository),
+    prediction_repository: PredictionRepositoryPort = Depends(get_prediction_repository),
+    human_review_repository: HumanReviewRepositoryPort = Depends(get_human_review_repository),
+) -> GetPreliminaryResultWithReviewUseCase:
+    return GetPreliminaryResultWithReviewUseCase(
+        analysis_run_repository, prediction_repository, human_review_repository
+    )
+
+
+def get_get_final_analysis_result_use_case(
+    analysis_run_repository: AnalysisRunRepositoryPort = Depends(get_analysis_run_repository),
+    prediction_repository: PredictionRepositoryPort = Depends(get_prediction_repository),
+    human_review_repository: HumanReviewRepositoryPort = Depends(get_human_review_repository),
+) -> GetFinalAnalysisResultUseCase:
+    return GetFinalAnalysisResultUseCase(
+        analysis_run_repository, prediction_repository, human_review_repository
+    )
 
 
 def get_create_dataset_snapshot_use_case(
