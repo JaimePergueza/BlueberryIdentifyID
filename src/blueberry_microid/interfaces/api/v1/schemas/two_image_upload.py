@@ -1,17 +1,22 @@
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 
 
 class TwoImageUploadAnalysisRead(BaseModel):
-    """Response for POST /api/v1/analysis/two-image-upload.
+    """Response for POST /api/v1/analysis/two-image-upload (Fase 40.1).
 
-    Internal file paths are never included — only the upload_id, the
-    preliminary visual label and supporting metadata, and a mandatory
-    disclaimer that this is a non-diagnostic simulated result.
+    All entities are persisted; the response includes real DB identifiers so
+    the caller can retrieve or review the AnalysisRun later.
+    Internal file paths are never included.
     """
 
-    upload_id: str = Field(description="Unique identifier for this upload call.")
+    analysis_run_id: UUID = Field(description="Persisted AnalysisRun identifier.")
+    sample_id: UUID = Field(description="Persisted Sample identifier.")
+    petri_image_id: UUID = Field(description="Persisted PetriImage identifier.")
+    micro_image_id: UUID = Field(description="Persisted MicroImage identifier.")
     predicted_label: PredictedLabel = Field(
         description="Preliminary visual category (non-diagnostic, non-taxonomic)."
     )
@@ -20,7 +25,7 @@ class TwoImageUploadAnalysisRead(BaseModel):
         description="Simulated probability distribution over all five preliminary classes."
     )
     requires_human_review: bool = Field(
-        description="True when the label is 'inconclusive' and human verification is recommended."
+        description="Always True for this endpoint — all preliminary uploads require expert review."
     )
     disclaimer: str = Field(
         description="Mandatory disclaimer: this result is produced by a mock engine with no diagnostic validity."

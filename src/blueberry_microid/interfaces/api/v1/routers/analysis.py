@@ -1,4 +1,4 @@
-"""Router for the two-image upload preliminary analysis endpoint (Fase 40).
+"""Router for the two-image upload preliminary analysis endpoint (Fase 40.1).
 
 Endpoints:
 - POST /api/v1/analysis/two-image-upload
@@ -6,11 +6,16 @@ Endpoints:
 
 Both carry a mandatory disclaimer: results are produced by a mock engine
 and carry no diagnostic or taxonomic validity.
+
+Fase 40.1: the POST endpoint now persists Sample, PetriImage, MicroImage,
+AnalysisRun and Prediction; the response includes real DB identifiers.
+`requires_human_review` is always True for this endpoint.
 """
 
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 
 from blueberry_microid.application.dto.two_image_upload_dto import TwoImageUploadRequest
 from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_images import (
@@ -38,12 +43,15 @@ router = APIRouter(tags=["analysis"])
 @router.post(
     "/analysis/two-image-upload",
     response_model=TwoImageUploadAnalysisRead,
-    status_code=status.HTTP_200_OK,
-    summary="Preliminary two-image upload analysis (non-diagnostic, mock engine)",
+    status_code=status.HTTP_201_CREATED,
+    summary="Preliminary two-image upload analysis — persisted (non-diagnostic, mock engine)",
     description=(
         "Upload a Petri dish photograph and a microscopy photograph of the same "
-        "sample.  Both images are validated and stored; a preliminary visual "
-        "category is returned immediately.  "
+        "sample.  Both images are validated and stored; Sample, PetriImage, "
+        "MicroImage, AnalysisRun and Prediction are persisted.  Real DB identifiers "
+        "are returned so the AnalysisRun can be retrieved or reviewed later.  "
+        "``requires_human_review`` is always ``true`` — all preliminary uploads "
+        "require expert review.  "
         "**This endpoint uses a simulated (mock) inference engine.  Results carry "
         "no diagnostic or taxonomic validity.**"
     ),
@@ -57,6 +65,14 @@ async def analyze_two_uploaded_images(
         ...,
         description="Microscopy photograph taken from the same Petri dish sample.",
     ),
+    sample_code: Optional[str] = Form(
+        default=None,
+        description="Optional lab sample code. Auto-generated if omitted.",
+    ),
+    notes: Optional[str] = Form(
+        default=None,
+        description="Optional free-text notes for the sample.",
+    ),
     use_case: AnalyzeTwoUploadedImagesUseCase = Depends(get_analyze_two_uploaded_images_use_case),
 ) -> TwoImageUploadAnalysisRead:
     petri_content = await petri_image.read()
@@ -69,11 +85,16 @@ async def analyze_two_uploaded_images(
         micro_file_name=micro_image.filename or "micro_upload",
         micro_mime_type=micro_image.content_type or "application/octet-stream",
         micro_content=micro_content,
+        sample_code=sample_code or None,
+        notes=notes or None,
     )
     result = use_case.execute(request)
 
     return TwoImageUploadAnalysisRead(
-        upload_id=result.upload_id,
+        analysis_run_id=result.analysis_run_id,
+        sample_id=result.sample_id,
+        petri_image_id=result.petri_image_id,
+        micro_image_id=result.micro_image_id,
         predicted_label=result.predicted_label,
         confidence_score=result.confidence_score,
         class_probabilities=result.class_probabilities,

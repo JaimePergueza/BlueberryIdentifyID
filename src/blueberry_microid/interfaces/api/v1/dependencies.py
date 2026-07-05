@@ -549,20 +549,6 @@ def get_upload_storage(settings: Settings = Depends(get_settings_dependency)) ->
     return LocalUploadStorage(settings.upload_storage_path)
 
 
-def get_analyze_two_uploaded_images_use_case(
-    settings: Settings = Depends(get_settings_dependency),
-    image_validator: ImageValidatorPort = Depends(get_image_validator),
-    upload_storage: ImageStoragePort = Depends(get_upload_storage),
-) -> AnalyzeTwoUploadedImagesUseCase:
-    engine = PreliminaryTwoImageAnalysisEngine()
-    return AnalyzeTwoUploadedImagesUseCase(
-        image_validator=image_validator,
-        upload_storage=upload_storage,
-        engine=engine,
-        max_upload_size_bytes=settings.max_upload_size_bytes,
-    )
-
-
 # --- repositories ----------------------------------------------------------
 
 
@@ -580,6 +566,30 @@ def get_micro_image_repository(session: Session = Depends(get_db_session)) -> Mi
 
 def get_model_version_repository(session: Session = Depends(get_db_session)) -> ModelVersionRepositoryPort:
     return SqlAlchemyModelVersionRepository(session)
+
+
+def get_analyze_two_uploaded_images_use_case(
+    settings: Settings = Depends(get_settings_dependency),
+    image_validator: ImageValidatorPort = Depends(get_image_validator),
+    upload_storage: ImageStoragePort = Depends(get_upload_storage),
+    sample_repository: SampleRepositoryPort = Depends(get_sample_repository),
+    petri_image_repository: PetriImageRepositoryPort = Depends(get_petri_image_repository),
+    micro_image_repository: MicroImageRepositoryPort = Depends(get_micro_image_repository),
+    model_version_repository: ModelVersionRepositoryPort = Depends(get_model_version_repository),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> AnalyzeTwoUploadedImagesUseCase:
+    engine = PreliminaryTwoImageAnalysisEngine()
+    return AnalyzeTwoUploadedImagesUseCase(
+        image_validator=image_validator,
+        upload_storage=upload_storage,
+        engine=engine,
+        sample_repository=sample_repository,
+        petri_image_repository=petri_image_repository,
+        micro_image_repository=micro_image_repository,
+        model_version_repository=model_version_repository,
+        unit_of_work=unit_of_work,
+        max_upload_size_bytes=settings.max_upload_size_bytes,
+    )
 
 
 def get_analysis_run_repository(session: Session = Depends(get_db_session)) -> AnalysisRunRepositoryPort:

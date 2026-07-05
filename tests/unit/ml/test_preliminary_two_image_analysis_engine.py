@@ -38,12 +38,10 @@ def test_class_probabilities_cover_all_labels():
     assert set(result.class_probabilities.keys()) == expected
 
 
-def test_requires_human_review_only_for_inconclusive():
+def test_requires_human_review_always_true():
+    # Fase 40.1: all preliminary uploads require expert review regardless of label.
     result = _engine().analyze(petri_image_bytes=b"x", micro_image_bytes=b"y")
-    if result.predicted_label == PredictedLabel.INCONCLUSIVE:
-        assert result.requires_human_review is True
-    else:
-        assert result.requires_human_review is False
+    assert result.requires_human_review is True
 
 
 def test_upload_id_is_non_empty_string():

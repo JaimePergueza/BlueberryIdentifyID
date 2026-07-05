@@ -1,25 +1,27 @@
-"""API tests for Fase 40: two-image upload preliminary analysis."""
+"""API tests for Fase 40.1: persistent two-image upload analysis."""
 
 from tests.api.image_helpers import make_valid_jpeg_bytes, make_valid_png_bytes
 
 
-def test_two_image_upload_returns_200_with_valid_images(api_client):
-    petri = make_valid_jpeg_bytes()
-    micro = make_valid_jpeg_bytes(color="green")
+def _upload(api_client, petri=None, micro=None, extra_data=None):
+    petri = petri or make_valid_jpeg_bytes()
+    micro = micro or make_valid_jpeg_bytes(color="green")
+    files = {
+        "petri_image": ("petri.jpg", petri, "image/jpeg"),
+        "micro_image": ("micro.jpg", micro, "image/jpeg"),
+    }
+    return api_client.post("/api/v1/analysis/two-image-upload", files=files, data=extra_data or {})
 
-    response = api_client.post(
-        "/api/v1/analysis/two-image-upload",
-        files={
-            "petri_image": ("petri.jpg", petri, "image/jpeg"),
-            "micro_image": ("micro.jpg", micro, "image/jpeg"),
-        },
-    )
 
-    assert response.status_code == 200
+def test_two_image_upload_returns_201_with_valid_images(api_client):
+    response = _upload(api_client)
+
+    assert response.status_code == 201
     body = response.json()
-    assert "upload_id" in body
-    assert body["upload_id"]
-    assert "predicted_label" in body
+    assert "analysis_run_id" in body
+    assert "sample_id" in body
+    assert "petri_image_id" in body
+    assert "micro_image_id" in body
     assert body["predicted_label"] in (
         "no_evident_growth",
         "suspicious_growth",
@@ -29,29 +31,46 @@ def test_two_image_upload_returns_200_with_valid_images(api_client):
     )
     assert 0.0 < body["confidence_score"] <= 1.0
     assert len(body["class_probabilities"]) == 5
-    assert isinstance(body["requires_human_review"], bool)
+    assert body["requires_human_review"] is True
     assert body["disclaimer"]
 
 
 def test_two_image_upload_accepts_png(api_client):
     petri = make_valid_png_bytes()
     micro = make_valid_png_bytes(color="red")
+    files = {
+        "petri_image": ("petri.png", petri, "image/png"),
+        "micro_image": ("micro.png", micro, "image/png"),
+    }
+    response = api_client.post("/api/v1/analysis/two-image-upload", files=files)
 
-    response = api_client.post(
-        "/api/v1/analysis/two-image-upload",
-        files={
-            "petri_image": ("petri.png", petri, "image/png"),
-            "micro_image": ("micro.png", micro, "image/png"),
-        },
-    )
+    assert response.status_code == 201
+    assert response.json()["analysis_run_id"]
 
-    assert response.status_code == 200
-    assert response.json()["upload_id"]
+
+def test_two_image_upload_always_requires_human_review(api_client):
+    response = _upload(api_client)
+    assert response.json()["requires_human_review"] is True
+
+
+def test_two_image_upload_persists_sample(api_client):
+    body = _upload(api_client).json()
+    sample_id = body["sample_id"]
+    sample_response = api_client.get(f"/api/v1/samples/{sample_id}")
+    assert sample_response.status_code == 200
+    assert sample_response.json()["id"] == sample_id
+
+
+def test_two_image_upload_with_custom_sample_code(api_client):
+    response = _upload(api_client, extra_data={"sample_code": "PETRI-TEST-001"})
+    assert response.status_code == 201
+    body = response.json()
+    sample_response = api_client.get(f"/api/v1/samples/{body['sample_id']}")
+    assert sample_response.json()["sample_code"] == "PETRI-TEST-001"
 
 
 def test_two_image_upload_rejects_corrupted_petri(api_client):
     micro = make_valid_jpeg_bytes()
-
     response = api_client.post(
         "/api/v1/analysis/two-image-upload",
         files={
@@ -59,14 +78,12 @@ def test_two_image_upload_rejects_corrupted_petri(api_client):
             "micro_image": ("micro.jpg", micro, "image/jpeg"),
         },
     )
-
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_image"
 
 
 def test_two_image_upload_rejects_corrupted_micro(api_client):
     petri = make_valid_jpeg_bytes()
-
     response = api_client.post(
         "/api/v1/analysis/two-image-upload",
         files={
@@ -74,40 +91,22 @@ def test_two_image_upload_rejects_corrupted_micro(api_client):
             "micro_image": ("micro.jpg", b"not-an-image", "image/jpeg"),
         },
     )
-
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_image"
 
 
 def test_two_image_upload_response_contains_no_internal_path(api_client):
-    petri = make_valid_jpeg_bytes()
-    micro = make_valid_jpeg_bytes()
-
-    body = api_client.post(
-        "/api/v1/analysis/two-image-upload",
-        files={
-            "petri_image": ("petri.jpg", petri, "image/jpeg"),
-            "micro_image": ("micro.jpg", micro, "image/jpeg"),
-        },
-    ).json()
-
+    body = _upload(api_client).json()
     body_str = str(body)
-    assert "storage" not in body_str.lower() or "upload" not in body_str.lower()
     for key in body:
         if isinstance(body[key], str):
             assert "\\" not in body[key] and ("/" not in body[key] or key == "disclaimer")
 
 
-def test_two_image_upload_produces_unique_upload_ids(api_client):
-    petri = make_valid_jpeg_bytes()
-    micro = make_valid_jpeg_bytes()
-    files = {
-        "petri_image": ("petri.jpg", petri, "image/jpeg"),
-        "micro_image": ("micro.jpg", micro, "image/jpeg"),
-    }
-    r1 = api_client.post("/api/v1/analysis/two-image-upload", files=files).json()
-    r2 = api_client.post("/api/v1/analysis/two-image-upload", files=files).json()
-    assert r1["upload_id"] != r2["upload_id"]
+def test_two_image_upload_produces_unique_run_ids(api_client):
+    r1 = _upload(api_client).json()
+    r2 = _upload(api_client).json()
+    assert r1["analysis_run_id"] != r2["analysis_run_id"]
 
 
 def _setup_completed_analysis_run(api_client) -> str:
@@ -196,3 +195,20 @@ def test_get_preliminary_result_404_for_unknown_run(api_client):
         "/api/v1/analysis-runs/00000000-0000-0000-0000-000000000000/preliminary-result"
     )
     assert response.status_code == 404
+
+
+def test_two_image_upload_analysis_run_is_retrievable(api_client):
+    body = _upload(api_client).json()
+    run_id = body["analysis_run_id"]
+    run_response = api_client.get(f"/api/v1/analysis-runs/{run_id}")
+    assert run_response.status_code == 200
+    assert run_response.json()["id"] == run_id
+    assert run_response.json()["status"] in ("completed", "needs_review")
+
+
+def test_two_image_upload_preliminary_result_retrievable(api_client):
+    body = _upload(api_client).json()
+    run_id = body["analysis_run_id"]
+    result_response = api_client.get(f"/api/v1/analysis-runs/{run_id}/preliminary-result")
+    assert result_response.status_code == 200
+    assert result_response.json()["requires_human_review"] is True

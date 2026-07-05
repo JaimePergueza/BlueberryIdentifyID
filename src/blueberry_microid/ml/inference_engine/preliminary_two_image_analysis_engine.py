@@ -83,7 +83,7 @@ class PreliminaryTwoImageAnalysisEngine:
             predicted_label=label,
             confidence_score=confidence,
             class_probabilities=self._simulated_probabilities(label),
-            requires_human_review=(label == PredictedLabel.INCONCLUSIVE),
+            requires_human_review=True,
             disclaimer=PRELIMINARY_DISCLAIMER,
         )
 
