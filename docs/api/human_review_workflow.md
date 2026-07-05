@@ -60,6 +60,12 @@ training.  `confirmed`, `corrected`, and `marked_inconclusive` *may* be used
 in future dataset curation phases (explicit action required — no automatic
 export).
 
+Fase 44 makes that explicit action a separate snapshot step:
+`POST /api/v1/datasets/snapshots/from-curation-run` can freeze an already
+completed `DatasetCurationRun` into a `DatasetSnapshot`. The snapshot keeps
+metadata-only provenance back to the curation item and final human review. It
+does not create releases, split data, train, copy images, or add taxonomy.
+
 ---
 
 ## Endpoints

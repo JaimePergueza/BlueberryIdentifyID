@@ -1,5 +1,18 @@
 # Development guide
 
+## Fase 44 - Snapshot creation from curation runs
+
+- `POST /api/v1/datasets/snapshots/from-curation-run` creates a
+  `DatasetSnapshot` from an existing completed `DatasetCurationRun`.
+- The endpoint uses only `DatasetCurationItem` rows already marked
+  `included`. It records `curation_run_id`, `curation_item_id`, and
+  metadata-only provenance on every created `DatasetItem`.
+- `GET /api/v1/datasets/snapshots/{id}/items` and
+  `/manifest` expose this provenance for auditability.
+- The flow does not create a `DatasetRelease`, does not split the dataset,
+  does not train, does not run YOLO, does not copy images, does not store
+  binaries, and does not add taxonomy or diagnostic claims.
+
 ## Fase 39 - Smoke Model Evaluation & Promotion Gate
 
 - `scripts/evaluate_smoke_model_candidate.py` creates a metadata-only

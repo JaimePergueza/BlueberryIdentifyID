@@ -56,6 +56,11 @@ class DatasetManifestExporter:
             manifest_items.append(
                 {
                     "analysis_run_id": str(item.analysis_run_id),
+                    "dataset_item_id": str(item.id),
+                    "sample_id": str(item.sample_id),
+                    "prediction_id": str(item.prediction_id),
+                    "curation_run_id": str(item.curation_run_id) if item.curation_run_id else None,
+                    "curation_item_id": str(item.curation_item_id) if item.curation_item_id else None,
                     "sample_code": sample.sample_code,
                     "petri_image_path": petri_image.file_path,
                     "micro_image_path": micro_image.file_path,
@@ -63,6 +68,7 @@ class DatasetManifestExporter:
                     "source_review_decision": item.source_review_decision.value,
                     "prediction_label": prediction.predicted_label.value,
                     "final_review_id": str(item.final_review_id),
+                    "provenance": item.provenance or {},
                     "petri_metadata": {
                         "file_name": petri_image.file_name,
                         "mime_type": petri_image.mime_type,

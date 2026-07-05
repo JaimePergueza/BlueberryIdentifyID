@@ -315,9 +315,12 @@ def dataset_item_to_entity(model: DatasetItemModel) -> DatasetItem:
         final_review_id=model.final_review_id,
         source_review_decision=model.source_review_decision,
         id=model.id,
+        curation_run_id=model.curation_run_id,
+        curation_item_id=model.curation_item_id,
         ground_truth_label=model.ground_truth_label,
         included=model.included,
         exclusion_reason=model.exclusion_reason,
+        provenance=model.provenance,
         created_at=model.created_at,
     )
 

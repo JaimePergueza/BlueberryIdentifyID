@@ -113,6 +113,9 @@ from blueberry_microid.application.services.annotation_bundle_writer import Anno
 from blueberry_microid.application.services.annotation_quality_gate_validator import AnnotationQualityGateValidator
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_curation_evaluator import DatasetCurationEvaluator
+from blueberry_microid.application.services.snapshot_from_curation_evaluator import (
+    SnapshotFromCurationRunEvaluator,
+)
 from blueberry_microid.application.services.detection_training_artifact_policy_evaluator import (
     DetectionTrainingArtifactPolicyEvaluator,
 )
@@ -227,6 +230,9 @@ from blueberry_microid.application.use_cases.dataset.create_dataset_curation_run
     CreateDatasetCurationRunUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot_from_curation_run import (
+    CreateDatasetSnapshotFromCurationRunUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.get_dataset_curation_run import GetDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_snapshot import GetDatasetSnapshotUseCase
@@ -843,6 +849,10 @@ def get_dataset_curation_evaluator() -> DatasetCurationEvaluator:
     return DatasetCurationEvaluator()
 
 
+def get_snapshot_from_curation_run_evaluator() -> SnapshotFromCurationRunEvaluator:
+    return SnapshotFromCurationRunEvaluator()
+
+
 def get_manifest_validator() -> ManifestValidator:
     return ManifestValidator()
 
@@ -1087,6 +1097,13 @@ def get_create_dataset_snapshot_use_case(
         micro_image_repository,
         unit_of_work,
     )
+
+
+def get_create_dataset_snapshot_from_curation_run_use_case(
+    evaluator: SnapshotFromCurationRunEvaluator = Depends(get_snapshot_from_curation_run_evaluator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDatasetSnapshotFromCurationRunUseCase:
+    return CreateDatasetSnapshotFromCurationRunUseCase(evaluator, unit_of_work)
 
 
 def get_create_dataset_curation_run_use_case(

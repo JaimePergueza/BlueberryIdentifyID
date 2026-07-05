@@ -65,10 +65,13 @@ class DatasetItemDTO:
     micro_image_id: UUID
     prediction_id: UUID
     final_review_id: UUID
+    curation_run_id: Optional[UUID]
+    curation_item_id: Optional[UUID]
     ground_truth_label: Optional[PredictedLabel]
     source_review_decision: ReviewDecision
     included: bool
     exclusion_reason: Optional[str]
+    provenance: Optional[dict]
     created_at: datetime
 
     @classmethod
@@ -82,10 +85,13 @@ class DatasetItemDTO:
             micro_image_id=item.micro_image_id,
             prediction_id=item.prediction_id,
             final_review_id=item.final_review_id,
+            curation_run_id=item.curation_run_id,
+            curation_item_id=item.curation_item_id,
             ground_truth_label=item.ground_truth_label,
             source_review_decision=item.source_review_decision,
             included=item.included,
             exclusion_reason=item.exclusion_reason,
+            provenance=item.provenance,
             created_at=item.created_at,
         )
 

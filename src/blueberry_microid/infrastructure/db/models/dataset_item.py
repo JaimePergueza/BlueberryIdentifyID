@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.review_decision import ReviewDecision
 from blueberry_microid.infrastructure.db.models.base import Base
+from blueberry_microid.infrastructure.db.models.column_types import PortableJSON
 from blueberry_microid.infrastructure.db.models.enums import (
     predicted_label_enum as ground_truth_label_enum,
     review_decision_enum,
@@ -56,10 +57,17 @@ class DatasetItemModel(Base):
     final_review_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("human_reviews.id"), nullable=False
     )
+    curation_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dataset_curation_runs.id"), nullable=True, index=True
+    )
+    curation_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dataset_curation_items.id"), nullable=True, index=True
+    )
     ground_truth_label: Mapped[Optional[PredictedLabel]] = mapped_column(ground_truth_label_enum, nullable=True)
     source_review_decision: Mapped[ReviewDecision] = mapped_column(review_decision_enum, nullable=False)
     included: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     exclusion_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    provenance: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     dataset_snapshot: Mapped["DatasetSnapshotModel"] = relationship(back_populates="items")

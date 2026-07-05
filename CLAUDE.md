@@ -94,6 +94,20 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - Crear un snapshot desde la curation run es opcional y solo toma items
   incluidos. Nunca crear `DatasetRelease` automaticamente desde este flujo.
 
+## 5.1.2. Snapshot explicita desde curation run (Fase 44)
+
+- El camino canonico para congelar una curation run ya revisada es
+  `POST /api/v1/datasets/snapshots/from-curation-run`.
+- Solo `DatasetCurationItem` con `curation_status=included` puede generar
+  `DatasetItem`. Cada `DatasetItem` debe conservar `curation_run_id`,
+  `curation_item_id` y `provenance` metadata-only.
+- La snapshot conserva la trazabilidad:
+  `DatasetSnapshot -> DatasetItem -> DatasetCurationItem -> DatasetCurationRun
+  -> HumanReview final`. No se debe usar `Prediction` sola como ground truth.
+- Este flujo no crea `DatasetRelease`, no crea splits, no entrena, no ejecuta
+  YOLO, no copia imagenes, no guarda binarios y no agrega taxonomia,
+  diagnostico, frontend ni autenticacion.
+
 ## 5.2. Dataset release y particiones train/validation/test (Fase 9)
 
 - `DatasetRelease` congela una partición reproducible (train/validation/test) de un `DatasetSnapshot` ya existente; `DatasetSplitItem` registra el split de cada `DatasetItem` dentro de esa release. Ninguno de los dos modifica ni copia el `DatasetSnapshot`/`DatasetItem` original — solo los leen.

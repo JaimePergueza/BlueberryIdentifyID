@@ -149,3 +149,62 @@ class DatasetCurationRunDTO:
             created_at=run.created_at,
             completed_at=run.completed_at,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotFromCurationPolicy:
+    include_only_status: tuple[DatasetCurationStatus, ...] = (DatasetCurationStatus.INCLUDED,)
+    require_completed_curation_run: bool = True
+    require_human_review_id: bool = True
+    require_prediction_id: bool = True
+    require_petri_image_id: bool = True
+    require_micro_image_id: bool = True
+    require_final_label: bool = True
+    prevent_duplicate_analysis_runs: bool = True
+    prevent_duplicate_samples: bool = False
+    include_inconclusive: bool = True
+    allow_empty_snapshot: bool = False
+    allowed_labels: tuple[PredictedLabel, ...] = tuple(PredictedLabel)
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotFromCurationRunRequestDTO:
+    curation_run_id: UUID
+    snapshot_name: Optional[str] = None
+    snapshot_description: Optional[str] = None
+    created_by: Optional[str] = None
+    include_inconclusive: bool = True
+    allow_empty_snapshot: bool = False
+    notes: Optional[str] = None
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotCurationItemMappingDTO:
+    dataset_item_id: UUID
+    curation_item_id: UUID
+    sample_id: UUID
+    analysis_run_id: UUID
+    prediction_id: UUID
+    human_review_id: UUID
+    final_label: PredictedLabel
+    review_decision: ReviewDecision
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotFromCurationRunResultDTO:
+    snapshot_id: UUID
+    curation_run_id: UUID
+    status: str
+    snapshot_name: str
+    total_curation_items: int
+    included_items_scanned: int
+    dataset_items_created: int
+    excluded_items_ignored: int
+    duplicate_items_skipped: int
+    labels_distribution: dict[str, int]
+    created_by: Optional[str]
+    created_at: datetime
+    warnings: list[str]
+    provenance: dict
+    mappings: list[SnapshotCurationItemMappingDTO]

@@ -57,6 +57,15 @@ class SqlAlchemyDatasetCurationRunRepository(DatasetCurationRunRepositoryPort):
         models = self._session.execute(statement).scalars().all()
         return [dataset_curation_run_to_entity(model) for model in models]
 
+    def set_created_snapshot_id(self, curation_run_id: UUID, dataset_snapshot_id: UUID) -> DatasetCurationRun:
+        model = self._session.get(DatasetCurationRunModel, curation_run_id)
+        if model is None:
+            raise ValueError(f"dataset curation run '{curation_run_id}' was not found")
+        model.created_snapshot_id = dataset_snapshot_id
+        self._commit_or_flush()
+        self._session.refresh(model)
+        return dataset_curation_run_to_entity(model)
+
     def _commit_or_flush(self) -> None:
         if self._auto_commit:
             self._session.commit()
@@ -133,4 +142,3 @@ class SqlAlchemyDatasetCurationItemRepository(DatasetCurationItemRepositoryPort)
             self._session.commit()
         else:
             self._session.flush()
-

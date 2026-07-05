@@ -20,6 +20,10 @@ class DatasetCurationRunRepositoryPort(ABC):
     def list_all(self) -> list[DatasetCurationRun]:
         raise NotImplementedError
 
+    @abstractmethod
+    def set_created_snapshot_id(self, curation_run_id: UUID, dataset_snapshot_id: UUID) -> DatasetCurationRun:
+        raise NotImplementedError
+
 
 class DatasetCurationItemRepositoryPort(ABC):
     @abstractmethod
@@ -38,4 +42,3 @@ class DatasetCurationItemRepositoryPort(ABC):
     @abstractmethod
     def count_by_curation_run_id(self, curation_run_id: UUID) -> int:
         raise NotImplementedError
-

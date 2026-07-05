@@ -30,6 +30,7 @@ from blueberry_microid.application.exceptions import (
     ConflictError,
     DatasetCurationNotAllowedError,
     DatasetCurationRunNotFoundError,
+    DatasetSnapshotFromCurationNotAllowedError,
     DatasetReleaseNotFoundError,
     DatasetSnapshotNotFoundError,
     DatasetSplitMetadataError,
@@ -170,6 +171,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_dataset_split_item"
     if isinstance(exc, EmptyDatasetSnapshotError):
         return 409, "empty_dataset_snapshot"
+    if isinstance(exc, DatasetSnapshotFromCurationNotAllowedError):
+        return 409, "dataset_snapshot_from_curation_not_allowed"
     if isinstance(exc, BaselineTrainingNotAllowedError):
         return 409, "baseline_training_not_allowed"
     if isinstance(exc, TrainingRunComparisonNotAllowedError):

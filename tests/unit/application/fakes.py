@@ -8,6 +8,7 @@ hide real validation bugs.
 """
 
 import copy
+from dataclasses import replace
 from types import TracebackType
 from typing import Optional
 from uuid import UUID
@@ -28,6 +29,10 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
     AnnotationQualityGateRunRepositoryPort,
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_curation_repository import (
+    DatasetCurationItemRepositoryPort,
+    DatasetCurationRunRepositoryPort,
+)
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.detection_training_artifact_issue_repository import (
     DetectionTrainingArtifactIssueRepositoryPort,
@@ -110,6 +115,8 @@ from blueberry_microid.domain.entities.annotation_bundle_run import AnnotationBu
 from blueberry_microid.domain.entities.annotation_quality_gate_issue import AnnotationQualityGateIssue
 from blueberry_microid.domain.entities.annotation_quality_gate_run import AnnotationQualityGateRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
+from blueberry_microid.domain.entities.dataset_curation_item import DatasetCurationItem
+from blueberry_microid.domain.entities.dataset_curation_run import DatasetCurationRun
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
 from blueberry_microid.domain.entities.detection_training_artifact_issue import DetectionTrainingArtifactIssue
@@ -147,6 +154,7 @@ from blueberry_microid.domain.entities.training_run_comparison import TrainingRu
 from blueberry_microid.domain.entities.training_run_comparison_entry import TrainingRunComparisonEntry
 from blueberry_microid.domain.enums.analysis_status import AnalysisStatus
 from blueberry_microid.domain.enums.dataset_split import DatasetSplit
+from blueberry_microid.domain.enums.dataset_curation_status import DatasetCurationStatus
 
 
 class InMemorySampleRepository(SampleRepositoryPort):
@@ -290,6 +298,63 @@ class InMemoryDatasetItemRepository(DatasetItemRepositoryPort):
             if item.included and item.ground_truth_label is not None:
                 distribution[item.ground_truth_label.value] = distribution.get(item.ground_truth_label.value, 0) + 1
         return distribution
+
+
+class InMemoryDatasetCurationRunRepository(DatasetCurationRunRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DatasetCurationRun] = {}
+
+    def add(self, curation_run: DatasetCurationRun) -> DatasetCurationRun:
+        self._by_id[curation_run.id] = curation_run
+        return curation_run
+
+    def get_by_id(self, curation_run_id: UUID) -> Optional[DatasetCurationRun]:
+        return self._by_id.get(curation_run_id)
+
+    def list_all(self) -> list[DatasetCurationRun]:
+        return sorted(self._by_id.values(), key=lambda run: (run.created_at, run.id))
+
+    def set_created_snapshot_id(self, curation_run_id: UUID, dataset_snapshot_id: UUID) -> DatasetCurationRun:
+        curation_run = self._by_id[curation_run_id]
+        updated = replace(curation_run, created_snapshot_id=dataset_snapshot_id)
+        self._by_id[curation_run_id] = updated
+        return updated
+
+    def snapshot_state(self) -> dict[UUID, DatasetCurationRun]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, DatasetCurationRun]) -> None:
+        self._by_id = copy.deepcopy(state)
+
+
+class InMemoryDatasetCurationItemRepository(DatasetCurationItemRepositoryPort):
+    def __init__(self) -> None:
+        self._by_id: dict[UUID, DatasetCurationItem] = {}
+
+    def add_many(self, curation_items: list[DatasetCurationItem]) -> list[DatasetCurationItem]:
+        for item in curation_items:
+            self._by_id[item.id] = item
+        return curation_items
+
+    def list_by_curation_run_id(
+        self,
+        curation_run_id: UUID,
+        *,
+        status: Optional[DatasetCurationStatus] = None,
+    ) -> list[DatasetCurationItem]:
+        items = [item for item in self._by_id.values() if item.curation_run_id == curation_run_id]
+        if status is not None:
+            items = [item for item in items if item.curation_status == status]
+        return sorted(items, key=lambda item: (item.created_at, item.id))
+
+    def count_by_curation_run_id(self, curation_run_id: UUID) -> int:
+        return len([item for item in self._by_id.values() if item.curation_run_id == curation_run_id])
+
+    def snapshot_state(self) -> dict[UUID, DatasetCurationItem]:
+        return copy.deepcopy(self._by_id)
+
+    def restore_state(self, state: dict[UUID, DatasetCurationItem]) -> None:
+        self._by_id = copy.deepcopy(state)
 
 
 class InMemoryDatasetReleaseRepository(DatasetReleaseRepositoryPort):
@@ -1478,6 +1543,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         human_review_repository: Optional[HumanReviewRepositoryPort] = None,
         dataset_snapshot_repository: Optional[DatasetSnapshotRepositoryPort] = None,
         dataset_item_repository: Optional[DatasetItemRepositoryPort] = None,
+        dataset_curation_run_repository: Optional[DatasetCurationRunRepositoryPort] = None,
+        dataset_curation_item_repository: Optional[DatasetCurationItemRepositoryPort] = None,
         dataset_release_repository: Optional[DatasetReleaseRepositoryPort] = None,
         dataset_split_item_repository: Optional[DatasetSplitItemRepositoryPort] = None,
         training_preflight_run_repository: Optional[TrainingPreflightRunRepositoryPort] = None,
@@ -1534,6 +1601,8 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self.human_review_repository = human_review_repository
         self.dataset_snapshot_repository = dataset_snapshot_repository
         self.dataset_item_repository = dataset_item_repository
+        self.dataset_curation_run_repository = dataset_curation_run_repository
+        self.dataset_curation_item_repository = dataset_curation_item_repository
         self.dataset_release_repository = dataset_release_repository
         self.dataset_split_item_repository = dataset_split_item_repository
         self.training_preflight_run_repository = training_preflight_run_repository
@@ -1599,11 +1668,17 @@ class FakeUnitOfWork(UnitOfWorkPort):
         self._detection_training_artifact_issue_snapshot = None
         self._detection_training_execution_run_snapshot = None
         self._detection_training_execution_issue_snapshot = None
+        self._dataset_curation_run_snapshot = None
+        self._dataset_curation_item_snapshot = None
 
     def __enter__(self) -> "FakeUnitOfWork":
         self.entered = True
         if hasattr(self.human_review_repository, "snapshot_state"):
             self._human_review_snapshot = self.human_review_repository.snapshot_state()
+        if hasattr(self.dataset_curation_run_repository, "snapshot_state"):
+            self._dataset_curation_run_snapshot = self.dataset_curation_run_repository.snapshot_state()
+        if hasattr(self.dataset_curation_item_repository, "snapshot_state"):
+            self._dataset_curation_item_snapshot = self.dataset_curation_item_repository.snapshot_state()
         if hasattr(self.training_preflight_run_repository, "snapshot_state"):
             self._training_preflight_run_snapshot = self.training_preflight_run_repository.snapshot_state()
         if hasattr(self.training_preflight_issue_repository, "snapshot_state"):
@@ -1702,6 +1777,10 @@ class FakeUnitOfWork(UnitOfWorkPort):
     ) -> None:
         if exc_type is not None and self._human_review_snapshot is not None:
             self.human_review_repository.restore_state(self._human_review_snapshot)
+        if exc_type is not None and self._dataset_curation_run_snapshot is not None:
+            self.dataset_curation_run_repository.restore_state(self._dataset_curation_run_snapshot)
+        if exc_type is not None and self._dataset_curation_item_snapshot is not None:
+            self.dataset_curation_item_repository.restore_state(self._dataset_curation_item_snapshot)
         if exc_type is not None and self._training_preflight_run_snapshot is not None:
             self.training_preflight_run_repository.restore_state(self._training_preflight_run_snapshot)
         if exc_type is not None and self._training_preflight_issue_snapshot is not None:

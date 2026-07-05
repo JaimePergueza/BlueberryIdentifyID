@@ -26,8 +26,11 @@ class DatasetItem:
     final_review_id: UUID
     source_review_decision: ReviewDecision
     id: UUID = field(default_factory=uuid4)
+    curation_run_id: Optional[UUID] = None
+    curation_item_id: Optional[UUID] = None
     ground_truth_label: Optional[PredictedLabel] = None
     included: bool = True
     exclusion_reason: Optional[str] = None
+    provenance: Optional[dict] = None
     created_at: datetime = field(default_factory=_utcnow)
 

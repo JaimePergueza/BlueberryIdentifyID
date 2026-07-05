@@ -122,6 +122,14 @@ class CreateDatasetCurationRunUseCase:
                     final_review_id=item.human_review_id,
                     source_review_decision=item.review_decision,
                     ground_truth_label=item.final_label,
+                    curation_run_id=run_id,
+                    curation_item_id=item.id,
+                    provenance={
+                        "source": "dataset_curation_run",
+                        "curation_run_id": str(run_id),
+                        "curation_item_id": str(item.id),
+                        "selection_status": item.curation_status.value,
+                    },
                     included=True,
                 )
                 for item in included_items
@@ -149,11 +157,11 @@ class CreateDatasetCurationRunUseCase:
         with self._unit_of_work as uow:
             if snapshot is not None:
                 uow.dataset_snapshot_repository.add(snapshot)
-                if snapshot_items:
-                    uow.dataset_item_repository.add_many(snapshot_items)
             saved_run = uow.dataset_curation_run_repository.add(curation_run)
             if candidate_items:
                 uow.dataset_curation_item_repository.add_many(candidate_items)
+            if snapshot_items:
+                uow.dataset_item_repository.add_many(snapshot_items)
             uow.commit()
 
         return DatasetCurationRunDTO.from_entity(saved_run)
@@ -174,4 +182,3 @@ class CreateDatasetCurationRunUseCase:
             )
 
         return self._analysis_run_repository.list_all()
-

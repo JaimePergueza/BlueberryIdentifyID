@@ -1,5 +1,23 @@
 # BlueberryMicroID
 
+## Fase 44 - Snapshot Creation from Dataset Curation Runs
+
+Fase 44 adds the explicit endpoint
+`POST /api/v1/datasets/snapshots/from-curation-run` to freeze a completed,
+human-reviewed `DatasetCurationRun` into a `DatasetSnapshot`.
+
+Only included `DatasetCurationItem` rows can become `DatasetItem` rows. Each
+snapshot item keeps metadata-only provenance back to the curation run and
+curation item (`curation_run_id`, `curation_item_id`, and `provenance`) while
+retaining the original references to `AnalysisRun`, `Sample`, Petri image,
+micro image, `Prediction`, and final `HumanReview`. The manifest includes
+that provenance, but never image bytes, model weights, secrets, taxonomy, or
+diagnostic claims.
+
+This phase does not create `DatasetRelease`, train/validation/test splits,
+training jobs, YOLO runs, external datasets, frontend, authentication, or any
+replacement for `MockInferenceEngine`.
+
 ## Fase 43 - Dataset Curation from Human-Reviewed Two-Image Analyses
 
 Fase 43 adds persisted `DatasetCurationRun` and `DatasetCurationItem`

@@ -50,11 +50,43 @@ class DatasetItemRead(BaseModel):
     micro_image_id: UUID
     prediction_id: UUID
     final_review_id: UUID
+    curation_run_id: Optional[UUID] = None
+    curation_item_id: Optional[UUID] = None
     ground_truth_label: Optional[PredictedLabel]
     source_review_decision: ReviewDecision
     included: bool
     exclusion_reason: Optional[str]
+    provenance: Optional[dict[str, Any]] = None
     created_at: datetime
+
+
+class DatasetSnapshotFromCurationRunCreate(BaseModel):
+    curation_run_id: UUID
+    snapshot_name: Optional[str] = None
+    snapshot_description: Optional[str] = None
+    include_inconclusive: bool = True
+    allow_empty_snapshot: bool = False
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DatasetSnapshotFromCurationRunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    snapshot_id: UUID
+    curation_run_id: UUID
+    status: str
+    snapshot_name: str
+    total_curation_items: int
+    included_items_scanned: int
+    dataset_items_created: int
+    excluded_items_ignored: int
+    duplicate_items_skipped: int
+    labels_distribution: dict[str, int]
+    created_by: Optional[str]
+    created_at: datetime
+    warnings: list[str]
+    provenance: dict[str, Any]
 
 
 class DatasetReleaseCreate(BaseModel):

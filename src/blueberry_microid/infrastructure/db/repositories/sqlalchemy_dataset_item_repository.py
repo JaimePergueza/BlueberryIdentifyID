@@ -27,10 +27,13 @@ class SqlAlchemyDatasetItemRepository(DatasetItemRepositoryPort):
                 micro_image_id=item.micro_image_id,
                 prediction_id=item.prediction_id,
                 final_review_id=item.final_review_id,
+                curation_run_id=item.curation_run_id,
+                curation_item_id=item.curation_item_id,
                 ground_truth_label=item.ground_truth_label,
                 source_review_decision=item.source_review_decision,
                 included=item.included,
                 exclusion_reason=item.exclusion_reason,
+                provenance=item.provenance,
                 created_at=item.created_at,
             )
             for item in dataset_items

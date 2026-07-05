@@ -181,6 +181,10 @@ class DatasetCurationNotAllowedError(ApplicationError):
     """Raised when a curation request would scan all AnalysisRuns without explicit consent."""
 
 
+class DatasetSnapshotFromCurationNotAllowedError(ConflictError):
+    """Raised when a DatasetSnapshot cannot be safely created from a curation run."""
+
+
 class BaselineTrainingNotAllowedError(ConflictError):
     """Raised when a baseline TrainingRun cannot be created from current state."""
 

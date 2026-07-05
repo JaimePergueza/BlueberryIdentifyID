@@ -177,3 +177,111 @@ def test_dataset_curation_item_unique_per_run_and_analysis(pg_session):
             },
         )
         pg_session.flush()
+
+
+def test_dataset_items_reference_curation_run_and_item_with_metadata(pg_session):
+    refs = _seed_reviewed_analysis(pg_session)
+    snapshot_id = uuid4()
+    curation_run_id = uuid4()
+    curation_item_id = uuid4()
+    dataset_item_id = uuid4()
+
+    pg_session.execute(
+        text(
+            """
+            INSERT INTO dataset_snapshots
+                (id, name, version, item_count, label_distribution, selection_criteria)
+            VALUES
+                (:id, 'curation-snapshot-pg', 'v1', 1, CAST(:labels AS jsonb), CAST(:criteria AS jsonb))
+            """
+        ),
+        {
+            "id": snapshot_id,
+            "labels": json.dumps({"suspicious_growth": 1}),
+            "criteria": json.dumps({"source": "human_reviewed_curation_run"}),
+        },
+    )
+    pg_session.execute(
+        text(
+            """
+            INSERT INTO dataset_curation_runs
+                (id, status, policy, total_candidates_scanned, included_count, excluded_count,
+                 created_snapshot_id)
+            VALUES
+                (:id, 'completed', CAST(:policy AS jsonb), 1, 1, 0, :snapshot_id)
+            """
+        ),
+        {
+            "id": curation_run_id,
+            "snapshot_id": snapshot_id,
+            "policy": json.dumps({"require_final_human_review": True}),
+        },
+    )
+    pg_session.execute(
+        text(
+            """
+            INSERT INTO dataset_curation_items
+                (id, curation_run_id, sample_id, analysis_run_id, prediction_id, human_review_id,
+                 petri_image_id, micro_image_id, automatic_label, final_label, review_decision,
+                 curation_status, provenance)
+            VALUES
+                (:id, :curation_run_id, :sample_id, :analysis_run_id, :prediction_id, :human_review_id,
+                 :petri_image_id, :micro_image_id, 'suspicious_growth', 'suspicious_growth', 'confirmed',
+                 'included', CAST(:provenance AS jsonb))
+            """
+        ),
+        {
+            "id": curation_item_id,
+            "curation_run_id": curation_run_id,
+            "sample_id": refs["sample_id"],
+            "analysis_run_id": refs["analysis_run_id"],
+            "prediction_id": refs["prediction_id"],
+            "human_review_id": refs["review_id"],
+            "petri_image_id": refs["petri_image_id"],
+            "micro_image_id": refs["micro_image_id"],
+            "provenance": json.dumps({"prediction_is_ground_truth": False}),
+        },
+    )
+    pg_session.execute(
+        text(
+            """
+            INSERT INTO dataset_items
+                (id, dataset_snapshot_id, analysis_run_id, sample_id, petri_image_id, micro_image_id,
+                 prediction_id, final_review_id, ground_truth_label, source_review_decision,
+                 curation_run_id, curation_item_id, included, provenance)
+            VALUES
+                (:id, :dataset_snapshot_id, :analysis_run_id, :sample_id, :petri_image_id, :micro_image_id,
+                 :prediction_id, :final_review_id, 'suspicious_growth', 'confirmed',
+                 :curation_run_id, :curation_item_id, true, CAST(:provenance AS jsonb))
+            """
+        ),
+        {
+            "id": dataset_item_id,
+            "dataset_snapshot_id": snapshot_id,
+            "analysis_run_id": refs["analysis_run_id"],
+            "sample_id": refs["sample_id"],
+            "petri_image_id": refs["petri_image_id"],
+            "micro_image_id": refs["micro_image_id"],
+            "prediction_id": refs["prediction_id"],
+            "final_review_id": refs["review_id"],
+            "curation_run_id": curation_run_id,
+            "curation_item_id": curation_item_id,
+            "provenance": json.dumps({"source": "human_reviewed_curation_run"}),
+        },
+    )
+    pg_session.flush()
+
+    row = pg_session.execute(
+        text(
+            """
+            SELECT curation_run_id, curation_item_id, provenance->>'source' AS source
+            FROM dataset_items
+            WHERE id = :id
+            """
+        ),
+        {"id": dataset_item_id},
+    ).one()
+
+    assert row.curation_run_id == curation_run_id
+    assert row.curation_item_id == curation_item_id
+    assert row.source == "human_reviewed_curation_run"

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from blueberry_microid.application.dto.dataset_curation_dto import (
     CreateDatasetCurationRunRequest,
     DatasetCurationPolicy,
+    SnapshotFromCurationRunRequestDTO,
 )
 from blueberry_microid.application.dto.dataset_dto import CreateDatasetReleaseRequest, CreateDatasetSnapshotRequest
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
@@ -12,6 +13,9 @@ from blueberry_microid.application.services.dataset_release_manifest_exporter im
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_curation_run import CreateDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot_from_curation_run import (
+    CreateDatasetSnapshotFromCurationRunUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.get_dataset_curation_run import GetDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_snapshot import GetDatasetSnapshotUseCase
@@ -30,6 +34,7 @@ from blueberry_microid.interfaces.api.v1.dependencies import (
     get_create_dataset_release_use_case,
     get_create_dataset_curation_run_use_case,
     get_create_dataset_snapshot_use_case,
+    get_create_dataset_snapshot_from_curation_run_use_case,
     get_dataset_manifest_exporter,
     get_dataset_release_manifest_exporter,
     get_get_dataset_release_use_case,
@@ -51,6 +56,8 @@ from blueberry_microid.interfaces.api.v1.schemas.dataset import (
     DatasetReleaseCreate,
     DatasetReleaseRead,
     DatasetSnapshotCreate,
+    DatasetSnapshotFromCurationRunCreate,
+    DatasetSnapshotFromCurationRunRead,
     DatasetSnapshotRead,
     DatasetSplitItemRead,
 )
@@ -138,6 +145,31 @@ def list_dataset_snapshots(
     use_case: ListDatasetSnapshotsUseCase = Depends(get_list_dataset_snapshots_use_case),
 ) -> list[DatasetSnapshotRead]:
     return [DatasetSnapshotRead.model_validate(dto) for dto in use_case.execute()]
+
+
+@router.post(
+    "/snapshots/from-curation-run",
+    response_model=DatasetSnapshotFromCurationRunRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_dataset_snapshot_from_curation_run(
+    payload: DatasetSnapshotFromCurationRunCreate,
+    use_case: CreateDatasetSnapshotFromCurationRunUseCase = Depends(
+        get_create_dataset_snapshot_from_curation_run_use_case
+    ),
+) -> DatasetSnapshotFromCurationRunRead:
+    dto = use_case.execute(
+        SnapshotFromCurationRunRequestDTO(
+            curation_run_id=payload.curation_run_id,
+            snapshot_name=payload.snapshot_name,
+            snapshot_description=payload.snapshot_description,
+            include_inconclusive=payload.include_inconclusive,
+            allow_empty_snapshot=payload.allow_empty_snapshot,
+            created_by=payload.created_by,
+            notes=payload.notes,
+        )
+    )
+    return DatasetSnapshotFromCurationRunRead.model_validate(dto)
 
 
 @router.get("/snapshots/{dataset_snapshot_id}", response_model=DatasetSnapshotRead)

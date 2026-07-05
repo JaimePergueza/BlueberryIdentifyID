@@ -1,5 +1,21 @@
 # ARCHITECTURE.md — BlueberryMicroID
 
+## Fase 44 - Snapshot creation from curation runs
+
+`POST /api/v1/datasets/snapshots/from-curation-run` freezes a completed
+`DatasetCurationRun` into an explicit `DatasetSnapshot`. The use case reads
+already persisted `DatasetCurationItem` rows, includes only
+`curation_status=included`, avoids duplicate `AnalysisRun` entries, computes
+`item_count` and `label_distribution`, and records `created_snapshot_id` on
+the curation run in the same transaction.
+
+Every created `DatasetItem` keeps `curation_run_id`, `curation_item_id`, and
+metadata-only `provenance`, plus the original references to `Sample`,
+`AnalysisRun`, `PetriImage`, `MicroImage`, `Prediction`, and final
+`HumanReview`. The snapshot manifest exposes that provenance for audit. This
+phase does not copy images, create a `DatasetRelease`, create splits, train,
+run YOLO, store binaries, add taxonomy, or make diagnostic claims.
+
 ## 1. Propósito del sistema
 
 **BlueberryMicroID** es una plataforma de apoyo al reconocimiento preliminar de microorganismos asociados a **arándanos (blueberry)**, único producto soportado en esta etapa, a partir de dos fuentes visuales por muestra:
