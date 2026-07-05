@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
     Base,
+    DatasetCurationItemModel,
+    DatasetCurationRunModel,
     DatasetItemModel,
     DatasetReleaseModel,
     DatasetSnapshotModel,
@@ -36,6 +38,8 @@ _SQLITE_TABLES = [
     AnalysisRunModel.__table__,
     HumanReviewModel.__table__,
     PredictionModel.__table__,
+    DatasetCurationRunModel.__table__,
+    DatasetCurationItemModel.__table__,
     DatasetSnapshotModel.__table__,
     DatasetItemModel.__table__,
     DatasetReleaseModel.__table__,

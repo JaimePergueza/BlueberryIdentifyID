@@ -62,6 +62,8 @@ _ALL_TABLES = (
     "training_preflight_runs",
     "dataset_split_items",
     "dataset_releases",
+    "dataset_curation_items",
+    "dataset_curation_runs",
     "dataset_items",
     "dataset_snapshots",
     "human_reviews",

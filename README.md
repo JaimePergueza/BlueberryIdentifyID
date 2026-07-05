@@ -1,5 +1,20 @@
 # BlueberryMicroID
 
+## Fase 43 - Dataset Curation from Human-Reviewed Two-Image Analyses
+
+Fase 43 adds persisted `DatasetCurationRun` and `DatasetCurationItem`
+records. A curation run scans explicit `AnalysisRun` IDs, or all runs only
+when `explicit_all_reviewed=true`, and records why each two-image analysis is
+included or excluded before optionally creating a `DatasetSnapshot`.
+
+Only analyses with a `Prediction`, both Petri/microscopy images, and a final
+`HumanReview` can be included. Ground truth is derived from the same final
+result rules used by the API: `confirmed` keeps the reviewed prediction
+label, `corrected` uses the corrected label, `marked_inconclusive` yields
+`inconclusive`, and `rejected_invalid_sample` is excluded. The layer stores
+metadata and references only; it does not copy images, release a dataset,
+train, evaluate models, add taxonomy, or replace `MockInferenceEngine`.
+
 ## Fase 39 - Smoke Model Evaluation & Promotion Gate
 
 Fase 39 adds metadata-only model candidate evaluation for local/manual YOLO

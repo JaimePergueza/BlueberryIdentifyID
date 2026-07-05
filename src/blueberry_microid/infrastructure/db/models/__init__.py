@@ -9,6 +9,8 @@ from blueberry_microid.infrastructure.db.models.annotation_bundle_run import Ann
 from blueberry_microid.infrastructure.db.models.annotation_quality_gate_issue import AnnotationQualityGateIssueModel
 from blueberry_microid.infrastructure.db.models.annotation_quality_gate_run import AnnotationQualityGateRunModel
 from blueberry_microid.infrastructure.db.models.base import Base
+from blueberry_microid.infrastructure.db.models.dataset_curation_item import DatasetCurationItemModel
+from blueberry_microid.infrastructure.db.models.dataset_curation_run import DatasetCurationRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
@@ -75,6 +77,8 @@ __all__ = [
     "AnnotationQualityGateIssueModel",
     "AnnotationQualityGateRunModel",
     "Base",
+    "DatasetCurationItemModel",
+    "DatasetCurationRunModel",
     "DatasetItemModel",
     "DatasetReleaseModel",
     "DatasetSnapshotModel",

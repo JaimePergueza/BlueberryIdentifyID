@@ -22,6 +22,10 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_qual
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
 )
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_curation_repository import (
+    SqlAlchemyDatasetCurationItemRepository,
+    SqlAlchemyDatasetCurationRunRepository,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_release_repository import (
     SqlAlchemyDatasetReleaseRepository,
 )
@@ -158,6 +162,12 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
             self.session, auto_commit=False
         )
         self.dataset_item_repository = SqlAlchemyDatasetItemRepository(self.session, auto_commit=False)
+        self.dataset_curation_item_repository = SqlAlchemyDatasetCurationItemRepository(
+            self.session, auto_commit=False
+        )
+        self.dataset_curation_run_repository = SqlAlchemyDatasetCurationRunRepository(
+            self.session, auto_commit=False
+        )
         self.dataset_release_repository = SqlAlchemyDatasetReleaseRepository(self.session, auto_commit=False)
         self.dataset_snapshot_repository = SqlAlchemyDatasetSnapshotRepository(self.session, auto_commit=False)
         self.dataset_split_item_repository = SqlAlchemyDatasetSplitItemRepository(self.session, auto_commit=False)

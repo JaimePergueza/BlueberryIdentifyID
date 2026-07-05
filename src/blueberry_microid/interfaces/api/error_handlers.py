@@ -28,6 +28,8 @@ from blueberry_microid.application.exceptions import (
     ApplicationError,
     BaselineTrainingNotAllowedError,
     ConflictError,
+    DatasetCurationNotAllowedError,
+    DatasetCurationRunNotFoundError,
     DatasetReleaseNotFoundError,
     DatasetSnapshotNotFoundError,
     DatasetSplitMetadataError,
@@ -41,6 +43,7 @@ from blueberry_microid.application.exceptions import (
     DetectionTrainingReadinessReportNotFoundError,
     DetectionTrainingRunNotFoundError,
     DuplicateDatasetItemError,
+    DuplicateDatasetCurationItemError,
     DuplicateDatasetSnapshotError,
     DuplicateDatasetSplitItemError,
     DuplicateFinalHumanReviewError,
@@ -124,6 +127,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 404, "dataset_snapshot_not_found"
     if isinstance(exc, DatasetReleaseNotFoundError):
         return 404, "dataset_release_not_found"
+    if isinstance(exc, DatasetCurationRunNotFoundError):
+        return 404, "dataset_curation_run_not_found"
     if isinstance(exc, TrainingPreflightRunNotFoundError):
         return 404, "training_preflight_run_not_found"
     if isinstance(exc, TrainingRunNotFoundError):
@@ -159,6 +164,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
         return 409, "duplicate_dataset_snapshot"
     if isinstance(exc, DuplicateDatasetItemError):
         return 409, "duplicate_dataset_item"
+    if isinstance(exc, DuplicateDatasetCurationItemError):
+        return 409, "duplicate_dataset_curation_item"
     if isinstance(exc, DuplicateDatasetSplitItemError):
         return 409, "duplicate_dataset_split_item"
     if isinstance(exc, EmptyDatasetSnapshotError):
@@ -192,6 +199,8 @@ def _resolve_error(exc: Exception) -> tuple[int, str]:
 
     if isinstance(exc, InvalidModelTypeError):
         return 422, "invalid_model_type"
+    if isinstance(exc, DatasetCurationNotAllowedError):
+        return 422, "dataset_curation_not_allowed"
 
     if isinstance(exc, ImageTooLargeError):
         return 413, "image_too_large"

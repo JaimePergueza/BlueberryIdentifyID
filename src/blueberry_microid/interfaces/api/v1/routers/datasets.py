@@ -2,13 +2,22 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
+from blueberry_microid.application.dto.dataset_curation_dto import (
+    CreateDatasetCurationRunRequest,
+    DatasetCurationPolicy,
+)
 from blueberry_microid.application.dto.dataset_dto import CreateDatasetReleaseRequest, CreateDatasetSnapshotRequest
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
 from blueberry_microid.application.services.dataset_release_manifest_exporter import DatasetReleaseManifestExporter
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
+from blueberry_microid.application.use_cases.dataset.create_dataset_curation_run import CreateDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.get_dataset_curation_run import GetDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_snapshot import GetDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.list_dataset_curation_items import (
+    ListDatasetCurationItemsUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.list_dataset_items import ListDatasetItemsUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_releases import ListDatasetReleasesUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_snapshots import ListDatasetSnapshotsUseCase
@@ -19,11 +28,14 @@ from blueberry_microid.application.use_cases.ml_preflight.list_training_prefligh
 from blueberry_microid.application.use_cases.training.list_training_runs import ListTrainingRunsUseCase
 from blueberry_microid.interfaces.api.v1.dependencies import (
     get_create_dataset_release_use_case,
+    get_create_dataset_curation_run_use_case,
     get_create_dataset_snapshot_use_case,
     get_dataset_manifest_exporter,
     get_dataset_release_manifest_exporter,
     get_get_dataset_release_use_case,
+    get_get_dataset_curation_run_use_case,
     get_get_dataset_snapshot_use_case,
+    get_list_dataset_curation_items_use_case,
     get_list_dataset_items_use_case,
     get_list_dataset_releases_use_case,
     get_list_dataset_snapshots_use_case,
@@ -33,16 +45,73 @@ from blueberry_microid.interfaces.api.v1.dependencies import (
 )
 from blueberry_microid.interfaces.api.v1.schemas.dataset import (
     DatasetItemRead,
+    DatasetCurationItemRead,
+    DatasetCurationRunCreate,
+    DatasetCurationRunRead,
     DatasetReleaseCreate,
     DatasetReleaseRead,
     DatasetSnapshotCreate,
     DatasetSnapshotRead,
     DatasetSplitItemRead,
 )
+from blueberry_microid.domain.enums.dataset_curation_status import DatasetCurationStatus
 from blueberry_microid.interfaces.api.v1.schemas.ml_preflight import TrainingPreflightRunResponse
 from blueberry_microid.interfaces.api.v1.schemas.training_run import TrainingRunResponse
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
+
+
+@router.post("/curation-runs", response_model=DatasetCurationRunRead, status_code=status.HTTP_201_CREATED)
+def create_dataset_curation_run(
+    payload: DatasetCurationRunCreate,
+    use_case: CreateDatasetCurationRunUseCase = Depends(get_create_dataset_curation_run_use_case),
+) -> DatasetCurationRunRead:
+    policy = DatasetCurationPolicy(
+        include_confirmed=payload.policy.include_confirmed,
+        include_corrected=payload.policy.include_corrected,
+        include_marked_inconclusive=payload.policy.include_marked_inconclusive,
+        require_final_human_review=payload.policy.require_final_human_review,
+        require_petri_image=payload.policy.require_petri_image,
+        require_micro_image=payload.policy.require_micro_image,
+        require_prediction=payload.policy.require_prediction,
+        prevent_duplicates=payload.policy.prevent_duplicates,
+        allowed_labels=tuple(payload.policy.allowed_labels)
+        if payload.policy.allowed_labels is not None
+        else DatasetCurationPolicy().allowed_labels,
+    )
+    dto = use_case.execute(
+        CreateDatasetCurationRunRequest(
+            analysis_run_ids=payload.analysis_run_ids,
+            policy=policy,
+            explicit_all_reviewed=payload.explicit_all_reviewed,
+            create_snapshot=payload.create_snapshot,
+            snapshot_name=payload.snapshot_name,
+            snapshot_version=payload.snapshot_version,
+            created_by=payload.created_by,
+            notes=payload.notes,
+        )
+    )
+    return DatasetCurationRunRead.model_validate(dto)
+
+
+@router.get("/curation-runs/{curation_run_id}", response_model=DatasetCurationRunRead)
+def get_dataset_curation_run(
+    curation_run_id: UUID,
+    use_case: GetDatasetCurationRunUseCase = Depends(get_get_dataset_curation_run_use_case),
+) -> DatasetCurationRunRead:
+    return DatasetCurationRunRead.model_validate(use_case.execute(curation_run_id))
+
+
+@router.get("/curation-runs/{curation_run_id}/items", response_model=list[DatasetCurationItemRead])
+def list_dataset_curation_items(
+    curation_run_id: UUID,
+    status_filter: DatasetCurationStatus | None = None,
+    use_case: ListDatasetCurationItemsUseCase = Depends(get_list_dataset_curation_items_use_case),
+) -> list[DatasetCurationItemRead]:
+    return [
+        DatasetCurationItemRead.model_validate(dto)
+        for dto in use_case.execute(curation_run_id, status=status_filter)
+    ]
 
 
 @router.post("/snapshots", response_model=DatasetSnapshotRead, status_code=status.HTTP_201_CREATED)

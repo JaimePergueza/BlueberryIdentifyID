@@ -27,6 +27,10 @@ from blueberry_microid.application.ports.annotation_quality_gate_run_repository 
     AnnotationQualityGateRunRepositoryPort,
 )
 from blueberry_microid.application.ports.dataset_item_repository import DatasetItemRepositoryPort
+from blueberry_microid.application.ports.dataset_curation_repository import (
+    DatasetCurationItemRepositoryPort,
+    DatasetCurationRunRepositoryPort,
+)
 from blueberry_microid.application.ports.dataset_release_repository import DatasetReleaseRepositoryPort
 from blueberry_microid.application.ports.detection_training_artifact_issue_repository import (
     DetectionTrainingArtifactIssueRepositoryPort,
@@ -108,6 +112,7 @@ from blueberry_microid.application.services.annotation_bundle_validator import A
 from blueberry_microid.application.services.annotation_bundle_writer import AnnotationBundleWriter
 from blueberry_microid.application.services.annotation_quality_gate_validator import AnnotationQualityGateValidator
 from blueberry_microid.application.services.dataset_manifest_exporter import DatasetManifestExporter
+from blueberry_microid.application.services.dataset_curation_evaluator import DatasetCurationEvaluator
 from blueberry_microid.application.services.detection_training_artifact_policy_evaluator import (
     DetectionTrainingArtifactPolicyEvaluator,
 )
@@ -218,9 +223,16 @@ from blueberry_microid.application.use_cases.detection_training_execution.list_d
     ListDetectionTrainingExecutionRunsUseCase,
 )
 from blueberry_microid.application.use_cases.dataset.create_dataset_release import CreateDatasetReleaseUseCase
+from blueberry_microid.application.use_cases.dataset.create_dataset_curation_run import (
+    CreateDatasetCurationRunUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.create_dataset_snapshot import CreateDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.get_dataset_curation_run import GetDatasetCurationRunUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_release import GetDatasetReleaseUseCase
 from blueberry_microid.application.use_cases.dataset.get_dataset_snapshot import GetDatasetSnapshotUseCase
+from blueberry_microid.application.use_cases.dataset.list_dataset_curation_items import (
+    ListDatasetCurationItemsUseCase,
+)
 from blueberry_microid.application.use_cases.dataset.list_dataset_items import ListDatasetItemsUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_releases import ListDatasetReleasesUseCase
 from blueberry_microid.application.use_cases.dataset.list_dataset_snapshots import ListDatasetSnapshotsUseCase
@@ -352,6 +364,10 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_annotation_qual
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_item_repository import (
     SqlAlchemyDatasetItemRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_curation_repository import (
+    SqlAlchemyDatasetCurationItemRepository,
+    SqlAlchemyDatasetCurationRunRepository,
 )
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_dataset_release_repository import (
     SqlAlchemyDatasetReleaseRepository,
@@ -618,6 +634,18 @@ def get_dataset_item_repository(session: Session = Depends(get_db_session)) -> D
     return SqlAlchemyDatasetItemRepository(session)
 
 
+def get_dataset_curation_run_repository(
+    session: Session = Depends(get_db_session),
+) -> DatasetCurationRunRepositoryPort:
+    return SqlAlchemyDatasetCurationRunRepository(session)
+
+
+def get_dataset_curation_item_repository(
+    session: Session = Depends(get_db_session),
+) -> DatasetCurationItemRepositoryPort:
+    return SqlAlchemyDatasetCurationItemRepository(session)
+
+
 def get_dataset_release_repository(session: Session = Depends(get_db_session)) -> DatasetReleaseRepositoryPort:
     return SqlAlchemyDatasetReleaseRepository(session)
 
@@ -809,6 +837,10 @@ def get_detection_training_execution_issue_repository(
 
 def get_dataset_splitter() -> DatasetSplitter:
     return DatasetSplitter()
+
+
+def get_dataset_curation_evaluator() -> DatasetCurationEvaluator:
+    return DatasetCurationEvaluator()
 
 
 def get_manifest_validator() -> ManifestValidator:
@@ -1055,6 +1087,39 @@ def get_create_dataset_snapshot_use_case(
         micro_image_repository,
         unit_of_work,
     )
+
+
+def get_create_dataset_curation_run_use_case(
+    analysis_run_repository: AnalysisRunRepositoryPort = Depends(get_analysis_run_repository),
+    prediction_repository: PredictionRepositoryPort = Depends(get_prediction_repository),
+    human_review_repository: HumanReviewRepositoryPort = Depends(get_human_review_repository),
+    petri_image_repository: PetriImageRepositoryPort = Depends(get_petri_image_repository),
+    micro_image_repository: MicroImageRepositoryPort = Depends(get_micro_image_repository),
+    evaluator: DatasetCurationEvaluator = Depends(get_dataset_curation_evaluator),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> CreateDatasetCurationRunUseCase:
+    return CreateDatasetCurationRunUseCase(
+        analysis_run_repository,
+        prediction_repository,
+        human_review_repository,
+        petri_image_repository,
+        micro_image_repository,
+        evaluator,
+        unit_of_work,
+    )
+
+
+def get_get_dataset_curation_run_use_case(
+    curation_run_repository: DatasetCurationRunRepositoryPort = Depends(get_dataset_curation_run_repository),
+) -> GetDatasetCurationRunUseCase:
+    return GetDatasetCurationRunUseCase(curation_run_repository)
+
+
+def get_list_dataset_curation_items_use_case(
+    curation_run_repository: DatasetCurationRunRepositoryPort = Depends(get_dataset_curation_run_repository),
+    curation_item_repository: DatasetCurationItemRepositoryPort = Depends(get_dataset_curation_item_repository),
+) -> ListDatasetCurationItemsUseCase:
+    return ListDatasetCurationItemsUseCase(curation_run_repository, curation_item_repository)
 
 
 def get_get_dataset_snapshot_use_case(

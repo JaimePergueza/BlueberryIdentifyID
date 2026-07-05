@@ -10,6 +10,8 @@ from blueberry_microid.domain.entities.annotation_bundle_file import AnnotationB
 from blueberry_microid.domain.entities.annotation_bundle_run import AnnotationBundleRun
 from blueberry_microid.domain.entities.annotation_quality_gate_issue import AnnotationQualityGateIssue
 from blueberry_microid.domain.entities.annotation_quality_gate_run import AnnotationQualityGateRun
+from blueberry_microid.domain.entities.dataset_curation_item import DatasetCurationItem
+from blueberry_microid.domain.entities.dataset_curation_run import DatasetCurationRun
 from blueberry_microid.domain.entities.dataset_item import DatasetItem
 from blueberry_microid.domain.entities.dataset_release import DatasetRelease
 from blueberry_microid.domain.entities.dataset_snapshot import DatasetSnapshot
@@ -112,6 +114,8 @@ from blueberry_microid.infrastructure.db.models.annotation_bundle_file import An
 from blueberry_microid.infrastructure.db.models.annotation_bundle_run import AnnotationBundleRunModel
 from blueberry_microid.infrastructure.db.models.annotation_quality_gate_issue import AnnotationQualityGateIssueModel
 from blueberry_microid.infrastructure.db.models.annotation_quality_gate_run import AnnotationQualityGateRunModel
+from blueberry_microid.infrastructure.db.models.dataset_curation_item import DatasetCurationItemModel
+from blueberry_microid.infrastructure.db.models.dataset_curation_run import DatasetCurationRunModel
 from blueberry_microid.infrastructure.db.models.dataset_item import DatasetItemModel
 from blueberry_microid.infrastructure.db.models.dataset_release import DatasetReleaseModel
 from blueberry_microid.infrastructure.db.models.dataset_snapshot import DatasetSnapshotModel
@@ -314,6 +318,45 @@ def dataset_item_to_entity(model: DatasetItemModel) -> DatasetItem:
         ground_truth_label=model.ground_truth_label,
         included=model.included,
         exclusion_reason=model.exclusion_reason,
+        created_at=model.created_at,
+    )
+
+
+def dataset_curation_run_to_entity(model: DatasetCurationRunModel) -> DatasetCurationRun:
+    return DatasetCurationRun(
+        status=model.status,
+        id=model.id,
+        policy=model.policy,
+        total_candidates_scanned=model.total_candidates_scanned,
+        included_count=model.included_count,
+        excluded_count=model.excluded_count,
+        created_snapshot_id=model.created_snapshot_id,
+        issues=model.issues,
+        created_by=model.created_by,
+        notes=model.notes,
+        created_at=model.created_at,
+        completed_at=model.completed_at,
+    )
+
+
+def dataset_curation_item_to_entity(model: DatasetCurationItemModel) -> DatasetCurationItem:
+    return DatasetCurationItem(
+        curation_run_id=model.curation_run_id,
+        curation_status=model.curation_status,
+        id=model.id,
+        sample_id=model.sample_id,
+        analysis_run_id=model.analysis_run_id,
+        prediction_id=model.prediction_id,
+        human_review_id=model.human_review_id,
+        petri_image_id=model.petri_image_id,
+        micro_image_id=model.micro_image_id,
+        automatic_label=model.automatic_label,
+        final_label=model.final_label,
+        review_decision=model.review_decision,
+        exclusion_reason=model.exclusion_reason,
+        provenance=model.provenance,
+        feature_summary=model.feature_summary,
+        quality_summary=model.quality_summary,
         created_at=model.created_at,
     )
 

@@ -52,6 +52,10 @@ class DatasetReleaseNotFoundError(NotFoundError):
     """Raised when a requested DatasetRelease does not exist."""
 
 
+class DatasetCurationRunNotFoundError(NotFoundError):
+    """Raised when a requested DatasetCurationRun does not exist."""
+
+
 class TrainingPreflightRunNotFoundError(NotFoundError):
     """Raised when a requested TrainingPreflightRun does not exist."""
 
@@ -144,6 +148,10 @@ class DuplicateDatasetItemError(ConflictError):
     """Raised when the same AnalysisRun is inserted twice in one DatasetSnapshot."""
 
 
+class DuplicateDatasetCurationItemError(ConflictError):
+    """Raised when the same AnalysisRun is inserted twice in one DatasetCurationRun."""
+
+
 class DuplicateDatasetSplitItemError(ConflictError):
     """Raised when the same DatasetItem is inserted twice in one DatasetRelease."""
 
@@ -167,6 +175,10 @@ class DatasetSplitMetadataError(ApplicationError):
     itself is well-formed, but the referenced data cannot satisfy the
     requested split strategy.
     """
+
+
+class DatasetCurationNotAllowedError(ApplicationError):
+    """Raised when a curation request would scan all AnalysisRuns without explicit consent."""
 
 
 class BaselineTrainingNotAllowedError(ConflictError):

@@ -16,6 +16,21 @@
   checksums, and an explicit gate decision. Smoke weights are never treated
   as scientific or production models.
 
+## Fase 43 - Dataset curation runs
+
+- `POST /api/v1/datasets/curation-runs` creates an auditable curation run
+  from explicit `analysis_run_ids`. A global scan requires
+  `explicit_all_reviewed=true`.
+- `GET /api/v1/datasets/curation-runs/{id}` returns the curation run
+  metadata and counts. `GET /api/v1/datasets/curation-runs/{id}/items`
+  returns included and excluded decisions.
+- Included items require a `Prediction`, final `HumanReview`, Petri image,
+  and microscopy image. `Prediction` alone is never ground truth.
+- `create_snapshot=true` optionally creates a `DatasetSnapshot` from included
+  items only. It never creates a `DatasetRelease` automatically.
+- This flow is metadata-only: no image copying, no binary storage in DB, no
+  training, no metrics, no taxonomy, no frontend, and no authentication.
+
 ## Prerequisites
 
 - Python 3.10+

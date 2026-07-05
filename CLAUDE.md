@@ -76,6 +76,24 @@ El sistema es multimodal por diseño. En todo el código, nombres, tablas y endp
 - El manifest de dataset contiene rutas y metadata básica, nunca bytes de imagen, secretos, métricas de modelo, especies, géneros ni taxonomía.
 - Esta capa prepara datos trazables. No entrena modelos, no calcula accuracy/precision/recall/F1, no descarga datasets externos y no reemplaza `MockInferenceEngine`.
 
+## 5.1.1. Curacion auditada desde resultados finales (Fase 43)
+
+- `DatasetCurationRun` y `DatasetCurationItem` registran una decision de
+  inclusion/exclusion por cada `AnalysisRun` candidato de dos imagenes.
+- Un candidato incluido requiere `Prediction`, `HumanReview` final, `PetriImage`
+  y `MicroImage`. `AnalysisRun` en `pending`/`processing`, casos sin revision
+  final, predicciones faltantes, imagenes faltantes y `rejected_invalid_sample`
+  quedan excluidos.
+- La etiqueta final debe derivarse con la misma regla de resultado final:
+  `confirmed` usa la etiqueta de `Prediction` porque fue aceptada por un
+  humano; `corrected` usa `HumanReview.corrected_label`; `marked_inconclusive`
+  usa `inconclusive`; `rejected_invalid_sample` no genera dato entrenable.
+- `Prediction` por si sola nunca es ground truth. No agregar taxonomia,
+  diagnostico, metricas inventadas, entrenamiento, frontend, autenticacion ni
+  datasets externos en esta capa.
+- Crear un snapshot desde la curation run es opcional y solo toma items
+  incluidos. Nunca crear `DatasetRelease` automaticamente desde este flujo.
+
 ## 5.2. Dataset release y particiones train/validation/test (Fase 9)
 
 - `DatasetRelease` congela una partición reproducible (train/validation/test) de un `DatasetSnapshot` ya existente; `DatasetSplitItem` registra el split de cada `DatasetItem` dentro de esa release. Ninguno de los dos modifica ni copia el `DatasetSnapshot`/`DatasetItem` original — solo los leen.
