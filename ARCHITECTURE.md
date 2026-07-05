@@ -133,27 +133,27 @@ Un `AnalysisRun` **nunca** se ejecuta implícitamente sobre "todas las imágenes
 
 **Los pasos 1–6 ya están expuestos por HTTP** (Fase 3 para 1–4, Fase 4 para 5, Fase 5 para 6, Fase 7 para cola asíncrona — ver § 14, § 16, § 18 y § 22). El paso 5 puede correr de forma **síncrona** dentro del propio request HTTP (`POST /analysis-runs/{id}/process`) o de forma asíncrona con Celery (`POST /analysis-runs/{id}/process-async`), sin preprocesamiento real de imágenes ni fusión de features — el motor sigue siendo una simulación determinista (ver § 16). La revisión humana no sobrescribe la `Prediction`: agrega registros `HumanReview` auditables y marca una revisión final vigente.
 
-## 5.1. CuraciÃ³n auditada desde anÃ¡lisis revisados (Fase 43)
+## 5.1. Curación auditada desde análisis revisados (Fase 43)
 
-`DatasetCurationRun` representa una corrida auditable de selecciÃ³n de
-anÃ¡lisis de dos imÃ¡genes revisados por humanos. `DatasetCurationItem`
+`DatasetCurationRun` representa una corrida auditable de selección de
+análisis de dos imágenes revisados por humanos. `DatasetCurationItem`
 registra, por cada `AnalysisRun` candidato, las referencias a `Sample`,
 `PetriImage`, `MicroImage`, `Prediction` y `HumanReview` final, la etiqueta
-automÃ¡tica, la etiqueta final, la decisiÃ³n de revisiÃ³n y el motivo de
-inclusiÃ³n o exclusiÃ³n.
+automática, la etiqueta final, la decisión de revisión y el motivo de
+inclusión o exclusión.
 
-Reglas: se requiere `Prediction`, revisiÃ³n humana final, imagen Petri e
+Reglas: se requiere `Prediction`, revisión humana final, imagen Petri e
 imagen micro; `AnalysisRun` en `pending`/`processing` queda excluido;
 `rejected_invalid_sample` queda excluido; `Prediction` nunca es ground truth
-sin revisiÃ³n humana. La etiqueta final se resuelve reutilizando la misma
-regla del resultado final de anÃ¡lisis: `confirmed` acepta la etiqueta de la
-predicciÃ³n revisada, `corrected` usa `HumanReview.corrected_label`,
+sin revisión humana. La etiqueta final se resuelve reutilizando la misma
+regla del resultado final de análisis: `confirmed` acepta la etiqueta de la
+predicción revisada, `corrected` usa `HumanReview.corrected_label`,
 `marked_inconclusive` produce `inconclusive` y `rejected_invalid_sample`
-queda sin etiqueta entrenable. No hay taxonomÃ­a ni diagnÃ³stico.
+queda sin etiqueta entrenable. No hay taxonomía ni diagnóstico.
 
 La corrida puede crear opcionalmente un `DatasetSnapshot` con los items
-incluidos, pero nunca crea un `DatasetRelease` automÃ¡ticamente. Todo es
-metadata-only: no copia imÃ¡genes, no guarda binarios en base de datos, no
+incluidos, pero nunca crea un `DatasetRelease` automáticamente. Todo es
+metadata-only: no copia imágenes, no guarda binarios en base de datos, no
 entrena modelos y no modifica `AnalysisRun`, `Prediction` ni `HumanReview`.
 
 ## 6. Puertos (`application/ports/`) — implementados por fases

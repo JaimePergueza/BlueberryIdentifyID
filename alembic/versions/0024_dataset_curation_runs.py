@@ -17,12 +17,13 @@ branch_labels = None
 depends_on = None
 
 
-dataset_curation_run_status = sa.Enum(
+dataset_curation_run_status = postgresql.ENUM(
     "completed",
     "failed",
     name="dataset_curation_run_status",
+    create_type=False,
 )
-dataset_curation_status = sa.Enum(
+dataset_curation_status = postgresql.ENUM(
     "included",
     "excluded_pending_review",
     "excluded_invalid_sample",
@@ -32,6 +33,7 @@ dataset_curation_status = sa.Enum(
     "excluded_duplicate",
     "excluded_policy",
     name="dataset_curation_status",
+    create_type=False,
 )
 predicted_label = postgresql.ENUM(
     "no_evident_growth",
@@ -61,12 +63,12 @@ def upgrade() -> None:
         "dataset_curation_runs",
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("status", dataset_curation_run_status, server_default="completed", nullable=False),
-        sa.Column("policy", PortableJSON, nullable=True),
+        sa.Column("policy", PortableJSON(), nullable=True),
         sa.Column("total_candidates_scanned", sa.Integer(), server_default="0", nullable=False),
         sa.Column("included_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("excluded_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("created_snapshot_id", sa.UUID(), nullable=True),
-        sa.Column("issues", PortableJSON, nullable=True),
+        sa.Column("issues", PortableJSON(), nullable=True),
         sa.Column("created_by", sa.String(length=255), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -95,9 +97,9 @@ def upgrade() -> None:
         sa.Column("review_decision", review_decision, nullable=True),
         sa.Column("curation_status", dataset_curation_status, nullable=False),
         sa.Column("exclusion_reason", sa.String(length=255), nullable=True),
-        sa.Column("provenance", PortableJSON, nullable=True),
-        sa.Column("feature_summary", PortableJSON, nullable=True),
-        sa.Column("quality_summary", PortableJSON, nullable=True),
+        sa.Column("provenance", PortableJSON(), nullable=True),
+        sa.Column("feature_summary", PortableJSON(), nullable=True),
+        sa.Column("quality_summary", PortableJSON(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["analysis_run_id"], ["analysis_runs.id"]),
         sa.ForeignKeyConstraint(["curation_run_id"], ["dataset_curation_runs.id"]),
