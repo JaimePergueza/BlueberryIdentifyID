@@ -41,6 +41,11 @@ class PredictionModel(Base):
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     class_probabilities: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     technical_observation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    feature_summary: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    quality_summary: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    decision_trace: Mapped[Optional[list]] = mapped_column(PortableJSON, nullable=True)
+    warnings: Mapped[Optional[list]] = mapped_column(PortableJSON, nullable=True)
     requires_human_review: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

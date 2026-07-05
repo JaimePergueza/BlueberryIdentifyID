@@ -238,3 +238,54 @@ def test_two_image_upload_preliminary_result_retrievable(api_client):
     result_response = api_client.get(f"/api/v1/analysis-runs/{run_id}/preliminary-result")
     assert result_response.status_code == 200
     assert result_response.json()["requires_human_review"] is True
+
+
+def test_two_image_upload_response_has_explanation(api_client):
+    body = _upload(api_client).json()
+    assert "explanation" in body
+    assert isinstance(body["explanation"], str)
+    assert len(body["explanation"]) > 0
+
+
+def test_two_image_upload_response_has_feature_summary(api_client):
+    body = _upload(api_client).json()
+    assert "feature_summary" in body
+    fs = body["feature_summary"]
+    assert fs is not None
+    assert "petri" in fs
+    assert "micro" in fs
+
+
+def test_two_image_upload_response_has_quality_summary(api_client):
+    body = _upload(api_client).json()
+    assert "quality_summary" in body
+    qs = body["quality_summary"]
+    assert qs is not None
+    assert "petri_is_sharp" in qs
+    assert "micro_is_sharp" in qs
+
+
+def test_two_image_upload_response_has_decision_trace(api_client):
+    body = _upload(api_client).json()
+    assert "decision_trace" in body
+    trace = body["decision_trace"]
+    assert isinstance(trace, list)
+    assert len(trace) >= 3
+    steps = [s.get("step") for s in trace]
+    assert "label_assigned" in steps
+
+
+def test_preliminary_result_endpoint_has_explanation(api_client):
+    body = _upload(api_client).json()
+    run_id = body["analysis_run_id"]
+    result = api_client.get(f"/api/v1/analysis-runs/{run_id}/preliminary-result").json()
+    assert "explanation" in result
+    assert isinstance(result["explanation"], str)
+
+
+def test_preliminary_result_endpoint_has_feature_summary(api_client):
+    body = _upload(api_client).json()
+    run_id = body["analysis_run_id"]
+    result = api_client.get(f"/api/v1/analysis-runs/{run_id}/preliminary-result").json()
+    assert result["feature_summary"] is not None
+    assert "petri" in result["feature_summary"]

@@ -101,6 +101,11 @@ async def analyze_two_uploaded_images(
         class_probabilities=result.class_probabilities,
         requires_human_review=result.requires_human_review,
         disclaimer=result.disclaimer,
+        explanation=result.explanation,
+        feature_summary=result.feature_summary,
+        quality_summary=result.quality_summary,
+        decision_trace=result.decision_trace,
+        warnings=result.warnings,
     )
 
 
@@ -129,4 +134,9 @@ def get_preliminary_result(
         requires_human_review=prediction.requires_human_review,
         technical_observation=prediction.technical_observation,
         disclaimer=_MOCK_DISCLAIMER,
+        explanation=prediction.explanation,
+        feature_summary=prediction.feature_summary,
+        quality_summary=prediction.quality_summary,
+        decision_trace=prediction.decision_trace,
+        warnings=prediction.warnings,
     )

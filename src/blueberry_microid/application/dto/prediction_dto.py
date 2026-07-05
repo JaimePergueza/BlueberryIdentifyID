@@ -26,6 +26,11 @@ class PredictionDTO:
     technical_observation: Optional[str]
     requires_human_review: bool
     created_at: datetime
+    explanation: Optional[str] = None
+    feature_summary: Optional[dict] = None
+    quality_summary: Optional[dict] = None
+    decision_trace: Optional[list] = None
+    warnings: Optional[list[str]] = None
 
     @classmethod
     def from_entity(cls, prediction: Prediction) -> "PredictionDTO":
@@ -38,4 +43,9 @@ class PredictionDTO:
             technical_observation=prediction.technical_observation,
             requires_human_review=prediction.requires_human_review,
             created_at=prediction.created_at,
+            explanation=prediction.explanation,
+            feature_summary=prediction.feature_summary,
+            quality_summary=prediction.quality_summary,
+            decision_trace=prediction.decision_trace,
+            warnings=prediction.warnings,
         )

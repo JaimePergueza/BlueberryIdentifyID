@@ -264,6 +264,11 @@ def prediction_to_entity(model: PredictionModel) -> Prediction:
         technical_observation=model.technical_observation,
         requires_human_review=model.requires_human_review,
         created_at=model.created_at,
+        explanation=model.explanation,
+        feature_summary=model.feature_summary,
+        quality_summary=model.quality_summary,
+        decision_trace=model.decision_trace,
+        warnings=model.warnings,
     )
 
 

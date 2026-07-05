@@ -35,6 +35,11 @@ class SqlAlchemyPredictionRepository(PredictionRepositoryPort):
             technical_observation=prediction.technical_observation,
             requires_human_review=prediction.requires_human_review,
             created_at=prediction.created_at,
+            explanation=prediction.explanation,
+            feature_summary=prediction.feature_summary,
+            quality_summary=prediction.quality_summary,
+            decision_trace=prediction.decision_trace,
+            warnings=prediction.warnings,
         )
         self._session.add(model)
         try:

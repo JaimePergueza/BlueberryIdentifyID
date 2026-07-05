@@ -154,6 +154,11 @@ class AnalyzeTwoUploadedImagesUseCase:
             class_probabilities=output.class_probabilities,
             technical_observation=output.disclaimer,
             requires_human_review=True,
+            explanation=output.explanation,
+            feature_summary=output.feature_summary,
+            quality_summary=output.quality_summary,
+            decision_trace=output.decision_trace,
+            warnings=output.warnings,
         )
 
         with self._uow:
@@ -183,6 +188,11 @@ class AnalyzeTwoUploadedImagesUseCase:
             class_probabilities=output.class_probabilities,
             requires_human_review=True,
             disclaimer=output.disclaimer,
+            explanation=output.explanation,
+            feature_summary=output.feature_summary,
+            quality_summary=output.quality_summary,
+            decision_trace=output.decision_trace,
+            warnings=output.warnings,
         )
 
     def _validate_bytes(self, file_name: str, mime_type: str, content: bytes):

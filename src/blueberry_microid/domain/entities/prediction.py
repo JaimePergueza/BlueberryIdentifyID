@@ -30,6 +30,11 @@ class Prediction:
     technical_observation: Optional[str] = None
     requires_human_review: bool = False
     created_at: datetime = field(default_factory=_utcnow)
+    explanation: Optional[str] = None
+    feature_summary: Optional[dict] = None
+    quality_summary: Optional[dict] = None
+    decision_trace: Optional[list] = None
+    warnings: Optional[list[str]] = None
 
     def __post_init__(self) -> None:
         if self.confidence_score is not None:

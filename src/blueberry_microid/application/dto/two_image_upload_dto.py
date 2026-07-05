@@ -37,3 +37,8 @@ class TwoImageUploadResult:
     class_probabilities: dict[str, float]
     requires_human_review: bool
     disclaimer: str
+    explanation: Optional[str] = None
+    feature_summary: Optional[dict] = None
+    quality_summary: Optional[dict] = None
+    decision_trace: Optional[list] = None
+    warnings: Optional[list[str]] = None
