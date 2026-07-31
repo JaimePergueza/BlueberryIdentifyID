@@ -3,7 +3,7 @@
 > The GitHub repository keeps the historical name `BlueberryIdentifyID`; the
 > application and Python package are named **BlueberryMicroID**.
 
-BlueberryMicroID is a web-platform backend for preliminary analysis of
+BlueberryMicroID is a web platform for preliminary analysis of
 microorganism-associated visual patterns in blueberry laboratory samples.
 Each analysis combines two photographs from the same sample:
 
@@ -12,7 +12,8 @@ Each analysis combines two photographs from the same sample:
 
 The system extracts classical visual signals from both images, produces an
 explainable preliminary category, requires a human expert to confirm or correct
-the result, and preserves the complete audit trail.
+the result, and preserves the complete audit trail through an operational
+React/TypeScript interface.
 
 ## Scientific scope
 
@@ -27,8 +28,8 @@ requires expert review.
 
 ## Official MVP workflow
 
-An authenticated user with role `specialist` or `admin` starts the official
-flow through:
+An authenticated user with role `specialist` or `admin` can complete the
+workflow from the web interface or through:
 
 ```http
 POST /api/v1/analysis/two-image-upload
@@ -76,6 +77,23 @@ password, role or active status revokes every active session for that user.
 See [`docs/api/authentication.md`](docs/api/authentication.md) and
 [`docs/security/access_control_matrix.md`](docs/security/access_control_matrix.md).
 
+## Web interface
+
+The application under [`frontend/`](frontend/) implements the demonstrable
+product without requiring Swagger:
+
+- login and expired-session handling;
+- operational dashboard;
+- paired Petri/microscopy upload with previews;
+- preliminary result and warnings;
+- expert review;
+- searchable, paginated history;
+- consolidated automatic-versus-human detail.
+
+The interface is responsive, uses Spanish labels for operational categories and
+keeps the backend as the only source of business rules. See
+[`frontend/README.md`](frontend/README.md).
+
 ## Current product status
 
 Implemented:
@@ -83,6 +101,7 @@ Implemented:
 - authentication with revocable sessions;
 - roles `admin` and `specialist`;
 - administrator user management and secure bootstrap command;
+- operational React/TypeScript frontend;
 - sample and image persistence;
 - strict upload validation;
 - classical Petri and microscopy feature extraction;
@@ -92,17 +111,20 @@ Implemented:
 - auditable dataset curation, snapshots, and releases;
 - PostgreSQL migrations;
 - synchronous and Celery-backed technical processing paths;
-- automated SQLite, PostgreSQL, and authenticated Celery smoke tests.
+- automated backend, frontend, PostgreSQL, and authenticated Celery smoke tests.
 
 Still required for the demonstrable product:
 
-- operational React/TypeScript frontend;
-- reproducible full-stack deployment and demonstration data.
+- reproducible full-stack deployment;
+- controlled demonstration data and presentation runbook;
+- browser-level end-to-end validation of the deployed stack.
 
 See [`docs/mvp/README.md`](docs/mvp/README.md) for the delivery scope and
 priorities.
 
 ## Technology
+
+Backend:
 
 - Python 3.10+
 - FastAPI
@@ -110,11 +132,18 @@ priorities.
 - PostgreSQL 16
 - Celery and Redis
 - pwdlib and Argon2
-- Pillow, NumPy, and OpenCV
-- scikit-learn for classical dataset baselines
+- Pillow, NumPy, OpenCV and scikit-learn
 - pytest
 
-The code follows Clean Architecture / Ports and Adapters:
+Frontend:
+
+- React and TypeScript
+- Vite
+- React Router
+- TanStack Query
+- Vitest and Testing Library
+
+The backend follows Clean Architecture / Ports and Adapters:
 
 ```text
 interfaces/       HTTP and external entry points
@@ -126,7 +155,7 @@ ml/               image processing, validation, and training contracts
 
 ## Local setup
 
-### 1. Create the environment
+### 1. Create the backend environment
 
 ```bash
 python -m venv .venv
@@ -144,7 +173,7 @@ pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-On Windows, copy `.env.example` to `.env` manually or use PowerShell:
+On Windows:
 
 ```powershell
 Copy-Item .env.example .env
@@ -185,37 +214,43 @@ Development endpoints:
 Interactive API documentation is disabled automatically when
 `ENVIRONMENT=production`.
 
-### 7. Log in
+### 7. Start the web interface
+
+In a second terminal:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=REEMPLAZAR"
+cd frontend
+npm install
+npm run dev
 ```
 
-Use the returned value as `Authorization: Bearer <access_token>`.
+Open `http://127.0.0.1:5173`. Vite proxies `/api` and `/health` to the local
+FastAPI service.
 
 ## Tests
 
-Run the default suite:
+Backend:
 
 ```bash
 pytest -v
-```
-
-Validate the full PostgreSQL migration chain using a configured PostgreSQL
-`DATABASE_URL`:
-
-```bash
 python scripts/check_postgres_migrations.py
 ```
 
-GitHub Actions also validates PostgreSQL-specific behavior and a real,
-authenticated FastAPI/Celery/Redis smoke path.
+Frontend:
+
+```bash
+cd frontend
+npm run check
+```
+
+GitHub Actions validates the backend suite, the frontend build and component
+tests, PostgreSQL-specific behavior and a real authenticated
+FastAPI/Celery/Redis smoke path.
 
 ## Key documentation
 
 - [`docs/mvp/README.md`](docs/mvp/README.md): demonstrable MVP scope.
+- [`frontend/README.md`](frontend/README.md): frontend architecture and local use.
 - [`docs/api/authentication.md`](docs/api/authentication.md): login, sessions and user administration.
 - [`docs/security/access_control_matrix.md`](docs/security/access_control_matrix.md): public/protected route policy.
 - [`docs/api/two_image_upload_analysis.md`](docs/api/two_image_upload_analysis.md): official analysis API.
