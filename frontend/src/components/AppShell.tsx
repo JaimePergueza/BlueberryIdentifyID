@@ -3,15 +3,15 @@ import { useAuth } from "../lib/auth";
 
 const operationalLinks = [
   { to: "/", label: "Resumen", icon: "⌂", end: true },
-  { to: "/analyses/new", label: "Nuevo análisis", icon: "+" },
-  { to: "/analyses", label: "Historial", icon: "≡" },
+  { to: "/analyses/new", label: "Nuevo análisis", icon: "+", end: false },
+  { to: "/analyses", label: "Historial", icon: "≡", end: false },
 ];
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const links = user?.role === "admin"
-    ? [...operationalLinks, { to: "/admin/users", label: "Usuarios", icon: "⚙" }]
+    ? [...operationalLinks, { to: "/admin/users", label: "Usuarios", icon: "⚙", end: false }]
     : operationalLinks;
 
   const handleLogout = async () => {
