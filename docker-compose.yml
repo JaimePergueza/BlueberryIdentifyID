@@ -155,6 +155,8 @@ services:
       DEMO_BASE_URL: http://frontend
       BLUEBERRY_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin-demo}
       BLUEBERRY_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
+      BLUEBERRY_SPECIALIST_USERNAME: ${DEMO_SPECIALIST_USERNAME:-especialista-demo}
+      BLUEBERRY_SPECIALIST_PASSWORD: ${DEMO_SPECIALIST_PASSWORD:-}
     depends_on:
       demo-seed:
         condition: service_completed_successfully
