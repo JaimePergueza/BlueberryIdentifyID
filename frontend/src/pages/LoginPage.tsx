@@ -11,8 +11,9 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const destination = (location.state as { from?: string } | null)?.from ?? "/";
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={destination} replace />;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -20,7 +21,6 @@ export function LoginPage() {
     setError(null);
     try {
       await login(username, password);
-      const destination = (location.state as { from?: string } | null)?.from ?? "/";
       navigate(destination, { replace: true });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "No se pudo iniciar sesión.");
