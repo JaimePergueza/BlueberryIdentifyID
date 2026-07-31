@@ -17,5 +17,7 @@ class PwdlibPasswordHasher(PasswordHasherPort):
     def verify(self, password: str, password_hash: str) -> bool:
         try:
             return self._password_hash.verify(password, password_hash)
-        except (ValueError, TypeError):
+        except Exception:
+            # A malformed or unsupported persisted hash must fail closed and
+            # must never turn a login attempt into an internal-server error.
             return False
