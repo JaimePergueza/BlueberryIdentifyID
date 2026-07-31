@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { ErrorState, LoadingState } from "../components/Feedback";
+import { MorphologyEvidence } from "../components/MorphologyEvidence";
 import { LabelBadge, ReviewBadge } from "../components/StatusBadge";
 import { apiRequest } from "../lib/api";
 import { formatDate, formatPercent, labelName } from "../lib/format";
@@ -25,8 +26,8 @@ export function PreliminaryResultPage() {
       <div className="page-header">
         <div>
           <span className="eyebrow">Resultado automático</span>
-          <h1>Clasificación preliminar</h1>
-          <p>La predicción permanece inmutable aunque posteriormente exista una corrección humana.</p>
+          <h1>Clasificación morfológica preliminar</h1>
+          <p>La predicción y sus mediciones permanecen inmutables aunque exista una corrección humana posterior.</p>
         </div>
         <ReviewBadge reviewed={result.human_review_completed} />
       </div>
@@ -40,9 +41,15 @@ export function PreliminaryResultPage() {
         </div>
         <div className="confidence-ring" aria-label={`Confianza ${formatPercent(result.confidence_score)}`}>
           <strong>{formatPercent(result.confidence_score)}</strong>
-          <span>confianza técnica</span>
+          <span>confianza técnica limitada</span>
         </div>
       </section>
+
+      <MorphologyEvidence
+        featureSummary={result.feature_summary}
+        qualitySummary={result.quality_summary}
+        decisionTrace={result.decision_trace}
+      />
 
       <div className="two-column">
         <section className="card">
@@ -58,14 +65,13 @@ export function PreliminaryResultPage() {
         </section>
 
         <section className="card">
-          <div className="section-heading"><h2>Control de calidad</h2></div>
-          {result.quality_summary && Object.keys(result.quality_summary).length > 0 ? (
-            <dl className="key-value-list">
-              {Object.entries(result.quality_summary).map(([key, value]) => (
-                <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value)}</dd></div>
-              ))}
-            </dl>
-          ) : <p className="muted">No existen indicadores adicionales.</p>}
+          <div className="section-heading"><h2>Alcance del resultado</h2></div>
+          <ul className="scope-list">
+            <li>Compara evidencia macroscópica y microscópica de la misma muestra.</li>
+            <li>Describe crecimiento y patrones morfológicos amplios.</li>
+            <li>No afirma género, especie, patogenicidad ni diagnóstico.</li>
+            <li>Debe confirmarse o corregirse mediante revisión experta.</li>
+          </ul>
         </section>
       </div>
 
