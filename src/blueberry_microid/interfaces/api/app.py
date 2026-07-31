@@ -1,9 +1,10 @@
 """FastAPI application factory for BlueberryMicroID.
 
-This API is a preliminary, non-diagnostic tool: its inference endpoint uses
-only a deterministic mock engine, and it never identifies microorganism
-species/genus. See ARCHITECTURE.md and CLAUDE.md for the full scope
-statement.
+BlueberryMicroID is a preliminary, non-diagnostic platform. The official MVP
+upload endpoint analyzes real Petri and microscopy pixels with transparent,
+non-trained classical image-processing rules. Legacy processing endpoints may
+still use MockInferenceEngine for technical pipeline validation. No endpoint
+identifies microorganism species or genus, and expert review remains mandatory.
 """
 
 from fastapi import FastAPI
@@ -49,15 +50,12 @@ API_V1_PREFIX = "/api/v1"
 def create_app() -> FastAPI:
     """Build a fresh FastAPI application.
 
-    A factory function (rather than a module-level `app = FastAPI()`
-    global) so tests can construct an isolated app per test and point its
-    `app.state.session_factory` / `app.state.settings` at a throwaway
-    SQLite database and temp storage directory instead of the real
-    PostgreSQL configured by the environment (see tests/api/conftest.py).
+    A factory function (rather than a module-level `app = FastAPI()` global)
+    lets tests construct an isolated app and replace the database, settings,
+    storage, and task infrastructure.
 
-    `create_engine()` is lazy in SQLAlchemy — building the engine here does
-    not open a connection, so this never fails just because no database is
-    reachable yet.
+    `create_engine()` is lazy in SQLAlchemy, so building the engine here does
+    not open a connection immediately.
     """
     settings = get_settings()
     configure_logging(settings)
@@ -67,25 +65,23 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="BlueberryMicroID",
         description=(
-            "Preliminary, non-diagnostic support for recognizing microorganisms "
-            "associated with blueberries, from Petri dish (macro) and microscopy "
-            "(micro) imagery. The inference endpoint uses only a deterministic "
-            "mock engine; human reviews are recorded separately for audit, and "
-            "the API does not identify species/genus."
+            "Preliminary, non-diagnostic support for analyzing Petri dish and "
+            "microscopy images from the same blueberry-associated sample. "
+            "POST /api/v1/analysis/two-image-upload is the official MVP path: "
+            "it extracts real pixel signals with transparent classical image "
+            "processing, produces an unvalidated preliminary visual category, "
+            "and always requires expert review. Legacy mock endpoints remain "
+            "only for technical pipeline validation. The API never identifies "
+            "microorganism species or genus."
         ),
         version="0.1.0",
     )
 
-    # Every dependency a route needs is resolved from `app.state` at request
-    # time (see interfaces/api/v1/dependencies.py) rather than baked into a
-    # rigid module-level singleton, precisely so tests can swap them out.
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.celery_app = celery_app
 
-    # Assigns/reads request_id and logs one structured line per request; see
-    # infrastructure/logging/middleware.py.
     app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(analysis.router, prefix=API_V1_PREFIX)
