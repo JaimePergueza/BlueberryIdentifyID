@@ -1,15 +1,36 @@
-# Motor morfológico explicable 0.4.0
+# Motor morfológico explicable 0.4.1
 
 ## Propósito
 
-`PreliminaryTwoImageEngine 0.4.0` combina una fotografía macroscópica de caja
+`PreliminaryTwoImageEngine 0.4.1` combina una fotografía macroscópica de caja
 Petri con una imagen microscópica de la misma muestra. Su objetivo es producir
 una **clasificación morfológica preliminar, verificable y trazable**, no
 identificar género o especie ni emitir un diagnóstico.
 
 Todas las predicciones requieren revisión humana. La predicción automática, sus
-mediciones, sus regiones visualizadas y la decisión del especialista se
-conservan por separado.
+mediciones, sus regiones visualizadas, la versión exacta del motor y la decisión
+del especialista se conservan por separado.
+
+## Cambios de la versión 0.4.1
+
+La versión 0.4.1 corrige dos limitaciones observadas con capturas reales:
+
+- en Petri, medios oscuros con colonias grandes, texturizadas o parcialmente
+  conectadas ya no se descartan silenciosamente como una única máscara extensa;
+- en microscopía, los componentes pequeños sin suficiente soporte, las cajas
+  redundantes y los píxeles de ramificación contiguos se filtran o consolidan
+  antes de mostrarse.
+
+El extractor Petri usa una segunda segmentación conservadora basada en contraste
+local, distancia de color LAB, desviación de intensidad y textura local. Cuando
+una región grande puede separarse, aplica transformación de distancia y
+watershed. Si existe señal visual fuerte pero no se pueden obtener regiones
+confiables, se activa un conflicto de segmentación y el resultado se bloquea
+como `inconclusive`; nunca se interpreta automáticamente como ausencia de
+crecimiento.
+
+Los análisis creados con versiones anteriores permanecen inmutables y conservan
+la versión con la que fueron procesados.
 
 ## Categorías preliminares
 
@@ -17,7 +38,7 @@ conservan por separado.
 - `suspicious_growth`: hay crecimiento candidato, pero la microscopía no aporta evidencia suficiente;
 - `probable_fungal_growth`: la evidencia combinada presenta un patrón filamentoso compatible;
 - `probable_bacterial_growth`: la evidencia combinada presenta un patrón celular no filamentoso compatible;
-- `inconclusive`: calidad insuficiente, señales ambiguas o conflicto entre imágenes.
+- `inconclusive`: calidad insuficiente, señales ambiguas, conflicto de segmentación o conflicto entre imágenes.
 
 Estas categorías son visuales y amplias. No representan una etiqueta taxonómica.
 
@@ -29,12 +50,15 @@ externo y calcula:
 
 - cantidad de regiones candidatas;
 - cobertura candidata sobre el interior de la placa;
+- fracción de señal visual candidata antes del filtrado final;
 - área media de las regiones;
 - circularidad media;
 - irregularidad de bordes;
 - variación de textura;
 - saturación, tono e intensidad;
-- nitidez de la captura.
+- nitidez de la captura;
+- presencia de crecimiento grande o confluente refinado;
+- conflicto entre señal visual y regiones segmentadas.
 
 Una región candidata no equivale automáticamente a una colonia confirmada. La
 textura del medio, reflejos, condensación, residuos o iluminación irregular
@@ -47,28 +71,32 @@ El procesamiento intenta aislar el campo iluminado y calcula:
 - densidad de bordes;
 - cobertura de estructuras filamentosas;
 - densidad del esqueleto morfológico;
-- densidad de puntos de ramificación;
+- densidad de puntos de ramificación consolidados;
 - proporción de componentes alargados;
-- cantidad de componentes estructurales;
+- cantidad de componentes estructurales con soporte suficiente;
 - variación de intensidad y nitidez;
 - cobertura del campo analizado.
 
-Estas señales describen estructuras visibles. No permiten por sí mismas afirmar
-septación, género, especie, viabilidad o patogenicidad.
+La superposición limita los elementos visuales a los componentes y eventos de
+ramificación más respaldados. Estas señales describen estructuras visibles. No
+permiten por sí mismas afirmar septación, género, especie, viabilidad o
+patogenicidad.
 
 ## Visualización verificable
 
-La versión 0.4.0 guarda coordenadas normalizadas junto con la predicción:
+La versión 0.4.1 guarda coordenadas normalizadas junto con la predicción:
 
 - límite detectado de la caja Petri;
 - polígonos y cajas de regiones candidatas;
 - límite detectado del campo microscópico;
-- cajas de componentes estructurales y filamentosos;
-- puntos de ramificación muestreados.
+- cajas consolidadas de componentes estructurales y filamentosos;
+- puntos de ramificación agrupados.
 
 La interfaz superpone esas marcas sobre las imágenes protegidas y permite
-mostrarlas u ocultarlas. Las marcas son evidencia de lo que procesó el motor; no
-son anotaciones expertas ni ground truth.
+mostrarlas u ocultarlas. También presenta la fracción de señal candidata, el
+estado de crecimiento confluente y cualquier conflicto de segmentación. Las
+marcas son evidencia de lo que procesó el motor; no son anotaciones expertas ni
+ground truth.
 
 Las coordenadas se guardan en `feature_summary.petri.visualization` y
 `feature_summary.micro.visualization`, con `coordinate_space=normalized`. Esto
@@ -88,12 +116,13 @@ Son condiciones bloqueantes:
 - imposibilidad de aislar el límite de la caja Petri;
 - imposibilidad de aislar el campo microscópico;
 - sobreexposición o subexposición extrema de Petri;
-- campo microscópico aparentemente vacío o sin información suficiente.
+- campo microscópico aparentemente vacío o sin información suficiente;
+- contraste o textura compatible con crecimiento en Petri sin regiones que puedan separarse de forma confiable.
 
-El desenfoque moderado y las segmentaciones anormalmente densas se registran
-como advertencias. Cuando el estado es `rejected`, el motor detiene la fusión,
-devuelve `inconclusive`, limita la confianza a `0.25` y explica los motivos para
-repetir la captura.
+El desenfoque moderado, el crecimiento confluente refinado y las segmentaciones
+anormalmente densas se registran como advertencias. Cuando el estado es
+`rejected`, el motor detiene la fusión, devuelve `inconclusive`, limita la
+confianza a `0.25` y explica los motivos para repetir o revisar la captura.
 
 El estado, la puntuación técnica, las razones bloqueantes y las advertencias se
 guardan en `quality_summary` y en el primer paso de `decision_trace`.
