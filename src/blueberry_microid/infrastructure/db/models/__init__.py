@@ -8,6 +8,7 @@ from blueberry_microid.infrastructure.db.models.annotation_bundle_file import An
 from blueberry_microid.infrastructure.db.models.annotation_bundle_run import AnnotationBundleRunModel
 from blueberry_microid.infrastructure.db.models.annotation_quality_gate_issue import AnnotationQualityGateIssueModel
 from blueberry_microid.infrastructure.db.models.annotation_quality_gate_run import AnnotationQualityGateRunModel
+from blueberry_microid.infrastructure.db.models.auth_session import AuthSessionModel
 from blueberry_microid.infrastructure.db.models.base import Base
 from blueberry_microid.infrastructure.db.models.dataset_curation_item import DatasetCurationItemModel
 from blueberry_microid.infrastructure.db.models.dataset_curation_run import DatasetCurationRunModel
@@ -69,6 +70,7 @@ from blueberry_microid.infrastructure.db.models.training_prediction import Train
 from blueberry_microid.infrastructure.db.models.training_run import TrainingRunModel
 from blueberry_microid.infrastructure.db.models.training_run_comparison import TrainingRunComparisonModel
 from blueberry_microid.infrastructure.db.models.training_run_comparison_entry import TrainingRunComparisonEntryModel
+from blueberry_microid.infrastructure.db.models.user import UserModel
 
 __all__ = [
     "AnalysisRunModel",
@@ -76,6 +78,7 @@ __all__ = [
     "AnnotationBundleRunModel",
     "AnnotationQualityGateIssueModel",
     "AnnotationQualityGateRunModel",
+    "AuthSessionModel",
     "Base",
     "DatasetCurationItemModel",
     "DatasetCurationRunModel",
@@ -119,4 +122,5 @@ __all__ = [
     "TrainingRunModel",
     "TrainingRunComparisonModel",
     "TrainingRunComparisonEntryModel",
+    "UserModel",
 ]

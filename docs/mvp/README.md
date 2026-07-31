@@ -121,6 +121,19 @@ corrección nunca sobrescribe la predicción. Ambos contratos omiten rutas
 internas y `file_path`. La especificación y ejemplos están en
 [`docs/api/analysis_history.md`](../api/analysis_history.md).
 
-## 9. Regla de trabajo
+## 9. Autenticación y autorización
+
+El backend utiliza sesiones bearer opacas y revocables. Solo `/health` y el
+login son públicos. El rol `specialist` opera muestras, imágenes, análisis,
+historial y revisiones; el rol `admin` añade gestión de usuarios y acceso a
+rutas técnicas de modelos, datasets, auditoría y entrenamiento experimental.
+
+Las contraseñas se almacenan con Argon2 y el servidor persiste únicamente el
+hash SHA-256 de cada token de sesión. Cambiar contraseña, rol o estado revoca
+las sesiones activas. La guía de uso está en
+[`docs/api/authentication.md`](../api/authentication.md) y la política completa
+en [`docs/security/access_control_matrix.md`](../security/access_control_matrix.md).
+
+## 10. Regla de trabajo
 
 Cada cambio funcional se desarrolla en una rama independiente, se entrega mediante pull request y debe incluir pruebas y criterios de aceptación verificables. `main` debe permanecer estable y demostrable.

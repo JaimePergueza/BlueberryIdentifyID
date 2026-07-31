@@ -4,9 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 
+from blueberry_microid.application.use_cases.auth.create_user import CreateUserUseCase
+from blueberry_microid.domain.enums.user_role import UserRole
 from blueberry_microid.infrastructure.config.settings import Settings, get_settings
 from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
+    AuthSessionModel,
     Base,
     HumanReviewModel,
     MicroImageModel,
@@ -14,14 +17,21 @@ from blueberry_microid.infrastructure.db.models import (
     PetriImageModel,
     PredictionModel,
     SampleModel,
+    UserModel,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_user_repository import (
+    SqlAlchemyUserRepository,
 )
 from blueberry_microid.infrastructure.db.session.session_factory import create_session_factory
+from blueberry_microid.infrastructure.security.pwdlib_password_hasher import PwdlibPasswordHasher
 from blueberry_microid.infrastructure.tasks.analysis_tasks import process_analysis_run_task
 from blueberry_microid.interfaces.api.app import create_app
 from blueberry_microid.interfaces.api.v1.dependencies import get_process_analysis_run_task
 from tests.api.image_helpers import make_valid_jpeg_bytes, make_valid_png_bytes
 
 _SQLITE_TABLES = [
+    UserModel.__table__,
+    AuthSessionModel.__table__,
     SampleModel.__table__,
     ModelVersionModel.__table__,
     PetriImageModel.__table__,
@@ -30,6 +40,8 @@ _SQLITE_TABLES = [
     HumanReviewModel.__table__,
     PredictionModel.__table__,
 ]
+
+_EAGER_ADMIN_PASSWORD = "Eager-Administrator-Password-42"
 
 
 @pytest.fixture()
@@ -49,7 +61,13 @@ def eager_api_client(tmp_path, monkeypatch):
     Base.metadata.create_all(engine, tables=_SQLITE_TABLES)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
-    app.state.settings = Settings(_env_file=None)
+    app.state.settings = Settings(_env_file=None, database_url=database_url)
+
+    with app.state.session_factory() as session:
+        CreateUserUseCase(
+            SqlAlchemyUserRepository(session),
+            PwdlibPasswordHasher(),
+        ).execute("eager-admin", _EAGER_ADMIN_PASSWORD, UserRole.ADMIN)
 
     process_analysis_run_task.app.conf.update(
         broker_url="memory://",
@@ -61,6 +79,12 @@ def eager_api_client(tmp_path, monkeypatch):
     app.state.celery_app = process_analysis_run_task.app
 
     with TestClient(app, raise_server_exceptions=False) as client:
+        login = client.post(
+            "/api/v1/auth/login",
+            data={"username": "eager-admin", "password": _EAGER_ADMIN_PASSWORD},
+        )
+        assert login.status_code == 200, login.text
+        client.headers.update({"Authorization": f"Bearer {login.json()['access_token']}"})
         yield client
 
     engine.dispose()

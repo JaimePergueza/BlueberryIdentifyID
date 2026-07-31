@@ -14,6 +14,7 @@ from blueberry_microid.domain.enums.dataset_split import DatasetSplit
 from blueberry_microid.domain.enums.model_type import ModelType
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.enums.review_decision import ReviewDecision
+from blueberry_microid.domain.enums.user_role import UserRole
 
 
 def _values(enum_cls: type) -> list:
@@ -24,6 +25,7 @@ model_type_enum = Enum(ModelType, name="model_type", values_callable=_values)
 analysis_status_enum = Enum(AnalysisStatus, name="analysis_status", values_callable=_values)
 predicted_label_enum = Enum(PredictedLabel, name="predicted_label", values_callable=_values)
 review_decision_enum = Enum(ReviewDecision, name="review_decision", values_callable=_values)
+user_role_enum = Enum(UserRole, name="user_role", values_callable=_values)
 dataset_split_enum = Enum(DatasetSplit, name="dataset_split", values_callable=_values)
 dataset_curation_status_enum = Enum(
     DatasetCurationStatus, name="dataset_curation_status", values_callable=_values
