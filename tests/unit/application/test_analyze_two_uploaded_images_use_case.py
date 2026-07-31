@@ -1,4 +1,4 @@
-"""Unit tests for AnalyzeTwoUploadedImagesUseCase (Fase 40.1 persistent flow)."""
+"""Unit tests for AnalyzeTwoUploadedImagesUseCase persistent MVP flow."""
 
 from types import TracebackType
 from typing import Optional
@@ -6,21 +6,27 @@ from uuid import UUID
 
 import pytest
 
-from blueberry_microid.application.dto.two_image_upload_dto import TwoImageUploadRequest, TwoImageUploadResult
+from blueberry_microid.application.dto.two_image_upload_dto import (
+    TwoImageUploadRequest,
+    TwoImageUploadResult,
+)
 from blueberry_microid.application.exceptions import (
     DuplicateModelVersionError,
     ImageTooLargeError,
     InvalidImageError,
 )
+from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
-from blueberry_microid.application.ports.image_validator import ImageValidationResult, ImageValidatorPort
+from blueberry_microid.application.ports.image_validator import (
+    ImageValidationResult,
+    ImageValidatorPort,
+)
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
-from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
-from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_images import (
     AnalyzeTwoUploadedImagesUseCase,
 )
@@ -37,16 +43,17 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 from tests.unit.application.image_helpers import make_valid_jpeg_bytes
 
 
-# ---------------------------------------------------------------------------
-# Fakes
-# ---------------------------------------------------------------------------
-
-
 class _FakeValidator(ImageValidatorPort):
     def __init__(self, *, raise_error: bool = False) -> None:
         self._raise = raise_error
 
-    def validate(self, *, file_name: str, mime_type: str, content: bytes) -> ImageValidationResult:
+    def validate(
+        self,
+        *,
+        file_name: str,
+        mime_type: str,
+        content: bytes,
+    ) -> ImageValidationResult:
         if self._raise:
             raise InvalidImageError("fake invalid image")
         return ImageValidationResult(width=32, height=24)
@@ -58,7 +65,13 @@ class _FakeStorage(ImageStoragePort):
         self.saved: list[str] = []
         self.deleted: list[str] = []
 
-    def save(self, *, category: ImageCategory, original_file_name: str, content: bytes) -> str:
+    def save(
+        self,
+        *,
+        category: ImageCategory,
+        original_file_name: str,
+        content: bytes,
+    ) -> str:
         if category == self._fail_on:
             raise OSError("fake storage failure")
         path = f"/fake/{category.value}/{original_file_name}"
@@ -81,7 +94,10 @@ class _FakeSampleRepository(SampleRepositoryPort):
         return self._store.get(sample_id)
 
     def get_by_sample_code(self, sample_code: str) -> Optional[Sample]:
-        return next((s for s in self._store.values() if s.sample_code == sample_code), None)
+        return next(
+            (sample for sample in self._store.values() if sample.sample_code == sample_code),
+            None,
+        )
 
 
 class _FakePetriImageRepository(PetriImageRepositoryPort):
@@ -96,7 +112,11 @@ class _FakePetriImageRepository(PetriImageRepositoryPort):
         return self._store.get(petri_image_id)
 
     def list_by_sample_id(self, sample_id: UUID) -> list[PetriImage]:
-        return [p for p in self._store.values() if p.sample_id == sample_id]
+        return [
+            petri_image
+            for petri_image in self._store.values()
+            if petri_image.sample_id == sample_id
+        ]
 
 
 class _FakeMicroImageRepository(MicroImageRepositoryPort):
@@ -111,7 +131,11 @@ class _FakeMicroImageRepository(MicroImageRepositoryPort):
         return self._store.get(micro_image_id)
 
     def list_by_sample_id(self, sample_id: UUID) -> list[MicroImage]:
-        return [m for m in self._store.values() if m.sample_id == sample_id]
+        return [
+            micro_image
+            for micro_image in self._store.values()
+            if micro_image.sample_id == sample_id
+        ]
 
 
 class _FakeModelVersionRepository(ModelVersionRepositoryPort):
@@ -127,7 +151,14 @@ class _FakeModelVersionRepository(ModelVersionRepositoryPort):
         return model_version
 
     def get_by_id(self, model_version_id: UUID) -> Optional[ModelVersion]:
-        return next((mv for mv in self._store if mv.id == model_version_id), None)
+        return next(
+            (
+                model_version
+                for model_version in self._store
+                if model_version.id == model_version_id
+            ),
+            None,
+        )
 
     def list_all(self) -> list[ModelVersion]:
         return list(self._store)
@@ -148,10 +179,13 @@ class _FakeAnalysisRunRepository(AnalysisRunRepositoryPort):
         return None
 
     def get_by_id(self, analysis_run_id: UUID) -> Optional[AnalysisRun]:
-        return next((r for r in self.added if r.id == analysis_run_id), None)
+        return next(
+            (run for run in self.added if run.id == analysis_run_id),
+            None,
+        )
 
     def list_by_sample_id(self, sample_id: UUID) -> list[AnalysisRun]:
-        return [r for r in self.added if r.sample_id == sample_id]
+        return [run for run in self.added if run.sample_id == sample_id]
 
     def list_all(self) -> list[AnalysisRun]:
         return list(self.added)
@@ -166,10 +200,24 @@ class _FakePredictionRepository(PredictionRepositoryPort):
         return prediction
 
     def get_by_analysis_run_id(self, analysis_run_id: UUID) -> Optional[Prediction]:
-        return next((p for p in self.added if p.analysis_run_id == analysis_run_id), None)
+        return next(
+            (
+                prediction
+                for prediction in self.added
+                if prediction.analysis_run_id == analysis_run_id
+            ),
+            None,
+        )
 
     def get_by_id(self, prediction_id: UUID) -> Optional[Prediction]:
-        return next((p for p in self.added if p.id == prediction_id), None)
+        return next(
+            (
+                prediction
+                for prediction in self.added
+                if prediction.id == prediction_id
+            ),
+            None,
+        )
 
 
 class _FakeUnitOfWork(UnitOfWorkPort):
@@ -234,11 +282,6 @@ def _make_request(**kwargs):
     return TwoImageUploadRequest(**defaults)
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
 def test_returns_result_with_real_ids():
     use_case, _ = _make_use_case()
     result = use_case.execute(_make_request())
@@ -263,17 +306,19 @@ def test_persists_analysis_run_and_prediction():
     assert len(uow.analysis_run_repository.added) == 1
     assert uow.analysis_run_repository.added[0].id == result.analysis_run_id
     assert len(uow.prediction_repository.added) == 1
-    pred = uow.prediction_repository.added[0]
-    assert pred.id == result.prediction_id
-    assert pred.analysis_run_id == result.analysis_run_id
-    assert pred.requires_human_review is True
+    prediction = uow.prediction_repository.added[0]
+    assert prediction.id == result.prediction_id
+    assert prediction.analysis_run_id == result.analysis_run_id
+    assert prediction.requires_human_review is True
 
 
 def test_does_not_create_human_review():
     use_case, uow = _make_use_case()
     use_case.execute(_make_request())
     assert not hasattr(uow, "human_review_repository") or not getattr(
-        uow, "_human_reviews_created", False
+        uow,
+        "_human_reviews_created",
+        False,
     )
 
 
@@ -289,7 +334,7 @@ def test_stores_both_images_in_upload_storage():
     use_case, _ = _make_use_case(storage=storage)
     use_case.execute(_make_request())
     assert len(storage.saved) == 2
-    categories = {p.split("/")[2] for p in storage.saved}
+    categories = {path.split("/")[2] for path in storage.saved}
     assert "petri" in categories
     assert "micro" in categories
 
@@ -332,24 +377,41 @@ def test_uses_provided_sample_code():
     assert samples[0].sample_code == "LAB-001"
 
 
-def test_reuses_existing_model_version_on_duplicate():
-    existing_mv = ModelVersion(
+def test_registers_classical_model_version_for_mvp_flow():
+    model_repo = _FakeModelVersionRepository()
+    use_case, uow = _make_use_case(mv_repo=model_repo)
+
+    use_case.execute(_make_request())
+
+    assert len(model_repo._store) == 1
+    model_version = model_repo._store[0]
+    assert model_version.name == "PreliminaryTwoImageEngine"
+    assert model_version.version == "0.2.0"
+    assert model_version.model_type == ModelType.CLASSICAL
+    assert "real Petri and microscopy pixel signals" in model_version.description
+    assert uow.analysis_run_repository.added[0].model_version_id == model_version.id
+
+
+def test_reuses_existing_classical_model_version_on_duplicate():
+    existing_model = ModelVersion(
         name="PreliminaryTwoImageEngine",
-        version="0.1.0",
-        model_type=ModelType.MOCK,
+        version="0.2.0",
+        model_type=ModelType.CLASSICAL,
     )
-    mv_repo = _FakeModelVersionRepository(raise_duplicate=True)
-    mv_repo._store.append(existing_mv)
-    use_case, uow = _make_use_case(mv_repo=mv_repo)
+    model_repo = _FakeModelVersionRepository(raise_duplicate=True)
+    model_repo._store.append(existing_model)
+    use_case, uow = _make_use_case(mv_repo=model_repo)
+
     result = use_case.execute(_make_request())
+
     assert result.analysis_run_id is not None
     run = uow.analysis_run_repository.added[0]
-    assert run.model_version_id == existing_mv.id
+    assert run.model_version_id == existing_model.id
 
 
 def test_unique_run_ids_per_call():
     use_case, _ = _make_use_case()
-    req = _make_request()
-    r1 = use_case.execute(req)
-    r2 = use_case.execute(req)
-    assert r1.analysis_run_id != r2.analysis_run_id
+    request = _make_request()
+    first = use_case.execute(request)
+    second = use_case.execute(request)
+    assert first.analysis_run_id != second.analysis_run_id
