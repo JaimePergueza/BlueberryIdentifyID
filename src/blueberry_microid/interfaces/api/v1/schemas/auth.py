@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from blueberry_microid.domain.enums.user_role import UserRole
 
@@ -32,11 +32,33 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=12, max_length=256)
     role: UserRole
 
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not 3 <= len(normalized) <= 100:
+            raise ValueError("username must contain between 3 and 100 non-space characters")
+        return normalized
+
+    @field_validator("password")
+    @classmethod
+    def reject_blank_password(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("password cannot contain only whitespace")
+        return value
+
 
 class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     password: Optional[str] = Field(default=None, min_length=12, max_length=256)
+
+    @field_validator("password")
+    @classmethod
+    def reject_blank_password(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not value.strip():
+            raise ValueError("password cannot contain only whitespace")
+        return value
 
     @model_validator(mode="after")
     def require_at_least_one_change(self) -> "UserUpdate":
