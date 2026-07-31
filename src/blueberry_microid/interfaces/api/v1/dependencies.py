@@ -17,6 +17,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 from celery import Celery
 
+from blueberry_microid.application.ports.analysis_history_query import AnalysisHistoryQueryPort
 from blueberry_microid.application.ports.analysis_run_repository import AnalysisRunRepositoryPort
 from blueberry_microid.application.ports.annotation_bundle_file_repository import AnnotationBundleFileRepositoryPort
 from blueberry_microid.application.ports.annotation_bundle_run_repository import AnnotationBundleRunRepositoryPort
@@ -359,6 +360,9 @@ from blueberry_microid.application.use_cases.sample.get_sample import (
     GetSampleBySampleCodeUseCase,
 )
 from blueberry_microid.infrastructure.config.settings import Settings
+from blueberry_microid.infrastructure.db.queries.sqlalchemy_analysis_history_query import (
+    SqlAlchemyAnalysisHistoryQuery,
+)
 from blueberry_microid.infrastructure.db.repositories.sqlalchemy_analysis_run_repository import (
     SqlAlchemyAnalysisRunRepository,
 )
@@ -500,6 +504,12 @@ from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_image
 from blueberry_microid.application.use_cases.analysis.get_final_analysis_result import (
     GetFinalAnalysisResultUseCase,
 )
+from blueberry_microid.application.use_cases.analysis_history.get_analysis_run_detail import (
+    GetAnalysisRunDetailUseCase,
+)
+from blueberry_microid.application.use_cases.analysis_history.list_analysis_history import (
+    ListAnalysisHistoryUseCase,
+)
 from blueberry_microid.application.use_cases.analysis.get_preliminary_result_with_review import (
     GetPreliminaryResultWithReviewUseCase,
 )
@@ -628,6 +638,10 @@ def get_analyze_two_uploaded_images_use_case(
 
 def get_analysis_run_repository(session: Session = Depends(get_db_session)) -> AnalysisRunRepositoryPort:
     return SqlAlchemyAnalysisRunRepository(session)
+
+
+def get_analysis_history_query(session: Session = Depends(get_db_session)) -> AnalysisHistoryQueryPort:
+    return SqlAlchemyAnalysisHistoryQuery(session)
 
 
 def get_human_review_repository(session: Session = Depends(get_db_session)) -> HumanReviewRepositoryPort:
@@ -1085,6 +1099,18 @@ def get_get_final_analysis_result_use_case(
     return GetFinalAnalysisResultUseCase(
         analysis_run_repository, prediction_repository, human_review_repository
     )
+
+
+def get_list_analysis_history_use_case(
+    query: AnalysisHistoryQueryPort = Depends(get_analysis_history_query),
+) -> ListAnalysisHistoryUseCase:
+    return ListAnalysisHistoryUseCase(query)
+
+
+def get_analysis_run_detail_use_case(
+    query: AnalysisHistoryQueryPort = Depends(get_analysis_history_query),
+) -> GetAnalysisRunDetailUseCase:
+    return GetAnalysisRunDetailUseCase(query)
 
 
 def get_create_dataset_snapshot_use_case(
