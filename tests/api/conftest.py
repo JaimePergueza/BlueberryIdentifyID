@@ -1,19 +1,12 @@
-"""Fixtures for API tests.
-
-PostgreSQL is the real target database for this project (see
-ARCHITECTURE.md). These tests instead point a freshly built `create_app()`
-at an in-memory SQLite database (shared across the whole test via
-`StaticPool`, since plain `sqlite:///:memory:` would otherwise open a new,
-empty database per connection) and at a temporary directory for image
-storage. This is fast and hermetic for API-level testing, but it does not
-replace validating the real schema against PostgreSQL.
-"""
+"""Fixtures for isolated API tests with authenticated role variants."""
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
+from blueberry_microid.application.use_cases.auth.create_user import CreateUserUseCase
+from blueberry_microid.domain.enums.user_role import UserRole
 from blueberry_microid.infrastructure.config.settings import Settings
 from blueberry_microid.infrastructure.db.models import (
     AnalysisRunModel,
@@ -21,6 +14,7 @@ from blueberry_microid.infrastructure.db.models import (
     AnnotationBundleRunModel,
     AnnotationQualityGateIssueModel,
     AnnotationQualityGateRunModel,
+    AuthSessionModel,
     Base,
     DatasetCurationItemModel,
     DatasetCurationRunModel,
@@ -64,11 +58,18 @@ from blueberry_microid.infrastructure.db.models import (
     TrainingRunModel,
     TrainingRunComparisonEntryModel,
     TrainingRunComparisonModel,
+    UserModel,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_user_repository import (
+    SqlAlchemyUserRepository,
 )
 from blueberry_microid.infrastructure.db.session.session_factory import create_session_factory
+from blueberry_microid.infrastructure.security.pwdlib_password_hasher import PwdlibPasswordHasher
 from blueberry_microid.interfaces.api.app import create_app
 
 _SQLITE_TABLES = [
+    UserModel.__table__,
+    AuthSessionModel.__table__,
     SampleModel.__table__,
     ModelVersionModel.__table__,
     PetriImageModel.__table__,
@@ -118,24 +119,65 @@ _SQLITE_TABLES = [
     ModelPromotionGateRunModel.__table__,
 ]
 
+_TEST_PASSWORD = "Correct-Horse-Battery-42"
+
 
 @pytest.fixture()
-def api_client(tmp_path):
+def api_app(tmp_path):
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine, tables=_SQLITE_TABLES)
 
     app = create_app()
-    # Overriding app.state after create_app() — rather than relying on the
-    # real DATABASE_URL/storage_root from the environment — is what makes
-    # this test isolated and independent of whether PostgreSQL is running.
-    app.state.settings = Settings(_env_file=None, storage_root=tmp_path, database_url="sqlite://")
+    app.state.settings = Settings(
+        _env_file=None,
+        storage_root=tmp_path,
+        database_url="sqlite://",
+        auth_session_ttl_hours=12,
+    )
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
 
-    # raise_server_exceptions=False lets a genuinely unmapped exception come
-    # back as an HTTP 500 response instead of propagating as a Python
-    # exception inside the test — matching how a real ASGI server behaves.
-    with TestClient(app, raise_server_exceptions=False) as client:
+    yield app
+    engine.dispose()
+
+
+def _create_user(app, username: str, role: UserRole) -> None:
+    with app.state.session_factory() as session:
+        CreateUserUseCase(
+            SqlAlchemyUserRepository(session),
+            PwdlibPasswordHasher(),
+        ).execute(username, _TEST_PASSWORD, role)
+
+
+def _login(client: TestClient, username: str) -> str:
+    response = client.post(
+        "/api/v1/auth/login",
+        data={"username": username, "password": _TEST_PASSWORD},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]
+
+
+@pytest.fixture()
+def anonymous_api_client(api_app):
+    with TestClient(api_app, raise_server_exceptions=False) as client:
         yield client
 
-    engine.dispose()
+
+@pytest.fixture()
+def api_client(api_app):
+    """Backward-compatible client authenticated as an administrator."""
+    _create_user(api_app, "test-admin", UserRole.ADMIN)
+    with TestClient(api_app, raise_server_exceptions=False) as client:
+        token = _login(client, "test-admin")
+        client.headers.update({"Authorization": f"Bearer {token}"})
+        yield client
+
+
+@pytest.fixture()
+def specialist_api_client(api_app):
+    _create_user(api_app, "test-specialist", UserRole.SPECIALIST)
+    with TestClient(api_app, raise_server_exceptions=False) as client:
+        token = _login(client, "test-specialist")
+        client.headers.update({"Authorization": f"Bearer {token}"})
+        yield client
