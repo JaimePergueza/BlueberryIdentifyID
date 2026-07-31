@@ -27,12 +27,12 @@ def _image_bytes(image: Image.Image, image_format: str = "PNG") -> bytes:
 def _synthetic_petri() -> bytes:
     image = Image.new("RGB", (320, 320), "#111111")
     draw = ImageDraw.Draw(image)
-    draw.ellipse((25, 25, 295, 295), fill="#8b9081", outline="#d7ddd0", width=6)
-    draw.ellipse((70, 65, 175, 170), fill="#ded5b6")
-    draw.ellipse((165, 105, 270, 220), fill="#d7ceb1")
-    draw.ellipse((85, 180, 195, 285), fill="#e2d9be")
-    for offset in range(0, 70, 7):
-        draw.line((85 + offset, 75, 105 + offset, 158), fill="#a49b7e", width=2)
+    draw.ellipse((25, 25, 295, 295), fill="#d8d2b8", outline="#f2eee0", width=6)
+    draw.ellipse((70, 65, 155, 150), fill="#4c3b25")
+    draw.ellipse((170, 105, 260, 200), fill="#6e5731")
+    draw.ellipse((90, 190, 180, 275), fill="#31543d")
+    for offset in range(0, 60, 6):
+        draw.line((82 + offset, 75, 100 + offset, 142), fill="#9e8e66", width=2)
     return _image_bytes(image)
 
 
