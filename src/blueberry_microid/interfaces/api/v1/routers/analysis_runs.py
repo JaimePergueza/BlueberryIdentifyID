@@ -1,20 +1,36 @@
+from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from blueberry_microid.application.dto.analysis_history_dto import AnalysisHistoryFilters, ReviewStatus
 from blueberry_microid.application.dto.analysis_run_dto import CreateAnalysisRunRequest
 from blueberry_microid.application.use_cases.inference.create_analysis_run import CreateAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_analysis_run import GetAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.get_prediction import GetPredictionForAnalysisRunUseCase
 from blueberry_microid.application.use_cases.inference.process_analysis_run import ProcessAnalysisRunUseCase
+from blueberry_microid.application.use_cases.analysis_history.get_analysis_run_detail import (
+    GetAnalysisRunDetailUseCase,
+)
+from blueberry_microid.application.use_cases.analysis_history.list_analysis_history import (
+    ListAnalysisHistoryUseCase,
+)
 from blueberry_microid.domain.enums.analysis_status import AnalysisStatus
+from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.domain.exceptions.errors import InvalidAnalysisRunTransitionError
 from blueberry_microid.interfaces.api.v1.dependencies import (
+    get_analysis_run_detail_use_case,
     get_create_analysis_run_use_case,
     get_get_analysis_run_use_case,
     get_get_prediction_use_case,
+    get_list_analysis_history_use_case,
     get_process_analysis_run_task,
     get_process_analysis_run_use_case,
+)
+from blueberry_microid.interfaces.api.v1.schemas.analysis_history import (
+    AnalysisHistoryPageRead,
+    AnalysisRunDetailRead,
 )
 from blueberry_microid.interfaces.api.v1.schemas.analysis_run import (
     AnalysisRunAsyncProcessRead,
@@ -31,6 +47,46 @@ _MOCK_DISCLAIMER = (
     "testing only. It does not perform real image analysis, has no diagnostic "
     "validity, and never identifies a microorganism species or genus."
 )
+
+
+@router.get("", response_model=AnalysisHistoryPageRead)
+def list_analysis_history(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    sample_code: Optional[str] = Query(default=None),
+    status_filter: Optional[AnalysisStatus] = Query(default=None, alias="status"),
+    review_status: Optional[ReviewStatus] = Query(default=None),
+    preliminary_label: Optional[PredictedLabel] = Query(default=None),
+    final_label: Optional[PredictedLabel] = Query(default=None),
+    created_from: Optional[datetime] = Query(default=None),
+    created_to: Optional[datetime] = Query(default=None),
+    use_case: ListAnalysisHistoryUseCase = Depends(get_list_analysis_history_use_case),
+) -> AnalysisHistoryPageRead:
+    """List AnalysisRuns with stable pagination, filters, and final-review state."""
+    try:
+        filters = AnalysisHistoryFilters(
+            page=page,
+            page_size=page_size,
+            sample_code=sample_code,
+            status=status_filter,
+            review_status=review_status,
+            preliminary_label=preliminary_label,
+            final_label=final_label,
+            created_from=created_from,
+            created_to=created_to,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    return AnalysisHistoryPageRead.model_validate(use_case.execute(filters))
+
+
+@router.get("/{analysis_run_id}/detail", response_model=AnalysisRunDetailRead)
+def get_analysis_run_detail(
+    analysis_run_id: UUID,
+    use_case: GetAnalysisRunDetailUseCase = Depends(get_analysis_run_detail_use_case),
+) -> AnalysisRunDetailRead:
+    """Return the safe, consolidated audit view for one AnalysisRun."""
+    return AnalysisRunDetailRead.model_validate(use_case.execute(analysis_run_id))
 
 
 @router.post("", response_model=AnalysisRunRead, status_code=status.HTTP_201_CREATED)

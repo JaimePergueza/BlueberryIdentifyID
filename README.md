@@ -50,6 +50,8 @@ The result can then be reviewed and retrieved through:
 POST /api/v1/analysis-runs/{analysis_run_id}/reviews
 GET  /api/v1/analysis-runs/{analysis_run_id}/preliminary-result
 GET  /api/v1/analysis-runs/{analysis_run_id}/final-result
+GET  /api/v1/analysis-runs
+GET  /api/v1/analysis-runs/{analysis_run_id}/detail
 ```
 
 The repository still contains `MockInferenceEngine` for legacy orchestration and
@@ -65,6 +67,7 @@ Implemented:
 - classical Petri and microscopy feature extraction;
 - explainable preliminary classification;
 - human review and final-result resolution;
+- paginated analysis history, filters, and consolidated traceability detail;
 - auditable dataset curation, snapshots, and releases;
 - PostgreSQL migrations;
 - synchronous and Celery-backed technical processing paths;
@@ -73,7 +76,6 @@ Implemented:
 Still required for the demonstrable product:
 
 - authentication and basic roles;
-- analysis history, search, filters, and consolidated detail API;
 - operational React/TypeScript frontend;
 - reproducible full-stack deployment and demonstration data.
 
@@ -172,6 +174,7 @@ FastAPI/Celery/Redis smoke path.
 
 - [`docs/mvp/README.md`](docs/mvp/README.md): demonstrable MVP scope.
 - [`docs/api/two_image_upload_analysis.md`](docs/api/two_image_upload_analysis.md): official analysis API.
+- [`docs/api/analysis_history.md`](docs/api/analysis_history.md): history, filters, and consolidated detail API.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): architecture and historical phase detail.
 - [`docs/development.md`](docs/development.md): development procedures.
 - [`CLAUDE.md`](CLAUDE.md): repository development constraints and historical decisions.

@@ -108,6 +108,19 @@ El MVP se considera terminado cuando:
 - Despliegue y manual de operación.
 - Guion y respaldo para la presentación.
 
-## 8. Regla de trabajo
+## 8. Historial y trazabilidad API
+
+El frontend del MVP consulta `GET /api/v1/analysis-runs` para un historial
+paginado, ordenado de forma estable y filtrable por código de muestra, estado,
+revisión, resultado preliminar, resultado final y rango de fechas. El detalle
+consolidado está en `GET /api/v1/analysis-runs/{analysis_run_id}/detail`.
+
+El resultado preliminar conserva la `Prediction` automática original. El
+resultado final solo se deriva de la revisión humana final vigente; una
+corrección nunca sobrescribe la predicción. Ambos contratos omiten rutas
+internas y `file_path`. La especificación y ejemplos están en
+[`docs/api/analysis_history.md`](../api/analysis_history.md).
+
+## 9. Regla de trabajo
 
 Cada cambio funcional se desarrolla en una rama independiente, se entrega mediante pull request y debe incluir pruebas y criterios de aceptación verificables. `main` debe permanecer estable y demostrable.
