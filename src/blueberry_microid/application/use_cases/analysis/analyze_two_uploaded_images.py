@@ -1,16 +1,9 @@
 """Use case: validate, store, and persistently record a two-image upload analysis.
 
-This is the official MVP analysis entry point. It creates real database
-entities (Sample, PetriImage, MicroImage, AnalysisRun, Prediction) from two
-raw image uploads and analyzes the actual pixel content with transparent,
-non-trained classical image-processing rules.
-
-The AnalysisRun+Prediction write is atomic via UnitOfWork. Sample and image
-records are persisted before that transaction; if a later database step fails,
-those records remain valid traceability records and can be reconciled.
-
-This is not a trained or scientifically validated classifier. Every result is
-preliminary, non-diagnostic, non-taxonomic, and requires expert review.
+This is the official analysis entry point. It creates real database entities
+from two raw image uploads and analyses their pixel content with transparent,
+non-trained morphology rules. Results remain preliminary, non-diagnostic,
+non-taxonomic and require expert review.
 """
 
 import logging
@@ -45,23 +38,11 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 logger = logging.getLogger("blueberry_microid.business.analyze_two_uploaded_images")
 
 _PRELIMINARY_ENGINE_NAME = "PreliminaryTwoImageEngine"
-# Version 0.1.0 was registered as MOCK before the Fase 41 pixel-processing
-# implementation existed. A new version avoids reusing those legacy rows.
-_PRELIMINARY_ENGINE_VERSION = "0.2.0"
+_PRELIMINARY_ENGINE_VERSION = "0.3.0"
 
 
 class AnalyzeTwoUploadedImagesUseCase:
-    """Validate, store, analyze, and persist two images from one sample.
-
-    Creates Sample, PetriImage, MicroImage, AnalysisRun, and Prediction from a
-    single call. The engine reads both uploaded images and extracts classical
-    visual signals; it does not run a trained ML model.
-
-    ``requires_human_review`` is forced to ``True`` for every result.
-
-    Compensation: if micro-image storage fails, the already-saved Petri file
-    is deleted before the error propagates.
-    """
+    """Validate, store, analyse and persist a paired Petri/microscopy sample."""
 
     def __init__(
         self,
@@ -142,7 +123,6 @@ class AnalyzeTwoUploadedImagesUseCase:
         )
 
         model_version = self._get_or_create_model_version()
-
         analysis_run = AnalysisRun.create(
             petri_image=petri_image,
             micro_image=micro_image,
@@ -223,8 +203,10 @@ class AnalyzeTwoUploadedImagesUseCase:
             version=_PRELIMINARY_ENGINE_VERSION,
             model_type=ModelType.CLASSICAL,
             description=(
-                "Classical two-image heuristic engine using real Petri and "
-                "microscopy pixel signals; non-trained and non-diagnostic."
+                "Explainable classical two-image morphology engine combining "
+                "Petri colony geometry, colour and texture with microscopy "
+                "filament, branching and component signals; non-trained, "
+                "non-taxonomic and non-diagnostic."
             ),
         )
         try:
@@ -232,9 +214,9 @@ class AnalyzeTwoUploadedImagesUseCase:
         except DuplicateModelVersionError:
             existing = self._mv_repo.list_all()
             return next(
-                mv
-                for mv in existing
-                if mv.name == _PRELIMINARY_ENGINE_NAME
-                and mv.version == _PRELIMINARY_ENGINE_VERSION
-                and mv.model_type == ModelType.CLASSICAL
+                model_version
+                for model_version in existing
+                if model_version.name == _PRELIMINARY_ENGINE_NAME
+                and model_version.version == _PRELIMINARY_ENGINE_VERSION
+                and model_version.model_type == ModelType.CLASSICAL
             )

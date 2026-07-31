@@ -1,0 +1,85 @@
+.admin-dashboard-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  border-left: 5px solid var(--teal-600);
+}
+
+.admin-dashboard-callout h2,
+.admin-dashboard-callout p {
+  margin-bottom: 0;
+}
+
+.admin-dashboard-callout p {
+  margin-top: 0.45rem;
+}
+
+.admin-users-page > .alert {
+  margin-bottom: 1rem;
+}
+
+.admin-users-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.34fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.admin-create-card {
+  position: sticky;
+  top: 1.25rem;
+}
+
+.admin-user-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-users-table-card {
+  min-width: 0;
+}
+
+.admin-users-table-card select {
+  min-width: 145px;
+  padding: 0.58rem 0.65rem;
+}
+
+.inline-password-reset {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 330px;
+}
+
+.inline-password-reset input {
+  min-width: 185px;
+  padding: 0.62rem 0.7rem;
+}
+
+.inline-password-reset .button {
+  min-height: 38px;
+  padding: 0.55rem 0.8rem;
+}
+
+@media (max-width: 1120px) {
+  .admin-users-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-create-card {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-dashboard-callout {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inline-password-reset {
+    min-width: 285px;
+  }
+}

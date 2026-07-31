@@ -9,6 +9,22 @@ export interface User {
   updated_at: string;
 }
 
+export interface UserListResponse {
+  users: User[];
+}
+
+export interface CreateUserPayload {
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UpdateUserPayload {
+  role?: UserRole;
+  is_active?: boolean;
+  password?: string;
+}
+
 export interface LoginResponse {
   access_token: string;
   token_type: "bearer";

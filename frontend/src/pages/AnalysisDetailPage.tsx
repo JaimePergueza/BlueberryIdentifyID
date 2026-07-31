@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { ErrorState, LoadingState } from "../components/Feedback";
+import { MorphologyEvidence } from "../components/MorphologyEvidence";
 import { ProtectedImage } from "../components/ProtectedImage";
 import { AnalysisStatusBadge, LabelBadge, ReviewBadge } from "../components/StatusBadge";
 import { apiRequest } from "../lib/api";
@@ -47,7 +48,7 @@ export function AnalysisDetailPage() {
         <div>
           <span className="eyebrow">Muestra {detail.sample.sample_code}</span>
           <h1>Detalle y trazabilidad</h1>
-          <p>Registro automático y decisión humana presentados sin sobrescribir información.</p>
+          <p>Registro automático, evidencia morfológica y decisión humana sin sobrescribir información.</p>
         </div>
         <div className="header-badges">
           <AnalysisStatusBadge status={detail.analysis_run.status} />
@@ -101,6 +102,14 @@ export function AnalysisDetailPage() {
           />
         </div>
       </section>
+
+      {prediction && (
+        <MorphologyEvidence
+          featureSummary={prediction.feature_summary}
+          qualitySummary={prediction.quality_summary}
+          decisionTrace={prediction.decision_trace}
+        />
+      )}
 
       <div className="detail-grid">
         <MetadataCard

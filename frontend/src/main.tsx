@@ -6,6 +6,8 @@ import { App } from "./App";
 import { AuthProvider } from "./lib/auth";
 import { queryClient } from "./lib/queryClient";
 import "./styles/global.css";
+import "./styles/admin.css";
+import "./styles/morphology.css";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("The root element was not found");
