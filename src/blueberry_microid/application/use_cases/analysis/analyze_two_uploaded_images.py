@@ -38,7 +38,7 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 logger = logging.getLogger("blueberry_microid.business.analyze_two_uploaded_images")
 
 _PRELIMINARY_ENGINE_NAME = "PreliminaryTwoImageEngine"
-_PRELIMINARY_ENGINE_VERSION = "0.3.0"
+_PRELIMINARY_ENGINE_VERSION = "0.4.0"
 
 
 class AnalyzeTwoUploadedImagesUseCase:
@@ -94,9 +94,7 @@ class AnalyzeTwoUploadedImagesUseCase:
             raise
 
         sample_code = request.sample_code or f"AUTO-{uuid.uuid4().hex[:8].upper()}"
-        sample = self._sample_repo.add(
-            Sample(sample_code=sample_code, notes=request.notes)
-        )
+        sample = self._sample_repo.add(Sample(sample_code=sample_code, notes=request.notes))
 
         petri_image = self._petri_repo.add(
             PetriImage(
@@ -203,10 +201,10 @@ class AnalyzeTwoUploadedImagesUseCase:
             version=_PRELIMINARY_ENGINE_VERSION,
             model_type=ModelType.CLASSICAL,
             description=(
-                "Explainable classical two-image morphology engine combining "
-                "Petri colony geometry, colour and texture with microscopy "
-                "filament, branching and component signals; non-trained, "
-                "non-taxonomic and non-diagnostic."
+                "Explainable classical two-image morphology engine combining Petri colony "
+                "geometry, colour and texture with microscopy filament, branching and component "
+                "signals. Version 0.4.0 adds verifiable normalized overlays and a blocking visual "
+                "quality gate; non-trained, non-taxonomic and non-diagnostic."
             ),
         )
         try:
