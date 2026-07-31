@@ -21,7 +21,7 @@ describe("ProtectedImage", () => {
   it("loads binary content with the bearer token and creates a local preview URL", async () => {
     storeToken("protected-token");
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(new Blob(["image-bytes"], { type: "image/jpeg" }), {
+      new Response("image-bytes", {
         status: 200,
         headers: { "Content-Type": "image/jpeg" },
       }),
