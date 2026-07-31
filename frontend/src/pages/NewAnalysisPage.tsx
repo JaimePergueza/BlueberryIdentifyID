@@ -27,8 +27,8 @@ function ImageSelector({ label, hint, file, onChange }: SelectedImageProps) {
       <input
         type="file"
         accept="image/jpeg,image/png,image/tiff,.jpg,.jpeg,.png,.tif,.tiff"
+        aria-required="true"
         onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-        required
       />
       {previewUrl ? (
         <img src={previewUrl} alt={`Vista previa: ${label}`} />
@@ -91,7 +91,7 @@ export function NewAnalysisPage() {
         </div>
       </div>
 
-      <form className="analysis-form" onSubmit={handleSubmit}>
+      <form className="analysis-form" onSubmit={handleSubmit} noValidate>
         <section className="card">
           <div className="section-heading">
             <div>
