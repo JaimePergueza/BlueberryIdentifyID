@@ -12,11 +12,14 @@ dist/
 venv/
 .env
 .env.local
+.env.docker
+.env.ci
 *.db
 *.sqlite
 *.sqlite3
 *.log
 logs/
+backups/
 storage/petri_images/*
 storage/micro_images/*
 storage/uploads/

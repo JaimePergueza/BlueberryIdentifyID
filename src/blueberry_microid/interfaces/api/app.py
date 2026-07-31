@@ -16,6 +16,9 @@ from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.interfaces.api.auth_error_handlers import register_auth_exception_handlers
 from blueberry_microid.interfaces.api.error_handlers import register_exception_handlers
 from blueberry_microid.interfaces.api.security import require_admin, require_specialist
+from blueberry_microid.interfaces.api.stored_image_error_handlers import (
+    register_stored_image_exception_handlers,
+)
 from blueberry_microid.interfaces.api.v1.routers import (
     admin_users,
     analysis,
@@ -31,6 +34,7 @@ from blueberry_microid.interfaces.api.v1.routers import (
     detection_training_readiness,
     human_reviews,
     image_audits,
+    image_content,
     image_features,
     ml_preflight,
     micro_images,
@@ -90,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(samples.router, prefix=API_V1_PREFIX, dependencies=specialist_access)
     app.include_router(petri_images.router, prefix=API_V1_PREFIX, dependencies=specialist_access)
     app.include_router(micro_images.router, prefix=API_V1_PREFIX, dependencies=specialist_access)
+    app.include_router(image_content.router, prefix=API_V1_PREFIX, dependencies=specialist_access)
     app.include_router(analysis_runs.router, prefix=API_V1_PREFIX, dependencies=specialist_access)
     app.include_router(human_reviews.router, prefix=API_V1_PREFIX, dependencies=specialist_access)
 
@@ -117,6 +122,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
     register_auth_exception_handlers(app)
+    register_stored_image_exception_handlers(app)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:

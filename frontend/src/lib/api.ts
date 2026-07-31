@@ -37,40 +37,50 @@ function messageFromPayload(payload: ApiErrorPayload, fallback: string): string 
   return fallback;
 }
 
+function authenticatedHeaders(init: RequestInit, authenticated: boolean): Headers {
+  const headers = new Headers(init.headers);
+  const token = authenticated ? getStoredToken() : null;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+}
+
+async function apiError(response: Response, authenticated: boolean): Promise<ApiError> {
+  const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+  const error = new ApiError(
+    response.status,
+    payload.error?.code ?? "request_failed",
+    messageFromPayload(payload, "No se pudo completar la solicitud."),
+    payload.error?.request_id,
+  );
+  if (response.status === 401 && authenticated) {
+    clearStoredToken();
+    window.dispatchEvent(new CustomEvent("blueberry-auth-expired"));
+  }
+  return error;
+}
+
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
   options: { authenticated?: boolean } = { authenticated: true },
 ): Promise<T> {
-  const headers = new Headers(init.headers);
   const authenticated = options.authenticated !== false;
-  const token = authenticated ? getStoredToken() : null;
-
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const headers = authenticatedHeaders(init, authenticated);
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   if (response.status === 204) return undefined as T;
+  if (!response.ok) throw await apiError(response, authenticated);
+  return (await response.json()) as T;
+}
 
-  const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload | T;
-  if (!response.ok) {
-    const errorPayload = payload as ApiErrorPayload;
-    const error = new ApiError(
-      response.status,
-      errorPayload.error?.code ?? "request_failed",
-      messageFromPayload(errorPayload, "No se pudo completar la solicitud."),
-      errorPayload.error?.request_id,
-    );
-    if (response.status === 401 && authenticated) {
-      clearStoredToken();
-      window.dispatchEvent(new CustomEvent("blueberry-auth-expired"));
-    }
-    throw error;
-  }
-
-  return payload as T;
+export async function apiBlob(path: string): Promise<Blob> {
+  const headers = authenticatedHeaders({}, true);
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers });
+  if (!response.ok) throw await apiError(response, true);
+  return response.blob();
 }
 
 export function formBody(values: Record<string, string>): URLSearchParams {

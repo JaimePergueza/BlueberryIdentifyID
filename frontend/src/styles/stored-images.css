@@ -1,0 +1,64 @@
+.image-comparison-card {
+  margin-bottom: 1.25rem;
+}
+
+.stored-image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.protected-image {
+  margin: 0;
+}
+
+.protected-image-frame {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, rgba(238, 232, 248, 0.45), rgba(223, 243, 241, 0.55)),
+    #f8faf9;
+}
+
+.protected-image-frame img {
+  width: 100%;
+  height: 360px;
+  object-fit: contain;
+  background: #17202a;
+}
+
+.protected-image figcaption {
+  margin-top: 0.55rem;
+  color: var(--ink-700);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.image-unavailable {
+  color: var(--ink-500);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 860px) {
+  .stored-image-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .protected-image-frame img {
+    height: 300px;
+  }
+}
+
+@media (max-width: 620px) {
+  .protected-image-frame {
+    min-height: 220px;
+  }
+
+  .protected-image-frame img {
+    height: 230px;
+  }
+}
