@@ -8,6 +8,16 @@ import { apiRequest } from "../lib/api";
 import { decisionName, formatBytes, formatDate, formatPercent, labelName } from "../lib/format";
 import type { AnalysisDetail } from "../types/api";
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function visualizationFor(summary: Record<string, unknown> | null, branch: "petri" | "micro") {
+  return asRecord(asRecord(summary)[branch]).visualization;
+}
+
 function MetadataCard({
   title,
   entries,
@@ -41,6 +51,8 @@ export function AnalysisDetailPage() {
   const detail = query.data!;
   const prediction = detail.prediction;
   const review = detail.human_review;
+  const petriOverlay = visualizationFor(prediction?.feature_summary ?? null, "petri");
+  const microOverlay = visualizationFor(prediction?.feature_summary ?? null, "micro");
 
   return (
     <div className="page">
@@ -85,8 +97,9 @@ export function AnalysisDetailPage() {
       <section className="card image-comparison-card">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">Evidencia visual</span>
-            <h2>Imágenes de la muestra</h2>
+            <span className="eyebrow">Evidencia visual verificable</span>
+            <h2>Imágenes y detecciones empleadas</h2>
+            <p>Activa u oculta las marcas para comprobar el límite aislado y las regiones utilizadas por el motor.</p>
           </div>
         </div>
         <div className="stored-image-grid">
@@ -94,11 +107,13 @@ export function AnalysisDetailPage() {
             endpoint={`/api/v1/petri-images/${detail.petri_image.id}/content`}
             alt={`Caja Petri de la muestra ${detail.sample.sample_code}`}
             caption={`Caja Petri · ${detail.petri_image.file_name}`}
+            overlay={petriOverlay}
           />
           <ProtectedImage
             endpoint={`/api/v1/micro-images/${detail.micro_image.id}/content`}
             alt={`Microscopía de la muestra ${detail.sample.sample_code}`}
             caption={`Microscopía · ${detail.micro_image.file_name}`}
+            overlay={microOverlay}
           />
         </div>
       </section>
