@@ -1,25 +1,28 @@
 """Use case: validate, store, and persistently record a two-image upload analysis.
 
-Fase 40.1: this use case creates real DB entities (Sample, PetriImage,
-MicroImage, AnalysisRun, Prediction) from two raw image uploads.  The
-AnalysisRun+Prediction write is atomic via UnitOfWork; the Sample/image
-persistence uses individual repository commits (MVP trade-off: orphan rows
-are possible if the UoW step fails, but they are valid, harmless entities).
+This is the official MVP analysis entry point. It creates real database
+entities (Sample, PetriImage, MicroImage, AnalysisRun, Prediction) from two
+raw image uploads and analyzes the actual pixel content with transparent,
+non-trained classical image-processing rules.
 
-THIS IS NOT REAL IMAGE ANALYSIS.  See PreliminaryTwoImageAnalysisEngine.
-`requires_human_review` is always ``True`` for results from this endpoint —
-all preliminary uploads require expert review regardless of the visual label.
+The AnalysisRun+Prediction write is atomic via UnitOfWork. Sample and image
+records are persisted before that transaction; if a later database step fails,
+those records remain valid traceability records and can be reconciled.
+
+This is not a trained or scientifically validated classifier. Every result is
+preliminary, non-diagnostic, non-taxonomic, and requires expert review.
 """
 
 import logging
 import uuid
 
-from blueberry_microid.application.dto.two_image_upload_dto import TwoImageUploadRequest, TwoImageUploadResult
+from blueberry_microid.application.dto.two_image_upload_dto import (
+    TwoImageUploadRequest,
+    TwoImageUploadResult,
+)
 from blueberry_microid.application.exceptions import (
     DuplicateModelVersionError,
-    ImageStorageCompensationError,
     ImageTooLargeError,
-    InvalidImageError,
 )
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
 from blueberry_microid.application.ports.image_validator import ImageValidatorPort
@@ -42,22 +45,22 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 logger = logging.getLogger("blueberry_microid.business.analyze_two_uploaded_images")
 
 _PRELIMINARY_ENGINE_NAME = "PreliminaryTwoImageEngine"
-_PRELIMINARY_ENGINE_VERSION = "0.1.0"
+# Version 0.1.0 was registered as MOCK before the Fase 41 pixel-processing
+# implementation existed. A new version avoids reusing those legacy rows.
+_PRELIMINARY_ENGINE_VERSION = "0.2.0"
 
 
 class AnalyzeTwoUploadedImagesUseCase:
-    """Validate, store, and persistently record two raw image uploads.
+    """Validate, store, analyze, and persist two images from one sample.
 
-    Creates Sample, PetriImage, MicroImage, AnalysisRun, and Prediction
-    from a single two-image upload call.  The AnalysisRun+Prediction write
-    is atomic (UnitOfWork); earlier persistence steps (Sample, images) are
-    committed individually.
+    Creates Sample, PetriImage, MicroImage, AnalysisRun, and Prediction from a
+    single call. The engine reads both uploaded images and extracts classical
+    visual signals; it does not run a trained ML model.
 
-    ``requires_human_review`` is forced to ``True`` for every result — all
-    preliminary uploads require expert review, regardless of the label.
+    ``requires_human_review`` is forced to ``True`` for every result.
 
-    Compensation: if micro storage fails, the already-saved petri file is
-    deleted before the error propagates (no orphan files).
+    Compensation: if micro-image storage fails, the already-saved Petri file
+    is deleted before the error propagates.
     """
 
     def __init__(
@@ -84,10 +87,14 @@ class AnalyzeTwoUploadedImagesUseCase:
 
     def execute(self, request: TwoImageUploadRequest) -> TwoImageUploadResult:
         petri_validation = self._validate_bytes(
-            request.petri_file_name, request.petri_mime_type, request.petri_content
+            request.petri_file_name,
+            request.petri_mime_type,
+            request.petri_content,
         )
         micro_validation = self._validate_bytes(
-            request.micro_file_name, request.micro_mime_type, request.micro_content
+            request.micro_file_name,
+            request.micro_mime_type,
+            request.micro_content,
         )
 
         petri_path = self._storage.save(
@@ -173,6 +180,8 @@ class AnalyzeTwoUploadedImagesUseCase:
             extra={
                 "analysis_run_id": str(analysis_run.id),
                 "sample_id": str(sample.id),
+                "model_version_id": str(model_version.id),
+                "model_type": model_version.model_type.value,
                 "predicted_label": output.predicted_label.value,
             },
         )
@@ -202,20 +211,30 @@ class AnalyzeTwoUploadedImagesUseCase:
                 f"uploaded file '{file_name}' is {actual_size} bytes, which exceeds "
                 f"the maximum allowed size of {self._max_size} bytes"
             )
-        return self._validator.validate(file_name=file_name, mime_type=mime_type, content=content)
+        return self._validator.validate(
+            file_name=file_name,
+            mime_type=mime_type,
+            content=content,
+        )
 
     def _get_or_create_model_version(self) -> ModelVersion:
         candidate = ModelVersion(
             name=_PRELIMINARY_ENGINE_NAME,
             version=_PRELIMINARY_ENGINE_VERSION,
-            model_type=ModelType.MOCK,
-            description="Preliminary two-image upload engine (simulated, non-diagnostic).",
+            model_type=ModelType.CLASSICAL,
+            description=(
+                "Classical two-image heuristic engine using real Petri and "
+                "microscopy pixel signals; non-trained and non-diagnostic."
+            ),
         )
         try:
             return self._mv_repo.add(candidate)
         except DuplicateModelVersionError:
             existing = self._mv_repo.list_all()
             return next(
-                mv for mv in existing
-                if mv.name == _PRELIMINARY_ENGINE_NAME and mv.version == _PRELIMINARY_ENGINE_VERSION
+                mv
+                for mv in existing
+                if mv.name == _PRELIMINARY_ENGINE_NAME
+                and mv.version == _PRELIMINARY_ENGINE_VERSION
+                and mv.model_type == ModelType.CLASSICAL
             )
