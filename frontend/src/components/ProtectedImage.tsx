@@ -190,7 +190,7 @@ export function ProtectedImage({ endpoint, alt, caption, overlay }: ProtectedIma
 
   const aspectRatio = parsedOverlay?.imageWidth && parsedOverlay.imageHeight
     ? `${parsedOverlay.imageWidth} / ${parsedOverlay.imageHeight}`
-    : undefined;
+    : "4 / 3";
   const overlayItemCount = (parsedOverlay?.regions.length ?? 0) + (parsedOverlay?.branchPoints.length ?? 0);
 
   return (
