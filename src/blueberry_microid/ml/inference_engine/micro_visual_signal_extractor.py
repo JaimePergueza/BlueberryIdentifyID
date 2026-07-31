@@ -23,8 +23,8 @@ _LOW_SHARPNESS_THRESHOLD = 30.0
 _EMPTY_FIELD_STD_THRESHOLD = 10.0
 _EMPTY_FIELD_EDGE_THRESHOLD = 0.02
 _MAX_PROCESSING_DIMENSION = 1200
-_MAX_VISUAL_COMPONENTS = 100
-_MAX_VISUAL_BRANCH_POINTS = 160
+_MAX_VISUAL_COMPONENTS = 50
+_MAX_VISUAL_BRANCH_POINTS = 50
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +114,7 @@ class MicroVisualSignalExtractor:
         )
         component_count, elongated_ratio, round_density, visual_components = _component_morphology(
             line_mask,
+            skeleton,
             field_pixels,
             width,
             height,
@@ -129,7 +130,7 @@ class MicroVisualSignalExtractor:
             )
         if component_count > _MAX_VISUAL_COMPONENTS:
             warnings.append(
-                f"Only the {_MAX_VISUAL_COMPONENTS} largest microscopy components are shown in the visual overlay."
+                f"Only the {_MAX_VISUAL_COMPONENTS} most supported microscopy components are shown in the visual overlay."
             )
 
         visualization = {
@@ -260,25 +261,31 @@ def _extract_dark_filament_mask(gray: np.ndarray, field_mask: np.ndarray) -> np.
     background = cv2.GaussianBlur(enhanced, (0, 0), sigmaX=9.0)
     dark_difference = cv2.subtract(background, enhanced)
     field = field_mask > 0
-    threshold = max(7.0, float(np.percentile(dark_difference[field], 84)))
+    threshold = max(7.0, float(np.percentile(dark_difference[field], 90)))
     candidate = (dark_difference.astype(np.float32) >= threshold) & field
 
     mask = np.where(candidate, 255, 0).astype(np.uint8)
     close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, close_kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((2, 2), dtype=np.uint8))
-    return mask
+    return cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((2, 2), dtype=np.uint8))
 
 
 def _remove_implausible_components(mask: np.ndarray, field_pixels: int) -> np.ndarray:
     count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     cleaned = np.zeros(mask.shape, dtype=np.uint8)
-    min_area = max(4, int(field_pixels * 0.00001))
+    min_area = max(8, int(field_pixels * 0.000025))
     max_area = max(min_area + 1, int(field_pixels * 0.20))
     for label in range(1, count):
         area = int(stats[label, cv2.CC_STAT_AREA])
-        if min_area <= area <= max_area:
-            cleaned[labels == label] = 255
+        width = int(stats[label, cv2.CC_STAT_WIDTH])
+        height = int(stats[label, cv2.CC_STAT_HEIGHT])
+        if not min_area <= area <= max_area:
+            continue
+        aspect = max(width, height) / float(max(1, min(width, height)))
+        fill_ratio = area / float(max(1, width * height))
+        if aspect < 1.3 and fill_ratio < 0.16 and area < min_area * 3:
+            continue
+        cleaned[labels == label] = 255
     return cleaned
 
 
@@ -306,70 +313,189 @@ def _branch_points(
     binary = (skeleton > 0).astype(np.uint8)
     if not np.any(binary):
         return 0.0, []
-    neighbours = cv2.filter2D(binary, cv2.CV_16S, np.ones((3, 3), dtype=np.uint8)) - binary
-    branch_mask = (binary > 0) & (neighbours >= 3)
-    coordinates = np.argwhere(branch_mask)
-    density = float(len(coordinates)) / float(field_pixels)
 
-    if len(coordinates) > _MAX_VISUAL_BRANCH_POINTS:
-        step = max(1, len(coordinates) // _MAX_VISUAL_BRANCH_POINTS)
-        coordinates = coordinates[::step][:_MAX_VISUAL_BRANCH_POINTS]
+    neighbours = cv2.filter2D(
+        binary,
+        cv2.CV_16S,
+        np.ones((3, 3), dtype=np.uint8),
+    ) - binary
+    raw_branch_mask = np.where((binary > 0) & (neighbours >= 3), 255, 0).astype(np.uint8)
+    if not np.any(raw_branch_mask):
+        return 0.0, []
 
-    points = [
-        {
-            "x": round(float(column) / float(width), 6),
-            "y": round(float(row) / float(height), 6),
-        }
-        for row, column in coordinates
-    ]
+    cluster_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+    clustered = cv2.dilate(raw_branch_mask, cluster_kernel, iterations=1)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(
+        clustered,
+        connectivity=8,
+    )
+    points: list[dict] = []
+    for label in range(1, count):
+        area = int(stats[label, cv2.CC_STAT_AREA])
+        if area < 3:
+            continue
+        component = labels == label
+        original = (raw_branch_mask > 0) & component
+        coordinates = np.argwhere(original)
+        if len(coordinates) == 0:
+            continue
+        row, column = coordinates.mean(axis=0)
+        points.append(
+            {
+                "x": round(float(column) / float(width), 6),
+                "y": round(float(row) / float(height), 6),
+            }
+        )
+
+    if len(points) > _MAX_VISUAL_BRANCH_POINTS:
+        step = max(1, len(points) // _MAX_VISUAL_BRANCH_POINTS)
+        points = points[::step][:_MAX_VISUAL_BRANCH_POINTS]
+
+    density = float(len(points)) / float(field_pixels)
     return density, points
 
 
 def _component_morphology(
     mask: np.ndarray,
+    skeleton: np.ndarray,
     field_pixels: int,
     image_width: int,
     image_height: int,
 ) -> tuple[int, float, float, list[dict]]:
     count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
-    component_count = max(0, count - 1)
-    if component_count == 0:
+    if count <= 1:
         return 0, 0.0, 0.0, []
 
     elongated = 0
     roundish = 0
+    valid_count = 0
     components: list[dict] = []
+    min_visual_area = max(10, int(field_pixels * 0.000035))
+    skeleton_binary = skeleton > 0
+
     for label in range(1, count):
         x = int(stats[label, cv2.CC_STAT_LEFT])
         y = int(stats[label, cv2.CC_STAT_TOP])
-        width = int(stats[label, cv2.CC_STAT_WIDTH])
-        height = int(stats[label, cv2.CC_STAT_HEIGHT])
+        box_width = int(stats[label, cv2.CC_STAT_WIDTH])
+        box_height = int(stats[label, cv2.CC_STAT_HEIGHT])
         area = int(stats[label, cv2.CC_STAT_AREA])
-        short = max(1, min(width, height))
-        aspect = max(width, height) / float(short)
-        fill_ratio = area / float(max(1, width * height))
-        is_elongated = aspect >= 2.8
+        short = max(1, min(box_width, box_height))
+        aspect = max(box_width, box_height) / float(short)
+        fill_ratio = area / float(max(1, box_width * box_height))
+        component_mask = labels == label
+        skeleton_length = int(np.count_nonzero(skeleton_binary & component_mask))
+
+        if area < min_visual_area or skeleton_length < 8:
+            continue
+        if aspect < 1.5 and area < min_visual_area * 3:
+            continue
+
+        valid_count += 1
+        is_elongated = aspect >= 2.2 and skeleton_length >= 10
         if is_elongated:
             elongated += 1
         if aspect <= 1.6 and fill_ratio >= 0.35:
             roundish += 1
-        components.append(
-            {
-                "id": label,
-                "role": "filament_component" if is_elongated else "structure_component",
-                "bbox": _normalised_box(x, y, width, height, image_width, image_height),
-                "area_fraction": round(area / float(field_pixels), 7),
-                "aspect_ratio": round(aspect, 3),
-            }
-        )
+
+        if is_elongated or area >= max(80, min_visual_area * 3):
+            components.append(
+                {
+                    "id": label,
+                    "role": "filament_component" if is_elongated else "structure_component",
+                    "bbox": _normalised_box(
+                        x,
+                        y,
+                        box_width,
+                        box_height,
+                        image_width,
+                        image_height,
+                    ),
+                    "area_fraction": round(area / float(field_pixels), 7),
+                    "aspect_ratio": round(aspect, 3),
+                    "skeleton_length": skeleton_length,
+                }
+            )
 
     components.sort(key=lambda item: item["area_fraction"], reverse=True)
+    components = _merge_visual_components(components)
     return (
-        component_count,
-        elongated / float(component_count),
+        valid_count,
+        elongated / float(max(1, valid_count)),
         roundish / float(max(1, field_pixels)),
         components[:_MAX_VISUAL_COMPONENTS],
     )
+
+
+def _merge_visual_components(components: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    for component in components:
+        candidate = dict(component)
+        target_index = None
+        for index, existing in enumerate(merged):
+            if (
+                _normalised_box_iou(candidate["bbox"], existing["bbox"]) >= 0.35
+                or _normalised_box_containment(candidate["bbox"], existing["bbox"]) >= 0.72
+            ):
+                target_index = index
+                break
+        if target_index is None:
+            merged.append(candidate)
+            continue
+
+        existing = merged[target_index]
+        existing["bbox"] = _normalised_box_union(existing["bbox"], candidate["bbox"])
+        existing["area_fraction"] = round(
+            float(existing["area_fraction"]) + float(candidate["area_fraction"]),
+            7,
+        )
+        existing["skeleton_length"] = int(existing.get("skeleton_length", 0)) + int(
+            candidate.get("skeleton_length", 0)
+        )
+        if candidate["role"] == "filament_component":
+            existing["role"] = "filament_component"
+        existing["aspect_ratio"] = max(
+            float(existing["aspect_ratio"]),
+            float(candidate["aspect_ratio"]),
+        )
+    return merged
+
+
+def _normalised_box_iou(first: dict, second: dict) -> float:
+    intersection = _normalised_box_intersection(first, second)
+    first_area = first["width"] * first["height"]
+    second_area = second["width"] * second["height"]
+    union = first_area + second_area - intersection
+    return 0.0 if union <= 0 else intersection / union
+
+
+def _normalised_box_containment(first: dict, second: dict) -> float:
+    intersection = _normalised_box_intersection(first, second)
+    smaller = min(
+        first["width"] * first["height"],
+        second["width"] * second["height"],
+    )
+    return 0.0 if smaller <= 0 else intersection / smaller
+
+
+def _normalised_box_intersection(first: dict, second: dict) -> float:
+    left = max(first["x"], second["x"])
+    top = max(first["y"], second["y"])
+    right = min(first["x"] + first["width"], second["x"] + second["width"])
+    bottom = min(first["y"] + first["height"], second["y"] + second["height"])
+    return max(0.0, right - left) * max(0.0, bottom - top)
+
+
+def _normalised_box_union(first: dict, second: dict) -> dict:
+    left = min(first["x"], second["x"])
+    top = min(first["y"], second["y"])
+    right = max(first["x"] + first["width"], second["x"] + second["width"])
+    bottom = max(first["y"] + first["height"], second["y"] + second["height"])
+    return {
+        "x": round(left, 6),
+        "y": round(top, 6),
+        "width": round(right - left, 6),
+        "height": round(bottom - top, 6),
+    }
 
 
 def _normalised_box(
