@@ -16,12 +16,15 @@ interface MetricDefinition {
 const petriMetrics: MetricDefinition[] = [
   { key: "region_count", label: "Regiones candidatas" },
   { key: "colony_coverage", label: "Cobertura candidata", kind: "percent" },
+  { key: "candidate_signal_fraction", label: "Señal visual candidata", kind: "percent" },
   { key: "mean_region_area_fraction", label: "Área media por región", kind: "percent" },
   { key: "mean_circularity", label: "Circularidad media", digits: 3 },
   { key: "edge_irregularity", label: "Irregularidad del borde", digits: 3 },
   { key: "mean_texture_std", label: "Variación de textura", digits: 2 },
   { key: "mean_saturation", label: "Saturación media", kind: "percent" },
   { key: "plate_detected", label: "Placa aislada", kind: "boolean" },
+  { key: "confluent_growth_detected", label: "Crecimiento confluente refinado", kind: "boolean" },
+  { key: "segmentation_conflict", label: "Conflicto de segmentación", kind: "boolean" },
 ];
 
 const microMetrics: MetricDefinition[] = [
@@ -40,6 +43,8 @@ const qualityLabels: Record<string, string> = {
   petri_overexposed: "Petri sobreexpuesta",
   petri_underexposed: "Petri subexpuesta",
   petri_plate_detected: "Límite de placa detectado",
+  petri_segmentation_conflict: "Conflicto de segmentación Petri",
+  petri_confluent_growth_detected: "Crecimiento confluente refinado",
   micro_is_sharp: "Enfoque microscópico suficiente",
   micro_field_detected: "Campo microscópico detectado",
   micro_appears_empty: "Campo microscópico posiblemente vacío",
@@ -102,6 +107,17 @@ function qualityStatusName(status: unknown): string {
   if (status === "warning") return "Captura aceptada con advertencias";
   if (status === "rejected") return "Captura rechazada para interpretación";
   return "Estado de calidad no disponible";
+}
+
+function isPositiveQualityFlag(key: string, value: boolean): boolean {
+  const negativeWhenTrue = [
+    "overexposed",
+    "underexposed",
+    "empty",
+    "conflict",
+    "confluent",
+  ].some((token) => key.includes(token));
+  return negativeWhenTrue ? value === false : value === true;
 }
 
 export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTrace }: MorphologyEvidenceProps) {
@@ -182,9 +198,7 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
             {simpleQualityKeys.map((key) => {
               const value = quality[key];
               if (typeof value !== "boolean") return null;
-              const positive = key.includes("overexposed") || key.includes("underexposed") || key.includes("empty")
-                ? value === false
-                : value === true;
+              const positive = isPositiveQualityFlag(key, value);
               return (
                 <span className={`quality-chip ${positive ? "quality-chip-good" : "quality-chip-warning"}`} key={key}>
                   {qualityLabels[key]}: {value ? "Sí" : "No"}
