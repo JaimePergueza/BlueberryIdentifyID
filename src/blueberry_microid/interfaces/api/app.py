@@ -13,6 +13,7 @@ from blueberry_microid.infrastructure.db.session.session_factory import create_s
 from blueberry_microid.infrastructure.logging.config import configure_logging
 from blueberry_microid.infrastructure.logging.middleware import RequestLoggingMiddleware
 from blueberry_microid.infrastructure.tasks.celery_app import celery_app
+from blueberry_microid.interfaces.api.auth_error_handlers import register_auth_exception_handlers
 from blueberry_microid.interfaces.api.error_handlers import register_exception_handlers
 from blueberry_microid.interfaces.api.security import require_admin, require_specialist
 from blueberry_microid.interfaces.api.v1.routers import (
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router, prefix=API_V1_PREFIX, dependencies=admin_access)
 
     register_exception_handlers(app)
+    register_auth_exception_handlers(app)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:
