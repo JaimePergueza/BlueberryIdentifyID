@@ -12,6 +12,13 @@ x-backend-environment: &backend-environment
   CELERY_TASK_ALWAYS_EAGER: "false"
   CELERY_TASK_EAGER_PROPAGATES: "true"
 
+x-storage-volume: &storage-volume
+  type: volume
+  source: blueberry_storage
+  target: /app/storage
+  volume:
+    nocopy: true
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -56,6 +63,22 @@ services:
         condition: service_healthy
     restart: "no"
 
+  storage-init:
+    image: blueberry-microid-backend:${APP_VERSION:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "0:0"
+    command:
+      [
+        "sh",
+        "-c",
+        "mkdir -p /app/storage/uploads /app/storage/petri_images /app/storage/micro_images && chown -R blueberry:blueberry /app/storage",
+      ]
+    volumes:
+      - *storage-volume
+    restart: "no"
+
   api:
     image: blueberry-microid-backend:${APP_VERSION:-local}
     build:
@@ -63,9 +86,11 @@ services:
       dockerfile: Dockerfile
     environment: *backend-environment
     volumes:
-      - blueberry_storage:/app/storage
+      - *storage-volume
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      storage-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -105,9 +130,11 @@ services:
       ]
     environment: *backend-environment
     volumes:
-      - blueberry_storage:/app/storage
+      - *storage-volume
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      storage-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
