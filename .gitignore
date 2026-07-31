@@ -24,6 +24,12 @@ storage/uploads/
 !storage/micro_images/.gitkeep
 .claude/settings.local.json
 
+# Frontend dependencies and generated output
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+
 # Training artifacts / model weights
 *.pt
 *.pth
