@@ -24,6 +24,24 @@ jobs:
       - name: Run the full test suite (SQLite)
         run: pytest -v
 
+  frontend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run frontend tests and production build
+        run: npm run check
+
   postgres-migrations:
     runs-on: ubuntu-latest
 
