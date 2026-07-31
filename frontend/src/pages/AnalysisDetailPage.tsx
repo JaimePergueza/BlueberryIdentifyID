@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { ErrorState, LoadingState } from "../components/Feedback";
+import { ProtectedImage } from "../components/ProtectedImage";
 import { AnalysisStatusBadge, LabelBadge, ReviewBadge } from "../components/StatusBadge";
 import { apiRequest } from "../lib/api";
 import { decisionName, formatBytes, formatDate, formatPercent, labelName } from "../lib/format";
@@ -78,6 +79,27 @@ export function AnalysisDetailPage() {
             <Link className="button button-primary" to={`/analyses/${analysisRunId}/review`}>Registrar revisión</Link>
           )}
         </article>
+      </section>
+
+      <section className="card image-comparison-card">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Evidencia visual</span>
+            <h2>Imágenes de la muestra</h2>
+          </div>
+        </div>
+        <div className="stored-image-grid">
+          <ProtectedImage
+            endpoint={`/api/v1/petri-images/${detail.petri_image.id}/content`}
+            alt={`Caja Petri de la muestra ${detail.sample.sample_code}`}
+            caption={`Caja Petri · ${detail.petri_image.file_name}`}
+          />
+          <ProtectedImage
+            endpoint={`/api/v1/micro-images/${detail.micro_image.id}/content`}
+            alt={`Microscopía de la muestra ${detail.sample.sample_code}`}
+            caption={`Microscopía · ${detail.micro_image.file_name}`}
+          />
+        </div>
       </section>
 
       <div className="detail-grid">
