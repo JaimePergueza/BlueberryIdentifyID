@@ -1,28 +1,166 @@
+x-backend-environment: &backend-environment
+  ENVIRONMENT: production
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-blueberry}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the Compose env file}@postgres:5432/${POSTGRES_DB:-blueberry_microid}
+  STORAGE_ROOT: /app/storage
+  BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR: /app/storage/uploads
+  MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-20}
+  AUTH_SESSION_TTL_HOURS: ${AUTH_SESSION_TTL_HOURS:-12}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_FORMAT: ${LOG_FORMAT:-json}
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  CELERY_TASK_ALWAYS_EAGER: "false"
+  CELERY_TASK_EAGER_PROPAGATES: "true"
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: blueberry_microid_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-blueberry}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blueberry}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the Compose env file}
       POSTGRES_DB: ${POSTGRES_DB:-blueberry_microid}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - blueberry_microid_postgres_data:/var/lib/postgresql/data
+      - blueberry_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-blueberry} -d ${POSTGRES_DB:-blueberry_microid}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-blueberry} -d ${POSTGRES_DB:-blueberry_microid}",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 15
+    restart: unless-stopped
 
-  # Used by Celery as broker/result backend for asynchronous mock processing
-  # in local development. Tests use Celery eager mode and do not require Redis.
   redis:
     image: redis:7-alpine
-    container_name: blueberry_microid_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - blueberry_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: blueberry-microid-backend:${APP_VERSION:-local}
+    command: ["alembic", "upgrade", "head"]
+    environment: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: blueberry-microid-backend:${APP_VERSION:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *backend-environment
+    volumes:
+      - blueberry_storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    image: blueberry-microid-backend:${APP_VERSION:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      [
+        "python",
+        "-m",
+        "celery",
+        "-A",
+        "blueberry_microid.infrastructure.tasks.celery_app.celery_app",
+        "worker",
+        "--loglevel=info",
+        "-Q",
+        "analysis",
+        "--pool=solo",
+      ]
+    environment: *backend-environment
+    volumes:
+      - blueberry_storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: blueberry-microid-frontend:${APP_VERSION:-local}
+    depends_on:
+      api:
+        condition: service_healthy
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${APP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  demo-seed:
+    profiles: ["demo"]
+    image: blueberry-microid-backend:${APP_VERSION:-local}
+    command: ["python", "scripts/seed_demo.py"]
+    environment:
+      <<: *backend-environment
+      DEMO_BASE_URL: http://frontend
+      BLUEBERRY_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin-demo}
+      BLUEBERRY_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
+      BLUEBERRY_SPECIALIST_USERNAME: ${DEMO_SPECIALIST_USERNAME:-especialista-demo}
+      BLUEBERRY_SPECIALIST_PASSWORD: ${DEMO_SPECIALIST_PASSWORD:-}
+    depends_on:
+      frontend:
+        condition: service_healthy
+    restart: "no"
+
+  demo-smoke:
+    profiles: ["demo"]
+    image: blueberry-microid-backend:${APP_VERSION:-local}
+    command: ["python", "scripts/full_stack_smoke.py"]
+    environment:
+      DEMO_BASE_URL: http://frontend
+      BLUEBERRY_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin-demo}
+      BLUEBERRY_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
+    depends_on:
+      demo-seed:
+        condition: service_completed_successfully
+    restart: "no"
 
 volumes:
-  blueberry_microid_postgres_data:
+  blueberry_postgres_data:
+  blueberry_redis_data:
+  blueberry_storage:
