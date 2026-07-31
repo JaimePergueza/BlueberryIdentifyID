@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { useAuth } from "../lib/auth";
 
-const links = [
+const operationalLinks = [
   { to: "/", label: "Resumen", icon: "⌂", end: true },
   { to: "/analyses/new", label: "Nuevo análisis", icon: "+" },
   { to: "/analyses", label: "Historial", icon: "≡" },
@@ -10,6 +10,9 @@ const links = [
 export function AppShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const links = user?.role === "admin"
+    ? [...operationalLinks, { to: "/admin/users", label: "Usuarios", icon: "⚙" }]
+    : operationalLinks;
 
   const handleLogout = async () => {
     await logout();
