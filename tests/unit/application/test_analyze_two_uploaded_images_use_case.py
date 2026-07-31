@@ -386,18 +386,18 @@ def test_registers_classical_model_version_for_mvp_flow():
     assert len(model_repo._store) == 1
     model_version = model_repo._store[0]
     assert model_version.name == "PreliminaryTwoImageEngine"
-    assert model_version.version == "0.4.0"
+    assert model_version.version == "0.4.1"
     assert model_version.model_type == ModelType.CLASSICAL
     assert "Petri colony" in model_version.description
     assert "microscopy filament" in model_version.description
-    assert "quality gate" in model_version.description
+    assert "segmentation" in model_version.description
     assert uow.analysis_run_repository.added[0].model_version_id == model_version.id
 
 
 def test_reuses_existing_classical_model_version_on_duplicate():
     existing_model = ModelVersion(
         name="PreliminaryTwoImageEngine",
-        version="0.4.0",
+        version="0.4.1",
         model_type=ModelType.CLASSICAL,
     )
     model_repo = _FakeModelVersionRepository(raise_duplicate=True)
