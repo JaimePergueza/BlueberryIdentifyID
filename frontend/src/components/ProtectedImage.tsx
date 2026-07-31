@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiBlob } from "../lib/api";
+import "../styles/stored-images.css";
 
 interface ProtectedImageProps {
   endpoint: string;
