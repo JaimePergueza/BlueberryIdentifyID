@@ -1,18 +1,19 @@
-# Motor morfológico explicable 0.3.0
+# Motor morfológico explicable 0.4.0
 
 ## Propósito
 
-`PreliminaryTwoImageEngine 0.3.0` combina una fotografía macroscópica de caja
+`PreliminaryTwoImageEngine 0.4.0` combina una fotografía macroscópica de caja
 Petri con una imagen microscópica de la misma muestra. Su objetivo es producir
-una **clasificación morfológica preliminar y trazable**, no identificar género o
-especie ni emitir un diagnóstico.
+una **clasificación morfológica preliminar, verificable y trazable**, no
+identificar género o especie ni emitir un diagnóstico.
 
 Todas las predicciones requieren revisión humana. La predicción automática, sus
-mediciones y la decisión del especialista se conservan por separado.
+mediciones, sus regiones visualizadas y la decisión del especialista se
+conservan por separado.
 
 ## Categorías preliminares
 
-- `no_evident_growth`: no se observa crecimiento candidato suficiente en la captura;
+- `no_evident_growth`: no se observa crecimiento candidato suficiente en una captura aceptada;
 - `suspicious_growth`: hay crecimiento candidato, pero la microscopía no aporta evidencia suficiente;
 - `probable_fungal_growth`: la evidencia combinada presenta un patrón filamentoso compatible;
 - `probable_bacterial_growth`: la evidencia combinada presenta un patrón celular no filamentoso compatible;
@@ -22,8 +23,9 @@ Estas categorías son visuales y amplias. No representan una etiqueta taxonómic
 
 ## Evidencia macroscópica
 
-El procesamiento de la caja Petri intenta aislar la placa y excluir el borde
-externo. Después calcula:
+El procesamiento de la caja Petri intenta aislar la placa mediante detección de
+círculo central y una alternativa basada en contornos. Después excluye el borde
+externo y calcula:
 
 - cantidad de regiones candidatas;
 - cobertura candidata sobre el interior de la placa;
@@ -54,9 +56,52 @@ El procesamiento intenta aislar el campo iluminado y calcula:
 Estas señales describen estructuras visibles. No permiten por sí mismas afirmar
 septación, género, especie, viabilidad o patogenicidad.
 
+## Visualización verificable
+
+La versión 0.4.0 guarda coordenadas normalizadas junto con la predicción:
+
+- límite detectado de la caja Petri;
+- polígonos y cajas de regiones candidatas;
+- límite detectado del campo microscópico;
+- cajas de componentes estructurales y filamentosos;
+- puntos de ramificación muestreados.
+
+La interfaz superpone esas marcas sobre las imágenes protegidas y permite
+mostrarlas u ocultarlas. Las marcas son evidencia de lo que procesó el motor; no
+son anotaciones expertas ni ground truth.
+
+Las coordenadas se guardan en `feature_summary.petri.visualization` y
+`feature_summary.micro.visualization`, con `coordinate_space=normalized`. Esto
+permite reproducir la superposición aunque cambie el tamaño de presentación.
+
+## Puerta de calidad
+
+Antes de fusionar evidencia se calcula un estado:
+
+- `accepted`: no se detectan condiciones bloqueantes ni advertencias;
+- `warning`: la captura puede interpretarse, pero presenta problemas no bloqueantes;
+- `rejected`: no debe interpretarse morfológicamente.
+
+Son condiciones bloqueantes:
+
+- fallo de extracción de cualquiera de las imágenes;
+- imposibilidad de aislar el límite de la caja Petri;
+- imposibilidad de aislar el campo microscópico;
+- sobreexposición o subexposición extrema de Petri;
+- campo microscópico aparentemente vacío o sin información suficiente.
+
+El desenfoque moderado y las segmentaciones anormalmente densas se registran
+como advertencias. Cuando el estado es `rejected`, el motor detiene la fusión,
+devuelve `inconclusive`, limita la confianza a `0.25` y explica los motivos para
+repetir la captura.
+
+El estado, la puntuación técnica, las razones bloqueantes y las advertencias se
+guardan en `quality_summary` y en el primer paso de `decision_trace`.
+
 ## Fusión de evidencia
 
-El motor calcula tres puntuaciones auditables:
+Solo cuando la puerta de calidad no rechaza la captura, el motor calcula tres
+puntuaciones auditables:
 
 1. evidencia macroscópica de crecimiento;
 2. evidencia microscópica filamentosa;
@@ -66,20 +111,6 @@ La regla aplicada, los valores utilizados y la categoría resultante se guardan
 en `decision_trace`. La confianza está limitada deliberadamente a un máximo de
 `0.65`, porque el motor todavía no ha sido calibrado contra un conjunto de datos
 real, representativo y etiquetado por especialistas.
-
-## Calidad de captura
-
-Antes de interpretar las señales se registran indicadores de calidad:
-
-- enfoque suficiente de Petri y microscopía;
-- sobreexposición o subexposición de la caja;
-- detección del límite de la placa;
-- detección del campo microscópico;
-- posible campo vacío o desenfocado;
-- éxito o fallo de extracción de cada imagen.
-
-Cuando una de las dos imágenes no puede procesarse de forma confiable, el motor
-devuelve `inconclusive`.
 
 ## Datos necesarios para validación científica
 
@@ -109,6 +140,7 @@ La validación debe reportar, como mínimo:
 - F1 macro y por clase;
 - calibración de probabilidades;
 - tasa de resultados no concluyentes;
+- desempeño de la detección y segmentación;
 - acuerdo entre especialistas;
 - desempeño por medio, aumento y condición de captura.
 
@@ -118,8 +150,7 @@ limitaciones del conjunto de datos.
 
 ## Separación de responsabilidades
 
-- El motor automático genera evidencia y una categoría preliminar.
-- El especialista confirma, corrige, rechaza o marca como no concluyente.
-- El administrador gestiona usuarios y, en etapas posteriores, versiones,
-  datasets y evaluaciones.
+- El motor automático segmenta, mide, aplica la puerta de calidad y genera una categoría preliminar.
+- El especialista comprueba las marcas, confirma, corrige, rechaza o marca como no concluyente.
+- El administrador gestiona usuarios y, en etapas posteriores, versiones, datasets y evaluaciones.
 - La aplicación conserva la trazabilidad de todos esos pasos.
