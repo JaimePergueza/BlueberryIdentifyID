@@ -7,8 +7,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Anchored to the installed package location (not the process's current
 # working directory), so running the app/tests from an arbitrary directory
 # never silently creates/reads a "storage" folder somewhere unexpected.
-# This is a computed path, not a hardcoded absolute one — it still resolves
-# correctly if the repository is cloned anywhere.
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_STORAGE_ROOT = _REPO_ROOT / "storage"
 
@@ -38,6 +36,12 @@ class Settings(BaseSettings):
         default=20.0,
         description="Maximum accepted size, in megabytes, for a single Petri/micro image upload.",
     )
+    auth_session_ttl_hours: int = Field(
+        default=12,
+        ge=1,
+        le=168,
+        description="Lifetime of an opaque bearer session before re-authentication is required.",
+    )
     celery_broker_url: str = Field(default="redis://localhost:6379/0")
     celery_result_backend: str = Field(default="redis://localhost:6379/1")
     celery_task_always_eager: bool = Field(default=False)
@@ -51,14 +55,7 @@ class Settings(BaseSettings):
 
     @property
     def upload_storage_path(self) -> Path:
-        """Resolved upload storage directory.
-
-        Defaults to ``storage_root / 'uploads'`` so tests that override
-        ``storage_root`` (via ``Settings(storage_root=tmp_path)``) automatically
-        get an upload dir inside their tmp sandbox without extra config.
-        Override explicitly via the ``BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR``
-        environment variable.
-        """
+        """Resolved upload storage directory."""
         return self.upload_storage_dir if self.upload_storage_dir is not None else self.storage_root / "uploads"
 
     @property
@@ -73,13 +70,16 @@ class Settings(BaseSettings):
     def max_upload_size_bytes(self) -> int:
         return int(self.max_upload_size_mb * 1024 * 1024)
 
+    @property
+    def api_docs_enabled(self) -> bool:
+        return self.environment.strip().lower() != "production"
+
 
 @lru_cache
 def get_settings() -> Settings:
     """Process-wide cached Settings instance.
 
     Tests that need different values should construct `Settings(...)`
-    directly instead of calling this (bypassing the cache), e.g.
-    `Settings(database_url="sqlite:///:memory:")`.
+    directly instead of calling this.
     """
     return Settings()
