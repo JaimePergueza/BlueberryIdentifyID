@@ -183,6 +183,12 @@ def _classify(
                 "mean_circularity": round(petri.mean_circularity, 4),
                 "edge_irregularity": round(petri.edge_irregularity, 4),
                 "mean_texture_std": round(petri.mean_texture_std, 3),
+                "candidate_signal_fraction": round(
+                    petri.candidate_signal_fraction,
+                    5,
+                ),
+                "segmentation_conflict": petri.segmentation_conflict,
+                "confluent_growth_detected": petri.confluent_growth_detected,
                 "has_candidate_growth": has_candidate_growth,
             },
             {
@@ -190,7 +196,10 @@ def _classify(
                 "edge_density": round(micro.edge_density, 5),
                 "filament_coverage": round(micro.filament_coverage, 5),
                 "branch_point_density": round(micro.branch_point_density, 6),
-                "elongated_component_ratio": round(micro.elongated_component_ratio, 4),
+                "elongated_component_ratio": round(
+                    micro.elongated_component_ratio,
+                    4,
+                ),
                 "component_count": micro.component_count,
             },
             {
@@ -232,7 +241,9 @@ def _classify(
         )
 
     if micro.edge_density >= _HIGH_EDGE_FILAMENTOUS or filamentous_score >= _MIN_FILAMENTOUS_SCORE:
-        confidence = _bounded_confidence(0.51 + 0.09 * filamentous_score + 0.04 * macro_growth_score)
+        confidence = _bounded_confidence(
+            0.51 + 0.09 * filamentous_score + 0.04 * macro_growth_score
+        )
         explanation = (
             f"Se detectaron {petri.region_count} región(es) candidatas en Petri con cobertura "
             f"{petri.colony_coverage:.1%}. En microscopía se observaron señales lineales y "
@@ -250,7 +261,9 @@ def _classify(
         )
 
     if micro.intensity_std >= _MIN_STD_CELLULAR and cellular_score >= _MIN_CELLULAR_SCORE:
-        confidence = _bounded_confidence(0.49 + 0.09 * cellular_score + 0.03 * macro_growth_score)
+        confidence = _bounded_confidence(
+            0.49 + 0.09 * cellular_score + 0.03 * macro_growth_score
+        )
         explanation = (
             "La caja Petri presenta crecimiento candidato y la microscopía muestra una textura "
             f"celular densa (desviación de intensidad {micro.intensity_std:.1f}, densidad de bordes "
@@ -287,7 +300,13 @@ def _decision(
     rule: str,
 ) -> tuple[PredictedLabel, float, str, list[dict]]:
     trace.append({"step": "rule_applied", "rule": rule})
-    trace.append({"step": "label_assigned", "label": label.value, "confidence": confidence})
+    trace.append(
+        {
+            "step": "label_assigned",
+            "label": label.value,
+            "confidence": confidence,
+        }
+    )
     return label, confidence, explanation, trace
 
 
@@ -299,7 +318,10 @@ def _clip01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
-def _class_probabilities(label: PredictedLabel, confidence: float) -> dict[str, float]:
+def _class_probabilities(
+    label: PredictedLabel,
+    confidence: float,
+) -> dict[str, float]:
     others = [candidate for candidate in _LABEL_CYCLE if candidate != label]
     remainder = max(0.0, 1.0 - confidence)
     remainder_each = remainder / float(len(others))
@@ -308,12 +330,18 @@ def _class_probabilities(label: PredictedLabel, confidence: float) -> dict[str, 
     return {key: round(value, 6) for key, value in probabilities.items()}
 
 
-def _build_feature_summary(petri: PetriVisualSignals, micro: MicroVisualSignals) -> dict:
+def _build_feature_summary(
+    petri: PetriVisualSignals,
+    micro: MicroVisualSignals,
+) -> dict:
     return {
         "petri": {
             "region_count": petri.region_count,
             "colony_coverage": round(petri.colony_coverage, 5),
-            "mean_region_area_fraction": round(petri.mean_region_area_fraction, 5),
+            "mean_region_area_fraction": round(
+                petri.mean_region_area_fraction,
+                5,
+            ),
             "mean_circularity": round(petri.mean_circularity, 4),
             "edge_irregularity": round(petri.edge_irregularity, 4),
             "mean_texture_std": round(petri.mean_texture_std, 3),
@@ -323,6 +351,12 @@ def _build_feature_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
             "sharpness": round(petri.sharpness, 2),
             "plate_detected": petri.plate_detected,
             "plate_area_fraction": round(petri.plate_area_fraction, 4),
+            "candidate_signal_fraction": round(
+                petri.candidate_signal_fraction,
+                5,
+            ),
+            "segmentation_conflict": petri.segmentation_conflict,
+            "confluent_growth_detected": petri.confluent_growth_detected,
             "extraction_ok": petri.extraction_ok,
             "visualization": petri.visualization,
         },
@@ -332,9 +366,18 @@ def _build_feature_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
             "edge_density": round(micro.edge_density, 5),
             "filament_coverage": round(micro.filament_coverage, 5),
             "skeleton_density": round(micro.skeleton_density, 6),
-            "branch_point_density": round(micro.branch_point_density, 7),
-            "elongated_component_ratio": round(micro.elongated_component_ratio, 4),
-            "round_component_density": round(micro.round_component_density, 7),
+            "branch_point_density": round(
+                micro.branch_point_density,
+                7,
+            ),
+            "elongated_component_ratio": round(
+                micro.elongated_component_ratio,
+                4,
+            ),
+            "round_component_density": round(
+                micro.round_component_density,
+                7,
+            ),
             "component_count": micro.component_count,
             "sharpness": round(micro.sharpness, 2),
             "field_detected": micro.field_detected,
@@ -345,7 +388,10 @@ def _build_feature_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
     }
 
 
-def _build_quality_summary(petri: PetriVisualSignals, micro: MicroVisualSignals) -> dict:
+def _build_quality_summary(
+    petri: PetriVisualSignals,
+    micro: MicroVisualSignals,
+) -> dict:
     petri_is_sharp = petri.sharpness >= _PETRI_SHARP_THRESHOLD
     petri_overexposed = petri.mean_intensity > _OVEREXPOSED_MEAN
     petri_underexposed = petri.mean_intensity < _UNDEREXPOSED_MEAN
@@ -363,23 +409,42 @@ def _build_quality_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
     if not micro.extraction_ok:
         blocking_reasons.append("No se pudo procesar la imagen microscópica")
     if petri.extraction_ok and not petri.plate_detected:
-        blocking_reasons.append("No se aisló de forma confiable el límite de la caja Petri")
+        blocking_reasons.append(
+            "No se aisló de forma confiable el límite de la caja Petri"
+        )
     if micro.extraction_ok and not micro.field_detected:
-        blocking_reasons.append("No se aisló de forma confiable el campo microscópico")
+        blocking_reasons.append(
+            "No se aisló de forma confiable el campo microscópico"
+        )
+    if petri.extraction_ok and petri.segmentation_conflict:
+        blocking_reasons.append(
+            "La caja Petri presenta contraste o textura compatible con crecimiento, "
+            "pero la segmentación no pudo separar regiones confiables"
+        )
     if petri_overexposed:
         blocking_reasons.append("La imagen Petri está sobreexpuesta")
     if petri_underexposed:
         blocking_reasons.append("La imagen Petri está subexpuesta")
     if micro_appears_empty:
-        blocking_reasons.append("El campo microscópico parece vacío o sin información suficiente")
+        blocking_reasons.append(
+            "El campo microscópico parece vacío o sin información suficiente"
+        )
     if petri.extraction_ok and not petri_is_sharp:
         warning_reasons.append("El enfoque de la imagen Petri es bajo")
     if micro.extraction_ok and not micro_is_sharp:
         warning_reasons.append("El enfoque de la microscopía es bajo")
     if micro.filament_coverage > 0.35:
-        warning_reasons.append("La segmentación microscópica cubre una fracción inusualmente alta")
+        warning_reasons.append(
+            "La segmentación microscópica cubre una fracción inusualmente alta"
+        )
     if petri.region_count > 250:
-        warning_reasons.append("Se detectó una cantidad inusualmente alta de regiones en Petri")
+        warning_reasons.append(
+            "Se detectó una cantidad inusualmente alta de regiones en Petri"
+        )
+    if petri.confluent_growth_detected:
+        warning_reasons.append(
+            "Se detectó crecimiento grande o conectado; sus límites son aproximados"
+        )
 
     if blocking_reasons:
         overall_status = "rejected"
@@ -389,7 +454,12 @@ def _build_quality_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
         overall_status = "accepted"
 
     quality_score = round(
-        max(0.0, 1.0 - 0.22 * len(blocking_reasons) - 0.08 * len(warning_reasons)),
+        max(
+            0.0,
+            1.0
+            - 0.22 * len(blocking_reasons)
+            - 0.08 * len(warning_reasons),
+        ),
         3,
     )
 
@@ -402,6 +472,8 @@ def _build_quality_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
         "petri_overexposed": petri_overexposed,
         "petri_underexposed": petri_underexposed,
         "petri_plate_detected": petri.plate_detected,
+        "petri_segmentation_conflict": petri.segmentation_conflict,
+        "petri_confluent_growth_detected": petri.confluent_growth_detected,
         "micro_is_sharp": micro_is_sharp,
         "micro_field_detected": micro.field_detected,
         "micro_appears_empty": micro_appears_empty,
