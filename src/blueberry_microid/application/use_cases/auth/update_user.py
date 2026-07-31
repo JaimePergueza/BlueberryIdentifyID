@@ -47,7 +47,9 @@ class UpdateUserUseCase:
                 if candidate.role == UserRole.ADMIN and candidate.is_active
             ]
             if len(active_admins) <= 1:
-                raise LastActiveAdminError("the last active administrator cannot be removed or deactivated")
+                raise LastActiveAdminError(
+                    "the last active administrator cannot be removed or deactivated"
+                )
 
         revoke_sessions = False
         if role is not None and role != user.role:
@@ -60,7 +62,11 @@ class UpdateUserUseCase:
             user.replace_password_hash(self._password_hasher.hash(password))
             revoke_sessions = True
 
-        saved = self._users.update(user)
+        # Fail closed: revoke active sessions before persisting a sensitive
+        # account change. If the subsequent user update fails, the account may
+        # retain its previous data, but no previously issued token remains valid.
         if revoke_sessions:
             self._sessions.revoke_all_for_user(user.id)
+
+        saved = self._users.update(user)
         return UserDTO.from_entity(saved)
