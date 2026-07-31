@@ -21,18 +21,34 @@
   border-radius: var(--radius-md);
   background:
     linear-gradient(135deg, rgba(238, 232, 248, 0.45), rgba(223, 243, 241, 0.55)),
-    #f8faf9;
+    #17202a;
 }
 
-.protected-image-frame img {
+.protected-image-canvas {
+  position: relative;
   width: 100%;
-  height: 360px;
-  object-fit: contain;
+  overflow: hidden;
   background: #17202a;
 }
 
-.protected-image figcaption {
+.protected-image-canvas img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+.protected-image-caption-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-top: 0.55rem;
+}
+
+.protected-image figcaption {
   color: var(--ink-700);
   font-size: 0.82rem;
   font-weight: 750;
@@ -43,13 +59,79 @@
   font-size: 0.85rem;
 }
 
+.overlay-toggle {
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  background: var(--surface, #fff);
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.overlay-toggle:hover,
+.overlay-toggle:focus-visible {
+  border-color: var(--accent, #5b2a86);
+  color: var(--accent, #5b2a86);
+}
+
+.overlay-summary {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--ink-500);
+  line-height: 1.45;
+}
+
+.segmentation-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.segmentation-outline,
+.segmentation-region {
+  fill: transparent;
+  vector-effect: non-scaling-stroke;
+}
+
+.segmentation-outline {
+  stroke: #00f0ff;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
+}
+
+.segmentation-colony {
+  fill: rgba(255, 193, 7, 0.18);
+  stroke: #ffca28;
+  stroke-width: 2;
+}
+
+.segmentation-filament {
+  fill: rgba(0, 255, 163, 0.12);
+  stroke: #00e5a8;
+  stroke-width: 1.8;
+}
+
+.segmentation-structure {
+  fill: rgba(255, 105, 180, 0.09);
+  stroke: #ff79c6;
+  stroke-width: 1.4;
+}
+
+.segmentation-branch-point {
+  fill: #ff3d00;
+  stroke: #fff;
+  stroke-width: 0.0025;
+  vector-effect: non-scaling-stroke;
+}
+
 @media (max-width: 860px) {
   .stored-image-grid {
     grid-template-columns: 1fr;
-  }
-
-  .protected-image-frame img {
-    height: 300px;
   }
 }
 
@@ -58,7 +140,8 @@
     min-height: 220px;
   }
 
-  .protected-image-frame img {
-    height: 230px;
+  .protected-image-caption-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
