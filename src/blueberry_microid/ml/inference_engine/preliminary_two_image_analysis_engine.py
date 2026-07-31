@@ -15,10 +15,16 @@ from typing import Optional
 
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
 from blueberry_microid.ml.inference_engine.micro_visual_signal_extractor import (
+    _EMPTY_FIELD_EDGE_THRESHOLD,
+    _EMPTY_FIELD_STD_THRESHOLD,
+    _LOW_SHARPNESS_THRESHOLD as _MICRO_SHARP_THRESHOLD,
     MicroVisualSignalExtractor,
     MicroVisualSignals,
 )
 from blueberry_microid.ml.inference_engine.petri_visual_signal_extractor import (
+    _LOW_SHARPNESS_THRESHOLD as _PETRI_SHARP_THRESHOLD,
+    _OVEREXPOSED_MEAN,
+    _UNDEREXPOSED_MEAN,
     PetriVisualSignalExtractor,
     PetriVisualSignals,
 )
@@ -82,19 +88,21 @@ class PreliminaryTwoImageAnalysisEngine:
         upload_id = str(uuid.uuid4())
         petri_signals = self._petri_extractor.extract(petri_image_bytes)
         micro_signals = self._micro_extractor.extract(micro_image_bytes)
+        quality_summary = _build_quality_summary(petri_signals, micro_signals)
 
-        label, confidence, explanation, trace = _classify(petri_signals, micro_signals)
-        warnings = list(petri_signals.warnings) + list(micro_signals.warnings)
-        if not petri_signals.extraction_ok:
-            warnings.insert(0, "No se pudieron extraer características de la imagen Petri.")
-        if not micro_signals.extraction_ok:
-            warnings.insert(0, "No se pudieron extraer características de la microscopía.")
+        label, confidence, explanation, trace = _classify(
+            petri_signals,
+            micro_signals,
+            quality_summary,
+        )
+        warnings = _collect_warnings(petri_signals, micro_signals, quality_summary)
 
         logger.info(
-            "preliminary_morphology_analysis upload_id=%s label=%s confidence=%.3f",
+            "preliminary_morphology_analysis upload_id=%s label=%s confidence=%.3f quality=%s",
             upload_id,
             label.value,
             confidence,
+            quality_summary["overall_status"],
         )
 
         return PreliminaryAnalysisOutput(
@@ -106,7 +114,7 @@ class PreliminaryTwoImageAnalysisEngine:
             disclaimer=PRELIMINARY_DISCLAIMER,
             explanation=explanation,
             feature_summary=_build_feature_summary(petri_signals, micro_signals),
-            quality_summary=_build_quality_summary(petri_signals, micro_signals),
+            quality_summary=quality_summary,
             decision_trace=trace,
             warnings=warnings or None,
         )
@@ -115,26 +123,33 @@ class PreliminaryTwoImageAnalysisEngine:
 def _classify(
     petri: PetriVisualSignals,
     micro: MicroVisualSignals,
+    quality: dict,
 ) -> tuple[PredictedLabel, float, str, list[dict]]:
-    trace: list[dict] = []
-
-    if not petri.extraction_ok or not micro.extraction_ok:
-        trace.append({
+    trace: list[dict] = [
+        {
             "step": "quality_gate",
-            "passed": False,
-            "petri_extraction_ok": petri.extraction_ok,
-            "micro_extraction_ok": micro.extraction_ok,
-        })
+            "passed": quality["overall_status"] != "rejected",
+            "status": quality["overall_status"],
+            "quality_score": quality["quality_score"],
+            "blocking_reasons": quality["blocking_reasons"],
+            "warning_reasons": quality["warning_reasons"],
+        }
+    ]
+
+    if quality["overall_status"] == "rejected":
+        reasons = "; ".join(quality["blocking_reasons"])
         explanation = (
-            "No fue posible obtener evidencia confiable de ambas imágenes. "
-            "El análisis se marca como no concluyente y requiere repetir la captura."
+            "La captura no superó el control de calidad visual. "
+            f"Motivos: {reasons}. El resultado se marca como no concluyente; "
+            "debe repetirse o corregirse la captura antes de interpretar la morfología."
         )
-        trace.append({
-            "step": "label_assigned",
-            "label": PredictedLabel.INCONCLUSIVE.value,
-            "confidence": 0.30,
-        })
-        return PredictedLabel.INCONCLUSIVE, 0.30, explanation, trace
+        return _decision(
+            PredictedLabel.INCONCLUSIVE,
+            0.25,
+            explanation,
+            trace,
+            "quality_gate_rejected",
+        )
 
     has_candidate_growth = (
         petri.region_count >= _MIN_REGIONS_FOR_GROWTH
@@ -159,31 +174,33 @@ def _classify(
         + 0.10 * min(1.0, micro.round_component_density / 0.001)
     ) * (1.0 - 0.45 * micro.elongated_component_ratio)
 
-    trace.extend([
-        {
-            "step": "petri_analysis",
-            "region_count": petri.region_count,
-            "colony_coverage": round(petri.colony_coverage, 5),
-            "mean_circularity": round(petri.mean_circularity, 4),
-            "edge_irregularity": round(petri.edge_irregularity, 4),
-            "mean_texture_std": round(petri.mean_texture_std, 3),
-            "has_candidate_growth": has_candidate_growth,
-        },
-        {
-            "step": "micro_analysis",
-            "edge_density": round(micro.edge_density, 5),
-            "filament_coverage": round(micro.filament_coverage, 5),
-            "branch_point_density": round(micro.branch_point_density, 6),
-            "elongated_component_ratio": round(micro.elongated_component_ratio, 4),
-            "component_count": micro.component_count,
-        },
-        {
-            "step": "evidence_fusion",
-            "macro_growth_score": round(macro_growth_score, 4),
-            "filamentous_score": round(filamentous_score, 4),
-            "cellular_score": round(cellular_score, 4),
-        },
-    ])
+    trace.extend(
+        [
+            {
+                "step": "petri_analysis",
+                "region_count": petri.region_count,
+                "colony_coverage": round(petri.colony_coverage, 5),
+                "mean_circularity": round(petri.mean_circularity, 4),
+                "edge_irregularity": round(petri.edge_irregularity, 4),
+                "mean_texture_std": round(petri.mean_texture_std, 3),
+                "has_candidate_growth": has_candidate_growth,
+            },
+            {
+                "step": "micro_analysis",
+                "edge_density": round(micro.edge_density, 5),
+                "filament_coverage": round(micro.filament_coverage, 5),
+                "branch_point_density": round(micro.branch_point_density, 6),
+                "elongated_component_ratio": round(micro.elongated_component_ratio, 4),
+                "component_count": micro.component_count,
+            },
+            {
+                "step": "evidence_fusion",
+                "macro_growth_score": round(macro_growth_score, 4),
+                "filamentous_score": round(filamentous_score, 4),
+                "cellular_score": round(cellular_score, 4),
+            },
+        ]
+    )
 
     if not has_candidate_growth:
         confidence = _bounded_confidence(0.54 + 0.06 * (1.0 - macro_growth_score))
@@ -235,7 +252,7 @@ def _classify(
     if micro.intensity_std >= _MIN_STD_CELLULAR and cellular_score >= _MIN_CELLULAR_SCORE:
         confidence = _bounded_confidence(0.49 + 0.09 * cellular_score + 0.03 * macro_growth_score)
         explanation = (
-            f"La caja Petri presenta crecimiento candidato y la microscopía muestra una textura "
+            "La caja Petri presenta crecimiento candidato y la microscopía muestra una textura "
             f"celular densa (desviación de intensidad {micro.intensity_std:.1f}, densidad de bordes "
             f"{micro.edge_density:.1%}) sin predominio filamentoso. El patrón se clasifica como "
             "crecimiento bacteriano probable, sujeto a revisión experta."
@@ -307,6 +324,7 @@ def _build_feature_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
             "plate_detected": petri.plate_detected,
             "plate_area_fraction": round(petri.plate_area_fraction, 4),
             "extraction_ok": petri.extraction_ok,
+            "visualization": petri.visualization,
         },
         "micro": {
             "mean_intensity": round(micro.mean_intensity, 2),
@@ -322,33 +340,89 @@ def _build_feature_summary(petri: PetriVisualSignals, micro: MicroVisualSignals)
             "field_detected": micro.field_detected,
             "field_coverage": round(micro.field_coverage, 4),
             "extraction_ok": micro.extraction_ok,
+            "visualization": micro.visualization,
         },
     }
 
 
 def _build_quality_summary(petri: PetriVisualSignals, micro: MicroVisualSignals) -> dict:
-    from blueberry_microid.ml.inference_engine.micro_visual_signal_extractor import (
-        _EMPTY_FIELD_EDGE_THRESHOLD,
-        _EMPTY_FIELD_STD_THRESHOLD,
-        _LOW_SHARPNESS_THRESHOLD as _MICRO_SHARP_THRESHOLD,
+    petri_is_sharp = petri.sharpness >= _PETRI_SHARP_THRESHOLD
+    petri_overexposed = petri.mean_intensity > _OVEREXPOSED_MEAN
+    petri_underexposed = petri.mean_intensity < _UNDEREXPOSED_MEAN
+    micro_is_sharp = micro.sharpness >= _MICRO_SHARP_THRESHOLD
+    micro_appears_empty = (
+        micro.intensity_std < _EMPTY_FIELD_STD_THRESHOLD
+        and micro.edge_density < _EMPTY_FIELD_EDGE_THRESHOLD
     )
-    from blueberry_microid.ml.inference_engine.petri_visual_signal_extractor import (
-        _LOW_SHARPNESS_THRESHOLD as _PETRI_SHARP_THRESHOLD,
-        _OVEREXPOSED_MEAN,
-        _UNDEREXPOSED_MEAN,
+
+    blocking_reasons: list[str] = []
+    warning_reasons: list[str] = []
+
+    if not petri.extraction_ok:
+        blocking_reasons.append("No se pudo procesar la imagen de caja Petri")
+    if not micro.extraction_ok:
+        blocking_reasons.append("No se pudo procesar la imagen microscópica")
+    if petri.extraction_ok and not petri.plate_detected:
+        blocking_reasons.append("No se aisló de forma confiable el límite de la caja Petri")
+    if micro.extraction_ok and not micro.field_detected:
+        blocking_reasons.append("No se aisló de forma confiable el campo microscópico")
+    if petri_overexposed:
+        blocking_reasons.append("La imagen Petri está sobreexpuesta")
+    if petri_underexposed:
+        blocking_reasons.append("La imagen Petri está subexpuesta")
+    if micro_appears_empty:
+        blocking_reasons.append("El campo microscópico parece vacío o sin información suficiente")
+    if petri.extraction_ok and not petri_is_sharp:
+        warning_reasons.append("El enfoque de la imagen Petri es bajo")
+    if micro.extraction_ok and not micro_is_sharp:
+        warning_reasons.append("El enfoque de la microscopía es bajo")
+    if micro.filament_coverage > 0.35:
+        warning_reasons.append("La segmentación microscópica cubre una fracción inusualmente alta")
+    if petri.region_count > 250:
+        warning_reasons.append("Se detectó una cantidad inusualmente alta de regiones en Petri")
+
+    if blocking_reasons:
+        overall_status = "rejected"
+    elif warning_reasons:
+        overall_status = "warning"
+    else:
+        overall_status = "accepted"
+
+    quality_score = round(
+        max(0.0, 1.0 - 0.22 * len(blocking_reasons) - 0.08 * len(warning_reasons)),
+        3,
     )
 
     return {
-        "petri_is_sharp": petri.sharpness >= _PETRI_SHARP_THRESHOLD,
-        "petri_overexposed": petri.mean_intensity > _OVEREXPOSED_MEAN,
-        "petri_underexposed": petri.mean_intensity < _UNDEREXPOSED_MEAN,
+        "overall_status": overall_status,
+        "quality_score": quality_score,
+        "blocking_reasons": blocking_reasons,
+        "warning_reasons": warning_reasons,
+        "petri_is_sharp": petri_is_sharp,
+        "petri_overexposed": petri_overexposed,
+        "petri_underexposed": petri_underexposed,
         "petri_plate_detected": petri.plate_detected,
-        "micro_is_sharp": micro.sharpness >= _MICRO_SHARP_THRESHOLD,
+        "micro_is_sharp": micro_is_sharp,
         "micro_field_detected": micro.field_detected,
-        "micro_appears_empty": (
-            micro.intensity_std < _EMPTY_FIELD_STD_THRESHOLD
-            and micro.edge_density < _EMPTY_FIELD_EDGE_THRESHOLD
-        ),
+        "micro_appears_empty": micro_appears_empty,
         "petri_extraction_ok": petri.extraction_ok,
         "micro_extraction_ok": micro.extraction_ok,
     }
+
+
+def _collect_warnings(
+    petri: PetriVisualSignals,
+    micro: MicroVisualSignals,
+    quality: dict,
+) -> list[str]:
+    messages = (
+        list(quality["blocking_reasons"])
+        + list(quality["warning_reasons"])
+        + list(petri.warnings)
+        + list(micro.warnings)
+    )
+    unique: list[str] = []
+    for message in messages:
+        if message not in unique:
+            unique.append(message)
+    return unique

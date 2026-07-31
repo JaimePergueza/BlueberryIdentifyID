@@ -47,10 +47,16 @@ const qualityLabels: Record<string, string> = {
   micro_extraction_ok: "Extracción microscópica completada",
 };
 
+const simpleQualityKeys = Object.keys(qualityLabels);
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function formatMetric(value: unknown, definition: MetricDefinition): string {
@@ -91,12 +97,23 @@ function MetricCard({
   );
 }
 
+function qualityStatusName(status: unknown): string {
+  if (status === "accepted") return "Captura aceptada";
+  if (status === "warning") return "Captura aceptada con advertencias";
+  if (status === "rejected") return "Captura rechazada para interpretación";
+  return "Estado de calidad no disponible";
+}
+
 export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTrace }: MorphologyEvidenceProps) {
   if (!featureSummary && !qualitySummary) return null;
 
   const petri = asRecord(featureSummary?.petri);
   const micro = asRecord(featureSummary?.micro);
   const quality = asRecord(qualitySummary);
+  const status = quality.overall_status;
+  const blockingReasons = stringList(quality.blocking_reasons);
+  const warningReasons = stringList(quality.warning_reasons);
+  const qualityScore = typeof quality.quality_score === "number" ? quality.quality_score : null;
   const fusion = (decisionTrace ?? [])
     .map(asRecord)
     .find((step) => step.step === "evidence_fusion") ?? {};
@@ -139,15 +156,38 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
 
       {Object.keys(quality).length > 0 && (
         <article className="card morphology-quality-card">
-          <div className="section-heading"><h2>Calidad de captura</h2></div>
+          <div className="section-heading quality-heading">
+            <div>
+              <span className="eyebrow">Puerta de calidad</span>
+              <h2>{qualityStatusName(status)}</h2>
+              {qualityScore !== null && <p>Puntuación técnica de captura: {Math.round(qualityScore * 100)}%</p>}
+            </div>
+            <span className={`quality-status quality-status-${String(status)}`}>{String(status ?? "unknown")}</span>
+          </div>
+
+          {blockingReasons.length > 0 && (
+            <div className="quality-reason-block quality-reason-blocking">
+              <strong>Condiciones bloqueantes</strong>
+              <ul>{blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+            </div>
+          )}
+          {warningReasons.length > 0 && (
+            <div className="quality-reason-block quality-reason-warning">
+              <strong>Advertencias</strong>
+              <ul>{warningReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+            </div>
+          )}
+
           <div className="quality-chip-grid">
-            {Object.entries(quality).map(([key, value]) => {
+            {simpleQualityKeys.map((key) => {
+              const value = quality[key];
+              if (typeof value !== "boolean") return null;
               const positive = key.includes("overexposed") || key.includes("underexposed") || key.includes("empty")
                 ? value === false
                 : value === true;
               return (
                 <span className={`quality-chip ${positive ? "quality-chip-good" : "quality-chip-warning"}`} key={key}>
-                  {qualityLabels[key] ?? key.replaceAll("_", " ")}: {value === true ? "Sí" : value === false ? "No" : String(value)}
+                  {qualityLabels[key]}: {value ? "Sí" : "No"}
                 </span>
               );
             })}
