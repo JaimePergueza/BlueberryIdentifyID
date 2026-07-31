@@ -2,8 +2,24 @@ import json
 
 from fastapi.testclient import TestClient
 
+from blueberry_microid.application.use_cases.auth.create_user import CreateUserUseCase
+from blueberry_microid.domain.enums.user_role import UserRole
 from blueberry_microid.infrastructure.config.settings import Settings
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_user_repository import (
+    SqlAlchemyUserRepository,
+)
+from blueberry_microid.infrastructure.security.pwdlib_password_hasher import PwdlibPasswordHasher
 from blueberry_microid.interfaces.api import app as app_module
+
+_SESSION_PASSWORD = "Session-User-Password-Example-42"
+
+
+def _create_session_user(app) -> None:
+    with app.state.session_factory() as session:
+        CreateUserUseCase(
+            SqlAlchemyUserRepository(session),
+            PwdlibPasswordHasher(),
+        ).execute("session-user", _SESSION_PASSWORD, UserRole.SPECIALIST)
 
 
 def test_health_and_login_are_public(anonymous_api_client):
@@ -14,11 +30,10 @@ def test_health_and_login_are_public(anonymous_api_client):
         data={"username": "missing-user", "password": "not-the-right-password"},
     )
     assert response.status_code == 401
-    assert response.json()["error"] == {
-        "code": "invalid_credentials",
-        "message": "Invalid username or password",
-        "request_id": response.json()["error"]["request_id"],
-    }
+    error = response.json()["error"]
+    assert error["code"] == "invalid_credentials"
+    assert error["message"] == "Invalid username or password"
+    assert error["request_id"]
     assert response.headers["www-authenticate"] == "Bearer"
 
 
@@ -31,14 +46,11 @@ def test_anonymous_operational_request_is_rejected(anonymous_api_client):
 
 
 def test_login_me_and_logout_revoke_the_current_session(api_app):
-    from tests.api.conftest import _TEST_PASSWORD, _create_user
-    from blueberry_microid.domain.enums.user_role import UserRole
-
-    _create_user(api_app, "session-user", UserRole.SPECIALIST)
+    _create_session_user(api_app)
     with TestClient(api_app, raise_server_exceptions=False) as client:
         login = client.post(
             "/api/v1/auth/login",
-            data={"username": "SESSION-USER", "password": _TEST_PASSWORD},
+            data={"username": "SESSION-USER", "password": _SESSION_PASSWORD},
         )
         assert login.status_code == 200
         token = login.json()["access_token"]
@@ -118,6 +130,31 @@ def test_admin_can_create_list_and_deactivate_user(api_client, anonymous_api_cli
         data={"username": "new-specialist", "password": "Long-Specialist-Password-42"},
     )
     assert rejected_login.status_code == 401
+
+
+def test_admin_user_payload_validation_is_controlled(api_client):
+    blank_username = api_client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "   ",
+            "password": "Long-Specialist-Password-42",
+            "role": "specialist",
+        },
+    )
+    blank_password = api_client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "valid-specialist",
+            "password": "            ",
+            "role": "specialist",
+        },
+    )
+    current = api_client.get("/api/v1/auth/me").json()
+    empty_update = api_client.patch(f"/api/v1/admin/users/{current['id']}", json={})
+
+    assert blank_username.status_code == 422
+    assert blank_password.status_code == 422
+    assert empty_update.status_code == 422
 
 
 def test_duplicate_username_and_last_admin_are_controlled(api_client):
