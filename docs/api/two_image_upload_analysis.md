@@ -1,137 +1,152 @@
-# Two-Image Upload Preliminary Analysis API (Fase 40.1)
+# Official MVP Two-Image Analysis API
 
-## Overview
+## Purpose
 
-Fase 40.1 converts the stateless Fase 40 endpoint into a **fully persistent flow**. Uploading a Petri dish image and a microscopy image now creates real database entities (Sample, PetriImage, MicroImage, AnalysisRun, Prediction) and returns their actual identifiers.
+`POST /api/v1/analysis/two-image-upload` is the official analysis entry point
+for the demonstrable MVP.
 
-**Key invariant:** `requires_human_review` is always `true` for results from this endpoint. All preliminary uploads require expert review regardless of the visual label.
+It receives two photographs from the same laboratory sample:
 
-Both endpoints use the simulated (mock) inference engine. Results carry no diagnostic or taxonomic validity.
+- a Petri dish image;
+- a microscopy image.
 
----
+The endpoint validates and stores both files, reads their real pixel content,
+extracts transparent classical visual signals, applies non-trained heuristic
+rules, persists the complete analysis trace, and returns a preliminary visual
+category.
 
-## Endpoints
+The result is **not a microbiological diagnosis** and does not identify genus
+or species. Human expert review is mandatory for every analysis.
 
-### POST /api/v1/analysis/two-image-upload
+## Engine identity
 
-Upload a Petri dish photograph and a microscopy photograph. Both images are validated and stored; Sample, PetriImage, MicroImage, AnalysisRun and Prediction are created in the database. Real DB identifiers are returned.
+The official flow uses:
 
-**Content-Type**: `multipart/form-data`
+- model name: `PreliminaryTwoImageEngine`;
+- model version: `0.2.0`;
+- model type: `classical`.
+
+Version `0.1.0` was historically registered as `mock`. It is not reused by the
+official MVP upload flow.
+
+The classical engine uses Pillow, NumPy, and OpenCV image-processing operations.
+It is not a trained machine-learning model and has not been scientifically
+validated against a labelled dataset.
+
+## POST /api/v1/analysis/two-image-upload
+
+**Content-Type:** `multipart/form-data`
 
 | Field | Type | Required | Description |
-|---|---|---|---|
-| `petri_image` | file | yes | Petri dish photograph (JPEG/PNG/TIFF). Never a fruit photo. |
+|---|---|---:|---|
+| `petri_image` | file | yes | Petri dish photograph in an allowed image format. It must not be a photograph of the fruit. |
 | `micro_image` | file | yes | Microscopy photograph from the same sample. |
-| `sample_code` | string | no | Optional lab sample code. Auto-generated (`AUTO-XXXXXXXX`) if omitted. |
-| `notes` | string | no | Optional free-text notes for the sample. |
+| `sample_code` | string | no | Laboratory code. An `AUTO-XXXXXXXX` code is generated when omitted. |
+| `notes` | string | no | Optional sample notes. |
 
-**Response 201**:
+### Successful response
+
+Status: `201 Created`
 
 ```json
 {
   "analysis_run_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "prediction_id": "4985f64a-5717-4562-b3fc-2c963f66afa6",
   "sample_id": "1c2d3e4f-5678-9abc-def0-123456789abc",
   "petri_image_id": "aaaabbbb-cccc-dddd-eeee-ffffaaaabbbb",
   "micro_image_id": "11112222-3333-4444-5555-666677778888",
   "predicted_label": "probable_fungal_growth",
-  "confidence_score": 0.65,
+  "confidence_score": 0.55,
   "class_probabilities": {
-    "no_evident_growth": 0.0875,
-    "suspicious_growth": 0.0875,
-    "probable_fungal_growth": 0.65,
-    "probable_bacterial_growth": 0.0875,
-    "inconclusive": 0.0875
+    "no_evident_growth": 0.1125,
+    "suspicious_growth": 0.1125,
+    "probable_fungal_growth": 0.55,
+    "probable_bacterial_growth": 0.1125,
+    "inconclusive": 0.1125
   },
   "requires_human_review": true,
-  "disclaimer": "SIMULATED RESULT (mock inference engine — Fase 40 preliminary endpoint): ..."
+  "disclaimer": "PRELIMINARY RESULT ...",
+  "explanation": "Candidate growth regions were detected ...",
+  "feature_summary": {
+    "petri": {},
+    "micro": {}
+  },
+  "quality_summary": {},
+  "decision_trace": [],
+  "warnings": []
 }
 ```
 
-Internal storage paths are **never** included in the response.
+Internal storage paths are never returned.
 
-**Error responses**:
-- `400 invalid_image` — corrupted, disallowed MIME/extension, or format mismatch
-- `413 image_too_large` — file exceeds upload size limit
+### Validation errors
 
----
+- `400 invalid_image`: corrupt content, disallowed format, or mismatch between
+  extension, MIME type, and decoded image.
+- `413 image_too_large`: uploaded file exceeds the configured maximum size.
+
+## Persistent workflow
+
+1. Validate both files.
+2. Store the Petri image.
+3. Store the microscopy image.
+4. Create the `Sample`.
+5. Create `PetriImage` and `MicroImage` records linked to the sample.
+6. Register or reuse `PreliminaryTwoImageEngine` version `0.2.0` as
+   `ModelType.CLASSICAL`.
+7. Create the `AnalysisRun`.
+8. Extract real visual signals from both images.
+9. Apply transparent heuristic rules.
+10. Persist the `Prediction` and mark the run as `needs_review`.
+11. Return the real database identifiers.
+
+If microscopy file storage fails after the Petri file was saved, the Petri file
+is deleted as compensation.
+
+## Reading the result
 
 ### GET /api/v1/analysis-runs/{analysis_run_id}/preliminary-result
 
-Retrieve the `Prediction` produced by a previously processed `AnalysisRun`, formatted as a preliminary result.
+Returns the automatic prediction, explanation, visual features, quality flags,
+warnings, and the current human-review status.
 
-**Response 200**:
+### GET /api/v1/analysis-runs/{analysis_run_id}/final-result
 
-```json
-{
-  "analysis_run_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "predicted_label": "no_evident_growth",
-  "confidence_score": 0.60,
-  "class_probabilities": { ... },
-  "requires_human_review": false,
-  "technical_observation": "...",
-  "disclaimer": "This result was produced by a simulated (mock) inference engine ..."
-}
-```
+Returns the immutable automatic prediction together with the current final
+expert review. Until a final review exists, the status is
+`pending_human_review`.
 
-**Error responses**:
-- `404 analysis_run_not_found` — no such AnalysisRun
-- `404 prediction_not_found` — AnalysisRun exists but has no Prediction yet
+### POST /api/v1/analysis-runs/{analysis_run_id}/reviews
 
----
+Records an expert decision without overwriting the original prediction. The
+reviewer may confirm, correct, mark the result inconclusive, or reject an
+invalid sample.
 
-## Persistence flow
+## Preliminary visual categories
 
-1. Validate both images (MIME, extension, Pillow-decodable, size limit)
-2. Store petri image → upload storage (`uploads/petri/`)
-3. Store micro image → upload storage (`uploads/micro/`)
-   - If micro storage fails, petri file is deleted (no orphan files)
-4. Create and persist `Sample` (auto-code if not provided)
-5. Create and persist `PetriImage` linked to Sample
-6. Create and persist `MicroImage` linked to Sample
-7. Get or create `ModelVersion` for the preliminary engine
-8. Create `AnalysisRun` (pending → processing → needs_review)
-9. Run `PreliminaryTwoImageAnalysisEngine` (mock, no pixel inspection)
-10. Create `Prediction` with `requires_human_review=True`
-11. Persist `AnalysisRun` + `Prediction` atomically via `UnitOfWork`
-12. Return real DB identifiers
-
-The resulting `AnalysisRun` has status `needs_review` to signal that human expert review is required.
-
----
-
-## Configuration
-
-| Environment variable | Default | Description |
-|---|---|---|
-| `BLUEBERRY_MICROID_UPLOAD_STORAGE_DIR` | `<repo>/storage/uploads` | Directory for uploaded images. Must be **outside the repository** in production. |
-
-Uploaded images are stored under `<upload_storage_dir>/petri/` and `<upload_storage_dir>/micro/` with UUID-based file names.
-
----
-
-## Preliminary label classes
-
-| Label | Meaning |
+| Value | User-facing meaning |
 |---|---|
-| `no_evident_growth` | No evident microbial growth detected visually |
-| `suspicious_growth` | Possible but ambiguous growth pattern |
-| `probable_fungal_growth` | Visual pattern consistent with fungal growth |
-| `probable_bacterial_growth` | Visual pattern consistent with bacterial growth |
-| `inconclusive` | Cannot be classified reliably |
+| `no_evident_growth` | No evident growth |
+| `suspicious_growth` | Suspicious or ambiguous growth |
+| `probable_fungal_growth` | Probable fungal-type visual pattern |
+| `probable_bacterial_growth` | Probable bacterial-type visual pattern |
+| `inconclusive` | Inconclusive result |
 
-These are broad, non-diagnostic visual categories. They **never** encode a species or genus and must not be interpreted as microbiological diagnoses.
+These labels are broad visual categories. They are not taxonomic labels and
+must not be presented as confirmed laboratory findings.
 
-All results from this endpoint have `requires_human_review=true` — expert review is always required for preliminary uploads.
+## Legacy mock pipeline
 
----
+The repository still contains `MockInferenceEngine` for older synchronous and
+Celery pipeline tests. Those routes validate orchestration and state changes;
+they do not inspect image pixels. The frontend MVP must use
+`POST /api/v1/analysis/two-image-upload` instead.
 
-## Restrictions (Fase 40.1)
+## Current MVP limitations
 
-- No authentication required (not added in this phase).
-- No CORS headers (not added until a frontend phase is approved).
-- No frontend or dashboard.
-- No real inference engine — only `PreliminaryTwoImageAnalysisEngine` (simulated).
-- No taxonomic labels, species, genus, or diagnostic claims.
-- Internal file paths are never exposed in any API response.
-- `HumanReview` is **not** created automatically — it requires a separate API call.
-- Uploaded images are never added to training datasets automatically.
+- Authentication and frontend are handled by later MVP issues.
+- The classical thresholds are technical heuristics, not expert-validated
+  microbiological decision limits.
+- No species or genus identification exists.
+- No automatic training-dataset inclusion occurs.
+- Every result requires human review.
