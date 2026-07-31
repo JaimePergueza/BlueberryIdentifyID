@@ -180,6 +180,7 @@ export function ProtectedImage({ endpoint, alt, caption, overlay }: ProtectedIma
   );
   const parsedOverlay = useMemo(() => parseOverlay(overlay), [overlay]);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [naturalAspectRatio, setNaturalAspectRatio] = useState<string | null>(null);
 
   useEffect(
     () => () => {
@@ -190,7 +191,7 @@ export function ProtectedImage({ endpoint, alt, caption, overlay }: ProtectedIma
 
   const aspectRatio = parsedOverlay?.imageWidth && parsedOverlay.imageHeight
     ? `${parsedOverlay.imageWidth} / ${parsedOverlay.imageHeight}`
-    : "4 / 3";
+    : naturalAspectRatio ?? "4 / 3";
   const overlayItemCount = (parsedOverlay?.regions.length ?? 0) + (parsedOverlay?.branchPoints.length ?? 0);
 
   return (
@@ -200,7 +201,16 @@ export function ProtectedImage({ endpoint, alt, caption, overlay }: ProtectedIma
         {query.isError && <span className="image-unavailable">Imagen no disponible</span>}
         {source && (
           <div className="protected-image-canvas" style={{ aspectRatio }}>
-            <img src={source} alt={alt} />
+            <img
+              src={source}
+              alt={alt}
+              onLoad={(event) => {
+                const { naturalWidth, naturalHeight } = event.currentTarget;
+                if (naturalWidth > 0 && naturalHeight > 0) {
+                  setNaturalAspectRatio(`${naturalWidth} / ${naturalHeight}`);
+                }
+              }}
+            />
             {showOverlay && parsedOverlay && <SegmentationOverlay overlay={parsedOverlay} />}
           </div>
         )}
