@@ -3,13 +3,20 @@ import { Link } from "react-router";
 import { EmptyState, ErrorState, LoadingState } from "../components/Feedback";
 import { LabelBadge, ReviewBadge } from "../components/StatusBadge";
 import { apiRequest } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { formatDate } from "../lib/format";
-import type { AnalysisHistoryPage } from "../types/api";
+import type { AnalysisHistoryPage, UserListResponse } from "../types/api";
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const query = useQuery({
     queryKey: ["analysis-history", "dashboard"],
     queryFn: () => apiRequest<AnalysisHistoryPage>("/api/v1/analysis-runs?page=1&page_size=100"),
+  });
+  const usersQuery = useQuery({
+    queryKey: ["admin-users", "dashboard"],
+    queryFn: () => apiRequest<UserListResponse>("/api/v1/admin/users"),
+    enabled: user?.role === "admin",
   });
 
   if (query.isLoading) return <LoadingState message="Preparando el resumen operativo…" />;
@@ -21,19 +28,38 @@ export function DashboardPage() {
   const inconclusive = data.items.filter(
     (item) => item.final_label === "inconclusive" || item.preliminary_label === "inconclusive",
   ).length;
+  const activeUsers = usersQuery.data?.users.filter((item) => item.is_active).length ?? 0;
 
   return (
     <div className="page">
       <div className="page-header dashboard-header">
         <div>
-          <span className="eyebrow">Panel operativo</span>
+          <span className="eyebrow">{user?.role === "admin" ? "Panel administrativo y operativo" : "Panel operativo"}</span>
           <h1>Resumen de análisis</h1>
-          <p>Estado actual de las muestras registradas y pendientes de validación humana.</p>
+          <p>
+            {user?.role === "admin"
+              ? "Supervisa la operación microbiológica y administra el acceso de los usuarios."
+              : "Estado actual de las muestras registradas y pendientes de validación humana."}
+          </p>
         </div>
         <Link className="button button-primary" to="/analyses/new">
           Nuevo análisis
         </Link>
       </div>
+
+      {user?.role === "admin" && (
+        <section className="card admin-dashboard-callout">
+          <div>
+            <span className="eyebrow">Gobierno del sistema</span>
+            <h2>Administración habilitada</h2>
+            <p>
+              Hay {activeUsers} cuenta{activeUsers === 1 ? "" : "s"} activa{activeUsers === 1 ? "" : "s"}.
+              Puedes crear especialistas, administrar roles, desactivar accesos y restablecer contraseñas.
+            </p>
+          </div>
+          <Link className="button button-secondary" to="/admin/users">Gestionar usuarios</Link>
+        </section>
+      )}
 
       <section className="metric-grid" aria-label="Indicadores del sistema">
         <article className="metric-card">
