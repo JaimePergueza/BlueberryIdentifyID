@@ -16,6 +16,9 @@ from blueberry_microid.infrastructure.tasks.celery_app import celery_app
 from blueberry_microid.interfaces.api.auth_error_handlers import register_auth_exception_handlers
 from blueberry_microid.interfaces.api.error_handlers import register_exception_handlers
 from blueberry_microid.interfaces.api.security import require_admin, require_specialist
+from blueberry_microid.interfaces.api.stored_image_error_handlers import (
+    register_stored_image_exception_handlers,
+)
 from blueberry_microid.interfaces.api.v1.routers import (
     admin_users,
     analysis,
@@ -119,6 +122,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
     register_auth_exception_handlers(app)
+    register_stored_image_exception_handlers(app)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:
