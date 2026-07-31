@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from blueberry_microid.domain.enums.user_role import UserRole
 
@@ -37,6 +37,12 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     password: Optional[str] = Field(default=None, min_length=12, max_length=256)
+
+    @model_validator(mode="after")
+    def require_at_least_one_change(self) -> "UserUpdate":
+        if self.role is None and self.is_active is None and self.password is None:
+            raise ValueError("at least one user field must be provided")
+        return self
 
 
 class UserListRead(BaseModel):
