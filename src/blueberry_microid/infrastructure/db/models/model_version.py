@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class ModelVersionModel(Base):
-    """A registered, traceable version of an inference engine (mock, pytorch or external)."""
+    """A registered, traceable version of a mock, classical, trained, or external engine."""
 
     __tablename__ = "model_versions"
     __table_args__ = (UniqueConstraint("name", "version", name="uq_model_versions_name_version"),)
