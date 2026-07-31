@@ -38,7 +38,7 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 logger = logging.getLogger("blueberry_microid.business.analyze_two_uploaded_images")
 
 _PRELIMINARY_ENGINE_NAME = "PreliminaryTwoImageEngine"
-_PRELIMINARY_ENGINE_VERSION = "0.4.0"
+_PRELIMINARY_ENGINE_VERSION = "0.4.1"
 
 
 class AnalyzeTwoUploadedImagesUseCase:
@@ -203,8 +203,9 @@ class AnalyzeTwoUploadedImagesUseCase:
             description=(
                 "Explainable classical two-image morphology engine combining Petri colony "
                 "geometry, colour and texture with microscopy filament, branching and component "
-                "signals. Version 0.4.0 adds verifiable normalized overlays and a blocking visual "
-                "quality gate; non-trained, non-taxonomic and non-diagnostic."
+                "signals. Version 0.4.1 improves dark-media and confluent-colony segmentation, "
+                "adds a contradictory-segmentation quality block, and reduces redundant "
+                "microscopy overlays; non-trained, non-taxonomic and non-diagnostic."
             ),
         )
         try:
