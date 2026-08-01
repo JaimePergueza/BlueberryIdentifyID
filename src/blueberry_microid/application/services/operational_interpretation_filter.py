@@ -1,8 +1,9 @@
-"""Keep operational morphology hypotheses out of final and training contracts.
+"""Keep operational interpretation layers out of final and training contracts.
 
-The morphology differential is designed for specialist review in the analysis
-detail view. It must not become reviewed ground truth, leak into training
-features, or appear as part of the authoritative final-result contract.
+The taxonomic differential and coherence assessment support specialist review
+in the analysis-detail view. They must not become ground truth, leak automatic
+labels into training features, or appear in the authoritative final-result
+contract.
 """
 
 from __future__ import annotations
@@ -10,27 +11,32 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-_DIFFERENTIAL_FEATURE_KEY = "taxonomic_differential"
-_DIFFERENTIAL_TRACE_STEP = "taxonomic_differential"
-_DIFFERENTIAL_WARNING_PREFIX = "Las hipótesis de género son compatibilidades morfológicas"
+_OPERATIONAL_FEATURE_KEYS = {"taxonomic_differential", "coherence_assessment"}
+_OPERATIONAL_TRACE_STEPS = {"taxonomic_differential", "coherence_resolution"}
+_OPERATIONAL_WARNING_PREFIXES = (
+    "Las hipótesis de género son compatibilidades morfológicas",
+    "Se detectó conflicto entre evidencia celular y filamentosa",
+    "Faltan metadatos experimentales importantes",
+)
 
 
 def feature_summary_without_operational_differential(
     feature_summary: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Return a defensive copy containing only reusable visual measurements."""
+    """Return reusable visual measurements without review-support decisions."""
 
     if feature_summary is None:
         return None
     filtered = deepcopy(feature_summary)
-    filtered.pop(_DIFFERENTIAL_FEATURE_KEY, None)
+    for key in _OPERATIONAL_FEATURE_KEYS:
+        filtered.pop(key, None)
     return filtered
 
 
 def decision_trace_without_operational_differential(
     decision_trace: list[Any] | None,
 ) -> list[Any] | None:
-    """Remove the review-support interpretation step from the final contract."""
+    """Remove operational interpretation steps from final/training contracts."""
 
     if decision_trace is None:
         return None
@@ -39,7 +45,7 @@ def decision_trace_without_operational_differential(
         for step in decision_trace
         if not (
             isinstance(step, dict)
-            and step.get("step") == _DIFFERENTIAL_TRACE_STEP
+            and step.get("step") in _OPERATIONAL_TRACE_STEPS
         )
     ]
 
@@ -47,12 +53,12 @@ def decision_trace_without_operational_differential(
 def warnings_without_operational_differential(
     warnings: list[str] | None,
 ) -> list[str] | None:
-    """Remove warnings that only describe the optional differential layer."""
+    """Remove warnings that only describe operational interpretation layers."""
 
     if warnings is None:
         return None
     return [
         warning
         for warning in warnings
-        if not warning.startswith(_DIFFERENTIAL_WARNING_PREFIX)
+        if not warning.startswith(_OPERATIONAL_WARNING_PREFIXES)
     ]
