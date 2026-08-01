@@ -1,185 +1,153 @@
-# Motor morfológico explicable 0.4.1
+# Motor morfológico explicable 0.5.0
 
 ## Propósito
 
-`PreliminaryTwoImageEngine 0.4.1` combina una fotografía macroscópica de caja
-Petri con una imagen microscópica de la misma muestra. Su objetivo es producir
-una **clasificación morfológica preliminar, verificable y trazable**, no
-identificar género o especie ni emitir un diagnóstico.
+`PreliminaryTwoImageEngine 0.5.0` combina una fotografía macroscópica de caja
+Petri con una imagen microscópica del mismo aislamiento. Produce categorías
+visuales amplias, mediciones verificables y una interpretación orientativa. No
+confirma género, especie, patogenicidad ni diagnóstico.
 
-Todas las predicciones requieren revisión humana. La predicción automática, sus
-mediciones, sus regiones visualizadas, la versión exacta del motor y la decisión
-del especialista se conservan por separado.
+Cada predicción automática es inmutable y requiere revisión humana. Los
+resultados antiguos conservan la versión exacta con la que fueron generados.
 
-## Cambios de la versión 0.4.1
+## Metadatos estructurados
 
-La versión 0.4.1 corrige dos limitaciones observadas con capturas reales:
+El flujo de nuevo análisis registra por separado:
 
-- en Petri, medios oscuros con colonias grandes, texturizadas o parcialmente
-  conectadas ya no se descartan silenciosamente como una única máscara extensa;
-- en microscopía, los componentes pequeños sin suficiente soporte, las cajas
-  redundantes y los píxeles de ramificación contiguos se filtran o consolidan
-  antes de mostrarse.
+- código de muestra, lote, origen y fecha de recolección;
+- observaciones de la muestra;
+- medio, temperatura y tiempo de incubación;
+- aumento, tipo de microscopio, tinción o medio de montaje;
+- método de preparación microscópica;
+- imagen Petri e imagen microscópica del mismo aislamiento.
 
-El extractor Petri usa una segunda segmentación conservadora basada en contraste
-local, distancia de color LAB, desviación de intensidad y textura local. Cuando
-una región grande puede separarse, aplica transformación de distancia y
-watershed. Si existe señal visual fuerte pero no se pueden obtener regiones
-confiables, se activa un conflicto de segmentación y el resultado se bloquea
-como `inconclusive`; nunca se interpreta automáticamente como ausencia de
-crecimiento.
+Estos campos no son decorativos. La morfología colonial depende del medio, la
+temperatura y la edad del cultivo; la interpretación microscópica depende del
+aumento, la óptica y la preparación.
 
-Los análisis creados con versiones anteriores permanecen inmutables y conservan
-la versión con la que fueron procesados.
+## Categorías generales
 
-## Categorías preliminares
+- `no_evident_growth`: no se observa crecimiento candidato suficiente;
+- `suspicious_growth`: existe crecimiento, pero falta soporte microscópico;
+- `probable_fungal_growth`: patrón amplio compatible con crecimiento filamentoso;
+- `probable_bacterial_growth`: patrón celular no filamentoso compatible;
+- `inconclusive`: calidad insuficiente, evidencia ambigua o conflicto entre motores.
 
-- `no_evident_growth`: no se observa crecimiento candidato suficiente en una captura aceptada;
-- `suspicious_growth`: hay crecimiento candidato, pero la microscopía no aporta evidencia suficiente;
-- `probable_fungal_growth`: la evidencia combinada presenta un patrón filamentoso compatible;
-- `probable_bacterial_growth`: la evidencia combinada presenta un patrón celular no filamentoso compatible;
-- `inconclusive`: calidad insuficiente, señales ambiguas, conflicto de segmentación o conflicto entre imágenes.
+Las cifras asociadas se denominan **puntuaciones heurísticas**. No son
+probabilidades calibradas.
 
-Estas categorías son visuales y amplias. No representan una etiqueta taxonómica.
+## Segmentación y evidencia
 
-## Evidencia macroscópica
+### Caja Petri
 
-El procesamiento de la caja Petri intenta aislar la placa mediante detección de
-círculo central y una alternativa basada en contornos. Después excluye el borde
-externo y calcula:
+El motor intenta aislar la placa, excluir el borde y medir regiones candidatas,
+cobertura, color, textura, circularidad, irregularidad, intensidad, crecimiento
+confluente y conflictos de segmentación.
 
-- cantidad de regiones candidatas;
-- cobertura candidata sobre el interior de la placa;
-- fracción de señal visual candidata antes del filtrado final;
-- área media de las regiones;
-- circularidad media;
-- irregularidad de bordes;
-- variación de textura;
-- saturación, tono e intensidad;
-- nitidez de la captura;
-- presencia de crecimiento grande o confluente refinado;
-- conflicto entre señal visual y regiones segmentadas.
+### Microscopía
 
-Una región candidata no equivale automáticamente a una colonia confirmada. La
-textura del medio, reflejos, condensación, residuos o iluminación irregular
-pueden influir en la segmentación.
+El motor intenta aislar el campo y mide densidad de bordes, cobertura
+filamentosa, esqueleto, ramificación, componentes alargados, componentes
+redondeados, cantidad de estructuras, nitidez y cobertura analizada.
 
-## Evidencia microscópica
+Las superposiciones muestran qué procesó el algoritmo. No constituyen
+anotaciones expertas ni ground truth.
 
-El procesamiento intenta aislar el campo iluminado y calcula:
+## Cuatro dimensiones de calidad
 
-- densidad de bordes;
-- cobertura de estructuras filamentosas;
-- densidad del esqueleto morfológico;
-- densidad de puntos de ramificación consolidados;
-- proporción de componentes alargados;
-- cantidad de componentes estructurales con soporte suficiente;
-- variación de intensidad y nitidez;
-- cobertura del campo analizado.
+La versión 0.5.0 separa:
 
-La superposición limita los elementos visuales a los componentes y eventos de
-ramificación más respaldados. Estas señales describen estructuras visibles. No
-permiten por sí mismas afirmar septación, género, especie, viabilidad o
-patogenicidad.
+1. **calidad técnica de captura**: archivo válido, exposición, enfoque y campo;
+2. **calidad de segmentación**: placa/campo aislados y ausencia de contradicción;
+3. **suficiencia morfológica**: cantidad de evidencia interpretable;
+4. **suficiencia de metadatos**: completitud de condiciones experimentales.
 
-## Visualización verificable
+Una captura técnicamente aceptada puede seguir siendo insuficiente para una
+hipótesis morfológica o taxonómica.
 
-La versión 0.4.1 guarda coordenadas normalizadas junto con la predicción:
+## Coherencia entre motores
 
-- límite detectado de la caja Petri;
-- polígonos y cajas de regiones candidatas;
-- límite detectado del campo microscópico;
-- cajas consolidadas de componentes estructurales y filamentosos;
-- puntos de ramificación agrupados.
+`AnalysisCoherenceResolver 0.1.0` compara la categoría general, la fusión
+macro/micro y el diferencial morfológico antes de guardar la predicción.
 
-La interfaz superpone esas marcas sobre las imágenes protegidas y permite
-mostrarlas u ocultarlas. También presenta la fracción de señal candidata, el
-estado de crecimiento confluente y cualquier conflicto de segmentación. Las
-marcas son evidencia de lo que procesó el motor; no son anotaciones expertas ni
-ground truth.
+Cuando la clasificación general favorece un patrón bacteriano, pero existe
+crecimiento macroscópico y evidencia filamentosa sustancial, el sistema no
+presenta ambas conclusiones como si fueran compatibles. Se abstiene y devuelve:
 
-Las coordenadas se guardan en `feature_summary.petri.visualization` y
-`feature_summary.micro.visualization`, con `coordinate_space=normalized`. Esto
-permite reproducir la superposición aunque cambie el tamaño de presentación.
+- categoría automática `inconclusive`;
+- explicación del conflicto;
+- posibilidad de señal mixta o segmentación insuficiente;
+- revisión de varios campos y confirmación adicional.
 
-## Puerta de calidad
+Esta resolución automática apoya al especialista, pero se excluye del ground
+truth y de los datos de entrenamiento.
 
-Antes de fusionar evidencia se calcula un estado:
+## Diferencial morfológico para arándanos
 
-- `accepted`: no se detectan condiciones bloqueantes ni advertencias;
-- `warning`: la captura puede interpretarse, pero presenta problemas no bloqueantes;
-- `rejected`: no debe interpretarse morfológicamente.
+`MorphologicalDifferentialEngine 0.2.0` compara perfiles amplios asociados con
+arándanos:
 
-Son condiciones bloqueantes:
+- morfología tipo `Penicillium`;
+- morfología tipo `Aspergillus`;
+- morfología tipo `Botrytis`;
+- morfología tipo `Colletotrichum`;
+- morfología tipo `Alternaria`;
+- morfología tipo `Fusarium`;
+- morfología tipo Mucorales/`Rhizopus`.
 
-- fallo de extracción de cualquiera de las imágenes;
-- imposibilidad de aislar el límite de la caja Petri;
-- imposibilidad de aislar el campo microscópico;
-- sobreexposición o subexposición extrema de Petri;
-- campo microscópico aparentemente vacío o sin información suficiente;
-- contraste o textura compatible con crecimiento en Petri sin regiones que puedan separarse de forma confiable.
+Cada perfil incluye:
 
-El desenfoque moderado, el crecimiento confluente refinado y las segmentaciones
-anormalmente densas se registran como advertencias. Cuando el estado es
-`rejected`, el motor detiene la fusión, devuelve `inconclusive`, limita la
-confianza a `0.25` y explica los motivos para repetir o revisar la captura.
+- rasgos visuales que lo apoyan;
+- rasgos ausentes o contradictorios;
+- ejemplos reportados en arándanos;
+- método recomendado para confirmación.
 
-El estado, la puntuación técnica, las razones bloqueantes y las advertencias se
-guardan en `quality_summary` y en el primer paso de `decision_trace`.
+Los índices permanecen por debajo de 50 %, porque todavía no existe un detector
+semántico validado de conidióforos, fiálides, vesículas, acérvulos, macroconidios,
+esporangios u otras estructuras diagnósticas. Los nombres son hipótesis de
+compatibilidad, no identificaciones.
 
-## Fusión de evidencia
+## Frontera de seguridad y datasets
 
-Solo cuando la puerta de calidad no rechaza la captura, el motor calcula tres
-puntuaciones auditables:
+Los campos `taxonomic_differential` y `coherence_assessment` aparecen en la vista
+operativa del especialista, pero se eliminan de:
 
-1. evidencia macroscópica de crecimiento;
-2. evidencia microscópica filamentosa;
-3. evidencia microscópica celular.
+- `final-result`, cuyo resultado autoritativo depende de la revisión humana;
+- features curadas para entrenamiento;
+- ground truth;
+- etiquetas confirmadas de género o especie.
 
-La regla aplicada, los valores utilizados y la categoría resultante se guardan
-en `decision_trace`. La confianza está limitada deliberadamente a un máximo de
-`0.65`, porque el motor todavía no ha sido calibrado contra un conjunto de datos
-real, representativo y etiquetado por especialistas.
+Solo las mediciones visuales reutilizables pueden incorporarse a datasets. Las
+particiones deben hacerse por aislamiento o evento biológico, no por fotografía,
+para evitar fuga entre entrenamiento y prueba.
 
-## Datos necesarios para validación científica
+## Confirmación microbiológica
 
-Para avanzar desde categorías visuales hacia grupos, géneros o especies se debe
-construir un dataset pareado. Cada muestra debería incluir:
+La identificación final debe integrar:
 
-- imagen Petri original;
-- una o más imágenes microscópicas originales;
-- medio de cultivo;
-- temperatura y tiempo de incubación;
-- aumento, tinción y método de preparación;
-- origen y parte del arándano analizada;
-- etiqueta confirmada y método de confirmación;
-- especialista responsable;
-- condiciones de captura;
-- exclusiones o problemas de calidad.
+- cultivo en condiciones documentadas;
+- varios campos microscópicos maduros;
+- aislamiento puro cuando sea necesario;
+- revisión experta;
+- ITS y marcadores secundarios apropiados al grupo;
+- pruebas de patogenicidad cuando la pregunta científica lo requiera.
 
-Las particiones de entrenamiento, validación y prueba deben realizarse por
-muestra o aislamiento, no por fotografía, para evitar fuga de información.
+## Base bibliográfica del catálogo inicial
 
-## Evaluación futura
+- Ramos Bell S., Hernández Montiel L. G., González Estrada R. R. y Gutiérrez
+  Martínez P. *Main diseases in postharvest blueberries, conventional and
+  eco-friendly control methods: A review*. LWT 149 (2021), 112046.
+  DOI: 10.1016/j.lwt.2021.112046.
+- Wan C. et al. *Isolation, Identification and Essential Oil Control of
+  Pathogenic Fungi in Postharvest Blueberry*. Food Science 46(9) (2025),
+  275–284. DOI: 10.7506/spkx1002-6630-20241012-066.
+- Bollenbacher C. B. et al. *Fungal Organisms Associated with Postharvest Fruit
+  Rots on Blueberry in Georgia (U.S.A.) Surveyed over Two Growing Seasons*.
+  Plant Health Progress 27(2) (2026), 293–300.
+  DOI: 10.1094/PHP-09-25-0228-S.
+- *Storability evaluation of ‘Eureka’ blueberry under different temperatures
+  and characterization of postharvest pathogenic fungi*. Scientia
+  Horticulturae 363 (2026), 114925. DOI: 10.1016/j.scienta.2026.114925.
 
-La validación debe reportar, como mínimo:
-
-- matriz de confusión;
-- precisión, sensibilidad y especificidad por categoría;
-- F1 macro y por clase;
-- calibración de probabilidades;
-- tasa de resultados no concluyentes;
-- desempeño de la detección y segmentación;
-- acuerdo entre especialistas;
-- desempeño por medio, aumento y condición de captura.
-
-La identificación a nivel de género o especie solo debe habilitarse después de
-alcanzar criterios de aceptación definidos con microbiología y documentar las
-limitaciones del conjunto de datos.
-
-## Separación de responsabilidades
-
-- El motor automático segmenta, mide, aplica la puerta de calidad y genera una categoría preliminar.
-- El especialista comprueba las marcas, confirma, corrige, rechaza o marca como no concluyente.
-- El administrador gestiona usuarios y, en etapas posteriores, versiones, datasets y evaluaciones.
-- La aplicación conserva la trazabilidad de todos esos pasos.
+Estas referencias justifican qué perfiles incluir primero; no validan por sí
+solas las reglas heurísticas ni autorizan una identificación visual automática.
