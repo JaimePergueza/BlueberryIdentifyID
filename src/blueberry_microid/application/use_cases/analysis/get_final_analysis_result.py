@@ -1,7 +1,9 @@
 """Use case: get the final analysis result for an AnalysisRun (Fase 42).
 
 Combines the automatic Prediction with the current expert HumanReview (if any)
-and resolves the final label.  The Prediction is never modified.
+and resolves the final label. The Prediction is never modified. Operational
+morphology hypotheses remain available in the analysis-detail view, but are
+excluded from this authoritative final-result contract.
 """
 
 from __future__ import annotations
@@ -20,6 +22,11 @@ from blueberry_microid.application.ports.analysis_run_repository import Analysis
 from blueberry_microid.application.ports.human_review_repository import HumanReviewRepositoryPort
 from blueberry_microid.application.ports.prediction_repository import PredictionRepositoryPort
 from blueberry_microid.application.services.final_analysis_resolver import resolve_final_label
+from blueberry_microid.application.services.operational_interpretation_filter import (
+    decision_trace_without_operational_differential,
+    feature_summary_without_operational_differential,
+    warnings_without_operational_differential,
+)
 
 
 class GetFinalAnalysisResultUseCase:
@@ -61,10 +68,16 @@ class GetFinalAnalysisResultUseCase:
             preliminary_label=prediction.predicted_label,
             confidence_score=prediction.confidence_score,
             explanation=prediction.explanation,
-            feature_summary=prediction.feature_summary,
+            feature_summary=feature_summary_without_operational_differential(
+                prediction.feature_summary
+            ),
             quality_summary=prediction.quality_summary,
-            decision_trace=prediction.decision_trace,
-            automatic_warnings=prediction.warnings,
+            decision_trace=decision_trace_without_operational_differential(
+                prediction.decision_trace
+            ),
+            automatic_warnings=warnings_without_operational_differential(
+                prediction.warnings
+            ),
             human_review_id=review.id if review is not None else None,
             human_review_decision=review.review_decision if review is not None else None,
             corrected_label=review.corrected_label if review is not None else None,
