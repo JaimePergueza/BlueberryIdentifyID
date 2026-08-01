@@ -1,98 +1,112 @@
-# Morphological taxonomic differential
+# Diferencial morfológico para arándanos
 
-## Scope
+## Alcance
 
-`MorphologicalDifferentialEngine 0.1.0` converts the existing Petri and
-microscopy measurements into a limited, explainable differential. It does not
-identify a genus or species and must not be used as a diagnosis.
+`MorphologicalDifferentialEngine 0.2.0` convierte mediciones Petri y
+microscópicas en un diferencial visual explicable. No identifica ni confirma un
+género o una especie y no debe utilizarse como diagnóstico.
 
-The first supported genus-like profiles are:
+Los perfiles iniciales son:
 
-- morphology compatible with *Penicillium*;
-- morphology compatible with *Aspergillus*;
-- broad interpretation as another filamentous fungus when genus-like evidence
-  cannot be separated.
+- morfología tipo *Penicillium*;
+- morfología tipo *Aspergillus*;
+- morfología tipo *Botrytis*;
+- morfología tipo *Colletotrichum*;
+- morfología tipo *Alternaria*;
+- morfología tipo *Fusarium*;
+- morfología tipo Mucorales/*Rhizopus*.
 
-Genus-like compatibility indices are capped below 0.50. They are heuristic
-indices, not calibrated probabilities.
+Los índices se mantienen por debajo de 0.50. Son compatibilidades heurísticas,
+no probabilidades calibradas.
 
-## Scientific basis
+## Por qué se incluyeron estos perfiles
 
-The profile vocabulary follows the polyphasic identification guidance in:
+El catálogo prioriza microorganismos documentados en enfermedades o pudriciones
+de arándano. La literatura de poscosecha destaca moho gris por *Botrytis*,
+antracnosis por *Colletotrichum* y pudriciones asociadas con *Alternaria*, junto
+con reportes de *Penicillium*, *Aspergillus* y *Fusarium*. Estudios recientes
+identificaron mediante morfología y métodos moleculares aislamientos como
+*Penicillium crustosum*, *Aspergillus tubingensis*, *Alternaria alternata* y
+*Fusarium verticillioides*.
 
-- Visagie CM et al. (2014), **Identification and nomenclature of the genus
-  Penicillium**, Studies in Mycology 78:343–371,
-  DOI `10.1016/j.simyco.2014.09.001`.
-- Samson RA et al. (2014), **Phylogeny, identification and nomenclature of the
-  genus Aspergillus**, Studies in Mycology 78:141–173,
-  DOI `10.1016/j.simyco.2014.07.004`.
-- Schoch CL et al. (2012), **Nuclear ribosomal internal transcribed spacer (ITS)
-  region as a universal DNA barcode marker for Fungi**, PNAS 109:6241–6246,
-  DOI `10.1073/pnas.1117018109`.
+Los nombres de especies se muestran únicamente como ejemplos publicados en
+arándanos. Nunca representan el resultado de la imagen cargada.
 
-These sources treat colony characters and conidiophore morphology as important
-but insufficient on their own for species assignment. The application
-therefore reports missing diagnostic structures and recommends molecular
-confirmation.
+## Evidencia por candidato
 
-## Penicillium-like profile
+Cada candidato contiene:
 
-Supporting measurements may include:
+- `display_name`: perfil morfológico;
+- `reported_blueberry_examples`: ejemplos reportados en la bibliografía;
+- `compatibility_index`: índice heurístico limitado;
+- `supporting_evidence`: señales visibles favorables;
+- `missing_or_contradictory_evidence`: estructuras ausentes o no demostradas;
+- `required_confirmation`: trabajo de laboratorio necesario.
 
-- visible filamentous growth;
-- grey-green or blue-green colony colour;
-- heterogeneous colony texture;
-- elongated and branching microscopic structures.
+El campo `primary_hypothesis` puede ser `null`. Solo se propone una hipótesis
+principal cuando el perfil mejor puntuado supera el umbral conservador y se
+separa suficientemente del segundo. La hipótesis continúa sin confirmar.
 
-The profile remains unconfirmed until microscopy demonstrates the relevant
-conidiophore architecture, such as phialides, metulae and conidial chains.
-Branching patterns can be monoverticillate, divaricate, biverticillate,
-terverticillate or more complex. ITS alone may be insufficient for species
-resolution; a secondary marker such as `BenA` is commonly required.
+## Estructuras necesarias
 
-## Aspergillus-like profile
+El sistema todavía no reconoce semánticamente:
 
-Supporting measurements may include:
+- penicilos, métulas, fiálides y cadenas conidiales;
+- vesículas y cabezas conidiales;
+- conidióforos botrioides;
+- acérvulos, setas y apresorios;
+- conidios muriformes;
+- macroconidios, microconidios y clamidosporas;
+- esporangios, columelas, rizoides y estolones.
 
-- visible filamentous growth;
-- elongated and branching microscopic structures;
-- candidate rounded structures that warrant review.
+Por ello, un perfil puede orientar dónde mirar, pero no reemplaza la microscopía
+experta.
 
-The profile remains unconfirmed until a terminal vesicle and an interpretable
-conidial head are demonstrated. The reviewer must determine whether phialides
-are uniseriate or biseriate and assess stipe, vesicle, metula, phialide and
-conidial morphology. Molecular confirmation commonly combines ITS with an
-appropriate secondary marker such as `CaM` or `BenA`.
+## Metadatos y suficiencia
 
-## Output contract
+El diferencial debe interpretarse junto con:
 
-The differential is stored under:
+- medio de cultivo;
+- temperatura y tiempo de incubación;
+- aumento y tipo de microscopio;
+- tinción, montaje y preparación;
+- lote, origen y fecha de recolección.
+
+La ausencia de estos datos reduce la suficiencia de la interpretación, aunque la
+captura sea técnicamente correcta.
+
+## Contratos y seguridad
+
+El diferencial se almacena en:
 
 ```text
 prediction.feature_summary.taxonomic_differential
 ```
 
-Important fields:
+Se muestra al especialista en el detalle operativo, pero se elimina del
+resultado autoritativo, de la curación de datasets y del ground truth. Una
+captura rechazada produce `unavailable`; un patrón no filamentoso produce
+`insufficient`.
 
-- `engine.name` and `engine.version`;
-- `status`: `available`, `insufficient` or `unavailable`;
-- `summary`;
-- `morphological_description`;
-- `broad_interpretation`;
-- `primary_hypothesis`, which may be `null`;
-- `candidates` with supporting, missing and confirmation evidence;
-- `score_semantics`, `limitations` and `confirmation_required`.
+## Confirmación
 
-A rejected quality gate always produces `unavailable` with no genus-like
-candidates. A non-filamentous result produces `insufficient`. Existing
-predictions remain immutable and do not acquire the differential
-retrospectively.
+La identificación final debe combinar cultivo documentado, múltiples campos,
+revisión experta e identificación molecular. ITS puede requerir marcadores
+secundarios como `BenA`, `CaM`, `TEF1-α`, `RPB2`, `G3PDH` o `HSP60`, según el
+grupo y la resolución buscada.
 
-## Known limitations
+## Referencias principales
 
-The current visual extractors do not semantically detect conidiophores,
-vesicles, metulae, phialides or conidial chains. Consequently, the differential
-is an educational and review-support layer over generic morphology metrics.
-The next scientific milestone is a curated isolation-level dataset containing
-paired Petri images, multiple microscopy fields, standardised culture metadata,
-expert annotations and molecular ground truth.
+- Visagie CM et al. (2014). *Identification and nomenclature of the genus
+  Penicillium*. Studies in Mycology 78:343–371. DOI 10.1016/j.simyco.2014.09.001.
+- Samson RA et al. (2014). *Phylogeny, identification and nomenclature of the
+  genus Aspergillus*. Studies in Mycology 78:141–173. DOI 10.1016/j.simyco.2014.07.004.
+- Ramos Bell S. et al. (2021). *Main diseases in postharvest blueberries,
+  conventional and eco-friendly control methods: A review*. LWT 149:112046.
+  DOI 10.1016/j.lwt.2021.112046.
+- Wan C. et al. (2025). *Isolation, Identification and Essential Oil Control of
+  Pathogenic Fungi in Postharvest Blueberry*. Food Science 46(9):275–284.
+  DOI 10.7506/spkx1002-6630-20241012-066.
+- Bollenbacher CB et al. (2026). *Fungal Organisms Associated with Postharvest
+  Fruit Rots on Blueberry in Georgia (U.S.A.) Surveyed over Two Growing
+  Seasons*. Plant Health Progress 27(2):293–300. DOI 10.1094/PHP-09-25-0228-S.
