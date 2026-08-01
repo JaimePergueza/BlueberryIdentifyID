@@ -1,22 +1,19 @@
-"""Use case: validate, store, and persistently record a two-image upload analysis.
+"""Validate, store and persist a two-image morphology analysis.
 
-This is the official analysis entry point. It creates real database entities
-from two raw image uploads and analyses their pixel content with transparent,
-non-trained morphology rules. Results remain preliminary, non-diagnostic,
-non-taxonomic and require expert review.
+The entry point records structured sample/culture/microscopy metadata, runs the
+classical visual engine, builds a blueberry-oriented differential and resolves
+contradictions conservatively before persisting the immutable prediction.
 """
 
 import logging
 import uuid
+from datetime import datetime, time, timezone
 
 from blueberry_microid.application.dto.two_image_upload_dto import (
     TwoImageUploadRequest,
     TwoImageUploadResult,
 )
-from blueberry_microid.application.exceptions import (
-    DuplicateModelVersionError,
-    ImageTooLargeError,
-)
+from blueberry_microid.application.exceptions import DuplicateModelVersionError, ImageTooLargeError
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
 from blueberry_microid.application.ports.image_validator import ImageValidatorPort
 from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
@@ -24,6 +21,9 @@ from blueberry_microid.application.ports.model_version_repository import ModelVe
 from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
 from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
+from blueberry_microid.application.services.analysis_coherence_resolver import (
+    resolve_analysis_coherence,
+)
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
 from blueberry_microid.domain.entities.micro_image import MicroImage
 from blueberry_microid.domain.entities.model_version import ModelVersion
@@ -41,7 +41,7 @@ from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine
 logger = logging.getLogger("blueberry_microid.business.analyze_two_uploaded_images")
 
 _PRELIMINARY_ENGINE_NAME = "PreliminaryTwoImageEngine"
-_PRELIMINARY_ENGINE_VERSION = "0.4.1"
+_PRELIMINARY_ENGINE_VERSION = "0.5.0"
 
 
 class AnalyzeTwoUploadedImagesUseCase:
@@ -71,14 +71,10 @@ class AnalyzeTwoUploadedImagesUseCase:
 
     def execute(self, request: TwoImageUploadRequest) -> TwoImageUploadResult:
         petri_validation = self._validate_bytes(
-            request.petri_file_name,
-            request.petri_mime_type,
-            request.petri_content,
+            request.petri_file_name, request.petri_mime_type, request.petri_content
         )
         micro_validation = self._validate_bytes(
-            request.micro_file_name,
-            request.micro_mime_type,
-            request.micro_content,
+            request.micro_file_name, request.micro_mime_type, request.micro_content
         )
 
         petri_path = self._storage.save(
@@ -97,7 +93,20 @@ class AnalyzeTwoUploadedImagesUseCase:
             raise
 
         sample_code = request.sample_code or f"AUTO-{uuid.uuid4().hex[:8].upper()}"
-        sample = self._sample_repo.add(Sample(sample_code=sample_code, notes=request.notes))
+        collection_datetime = (
+            datetime.combine(request.collection_date, time.min, tzinfo=timezone.utc)
+            if request.collection_date is not None
+            else None
+        )
+        sample = self._sample_repo.add(
+            Sample(
+                sample_code=sample_code,
+                lot_code=request.lot_code,
+                origin=request.origin,
+                collection_date=collection_datetime,
+                notes=request.notes,
+            )
+        )
 
         petri_image = self._petri_repo.add(
             PetriImage(
@@ -108,6 +117,9 @@ class AnalyzeTwoUploadedImagesUseCase:
                 file_size_bytes=len(request.petri_content),
                 width=petri_validation.width,
                 height=petri_validation.height,
+                culture_medium=request.culture_medium,
+                incubation_temperature_c=request.incubation_temperature_c,
+                incubation_time_hours=request.incubation_time_hours,
             )
         )
 
@@ -120,6 +132,10 @@ class AnalyzeTwoUploadedImagesUseCase:
                 file_size_bytes=len(request.micro_content),
                 width=micro_validation.width,
                 height=micro_validation.height,
+                magnification=request.magnification,
+                microscope_type=request.microscope_type,
+                staining_method=request.staining_method,
+                preparation_method=request.preparation_method,
             )
         )
 
@@ -141,7 +157,38 @@ class AnalyzeTwoUploadedImagesUseCase:
         )
         feature_summary = dict(output.feature_summary or {})
         feature_summary["taxonomic_differential"] = taxonomic_differential
+
+        metadata = {
+            "lot_code": request.lot_code,
+            "origin": request.origin,
+            "collection_date": request.collection_date.isoformat() if request.collection_date else None,
+            "culture_medium": request.culture_medium,
+            "incubation_temperature_c": request.incubation_temperature_c,
+            "incubation_time_hours": request.incubation_time_hours,
+            "magnification": request.magnification,
+            "microscope_type": request.microscope_type,
+            "staining_method": request.staining_method or request.preparation_method,
+        }
+        resolution = resolve_analysis_coherence(
+            predicted_label=output.predicted_label,
+            confidence_score=output.confidence_score,
+            class_scores=output.class_probabilities,
+            explanation=output.explanation,
+            feature_summary=feature_summary,
+            quality_summary=output.quality_summary,
+            metadata=metadata,
+        )
+        feature_summary["coherence_assessment"] = resolution.assessment
         output.feature_summary = feature_summary
+        output.predicted_label = resolution.predicted_label
+        output.confidence_score = resolution.confidence_score
+        output.class_probabilities = resolution.class_scores
+        output.explanation = resolution.explanation
+
+        quality_summary = dict(output.quality_summary or {})
+        quality_summary["quality_dimensions"] = resolution.assessment.get("quality_dimensions", {})
+        quality_summary["metadata_sufficiency"] = resolution.assessment.get("metadata", {})
+        output.quality_summary = quality_summary
 
         decision_trace = list(output.decision_trace or [])
         decision_trace.append(
@@ -153,15 +200,26 @@ class AnalyzeTwoUploadedImagesUseCase:
                 "candidate_count": len(taxonomic_differential.get("candidates", [])),
             }
         )
+        decision_trace.append(
+            {
+                "step": "coherence_resolution",
+                "engine": resolution.assessment.get("engine"),
+                "status": resolution.assessment.get("status"),
+                "resolved_label": resolution.predicted_label.value,
+                "conflicts": resolution.assessment.get("conflicts", []),
+            }
+        )
         output.decision_trace = decision_trace
 
+        warnings = list(output.warnings or [])
         if taxonomic_differential.get("status") == "available":
-            warnings = list(output.warnings or [])
             warnings.append(
                 "Las hipótesis de género son compatibilidades morfológicas no calibradas; "
                 "requieren revisión experta y confirmación molecular."
             )
-            output.warnings = warnings
+        if resolution.warning:
+            warnings.append(resolution.warning)
+        output.warnings = warnings or None
 
         prediction = Prediction(
             analysis_run_id=analysis_run.id,
@@ -190,9 +248,9 @@ class AnalyzeTwoUploadedImagesUseCase:
                 "analysis_run_id": str(analysis_run.id),
                 "sample_id": str(sample.id),
                 "model_version_id": str(model_version.id),
-                "model_type": model_version.model_type.value,
                 "predicted_label": output.predicted_label.value,
                 "taxonomic_differential_status": taxonomic_differential.get("status"),
+                "coherence_status": resolution.assessment.get("status"),
             },
         )
 
@@ -221,11 +279,7 @@ class AnalyzeTwoUploadedImagesUseCase:
                 f"uploaded file '{file_name}' is {actual_size} bytes, which exceeds "
                 f"the maximum allowed size of {self._max_size} bytes"
             )
-        return self._validator.validate(
-            file_name=file_name,
-            mime_type=mime_type,
-            content=content,
-        )
+        return self._validator.validate(file_name=file_name, mime_type=mime_type, content=content)
 
     def _get_or_create_model_version(self) -> ModelVersion:
         candidate = ModelVersion(
@@ -233,20 +287,18 @@ class AnalyzeTwoUploadedImagesUseCase:
             version=_PRELIMINARY_ENGINE_VERSION,
             model_type=ModelType.CLASSICAL,
             description=(
-                "Explainable classical two-image morphology engine combining Petri colony "
-                "geometry, colour and texture with microscopy filament, branching and component "
-                "signals. Version 0.4.1 improves dark-media and confluent-colony segmentation, "
-                "adds a contradictory-segmentation quality block, and reduces redundant "
-                "microscopy overlays; non-trained, non-taxonomic and non-diagnostic."
+                "Explainable classical two-image engine. Version 0.5.0 persists structured "
+                "laboratory metadata, separates quality dimensions, resolves bacterial-versus-"
+                "filamentous conflicts by abstention and attaches the blueberry morphology "
+                "differential 0.2.0. Non-trained, non-diagnostic and non-taxonomic."
             ),
         )
         try:
             return self._mv_repo.add(candidate)
         except DuplicateModelVersionError:
-            existing = self._mv_repo.list_all()
             return next(
                 model_version
-                for model_version in existing
+                for model_version in self._mv_repo.list_all()
                 if model_version.name == _PRELIMINARY_ENGINE_NAME
                 and model_version.version == _PRELIMINARY_ENGINE_VERSION
                 and model_version.model_type == ModelType.CLASSICAL
