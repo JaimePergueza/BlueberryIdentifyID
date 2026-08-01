@@ -1,7 +1,7 @@
 """Keep operational morphology hypotheses out of final and training contracts.
 
 The morphology differential is designed for specialist review in the analysis
--detail view. It must not become reviewed ground truth, leak into training
+detail view. It must not become reviewed ground truth, leak into training
 features, or appear as part of the authoritative final-result contract.
 """
 
