@@ -31,6 +31,9 @@ from blueberry_microid.domain.entities.petri_image import PetriImage
 from blueberry_microid.domain.entities.prediction import Prediction
 from blueberry_microid.domain.entities.sample import Sample
 from blueberry_microid.domain.enums.model_type import ModelType
+from blueberry_microid.ml.inference_engine.morphological_taxonomic_differential import (
+    build_taxonomic_differential,
+)
 from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine import (
     PreliminaryTwoImageAnalysisEngine,
 )
@@ -131,6 +134,34 @@ class AnalyzeTwoUploadedImagesUseCase:
             petri_image_bytes=request.petri_content,
             micro_image_bytes=request.micro_content,
         )
+        taxonomic_differential = build_taxonomic_differential(
+            predicted_label=output.predicted_label,
+            feature_summary=output.feature_summary,
+            quality_summary=output.quality_summary,
+        )
+        feature_summary = dict(output.feature_summary or {})
+        feature_summary["taxonomic_differential"] = taxonomic_differential
+        output.feature_summary = feature_summary
+
+        decision_trace = list(output.decision_trace or [])
+        decision_trace.append(
+            {
+                "step": "taxonomic_differential",
+                "engine": taxonomic_differential.get("engine"),
+                "status": taxonomic_differential.get("status"),
+                "primary_hypothesis": taxonomic_differential.get("primary_hypothesis"),
+                "candidate_count": len(taxonomic_differential.get("candidates", [])),
+            }
+        )
+        output.decision_trace = decision_trace
+
+        if taxonomic_differential.get("status") == "available":
+            warnings = list(output.warnings or [])
+            warnings.append(
+                "Las hipótesis de género son compatibilidades morfológicas no calibradas; "
+                "requieren revisión experta y confirmación molecular."
+            )
+            output.warnings = warnings
 
         prediction = Prediction(
             analysis_run_id=analysis_run.id,
@@ -161,6 +192,7 @@ class AnalyzeTwoUploadedImagesUseCase:
                 "model_version_id": str(model_version.id),
                 "model_type": model_version.model_type.value,
                 "predicted_label": output.predicted_label.value,
+                "taxonomic_differential_status": taxonomic_differential.get("status"),
             },
         )
 

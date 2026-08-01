@@ -7,6 +7,9 @@ from blueberry_microid.application.dto.dataset_curation_dto import (
     DatasetCurationPolicy,
 )
 from blueberry_microid.application.services.final_analysis_resolver import resolve_final_label
+from blueberry_microid.application.services.operational_interpretation_filter import (
+    feature_summary_without_operational_differential,
+)
 from blueberry_microid.domain.entities.analysis_run import AnalysisRun
 from blueberry_microid.domain.entities.human_review import HumanReview
 from blueberry_microid.domain.entities.micro_image import MicroImage
@@ -18,7 +21,12 @@ from blueberry_microid.domain.enums.review_decision import ReviewDecision
 
 
 class DatasetCurationEvaluator:
-    """Evaluates whether a two-image AnalysisRun is eligible for curation."""
+    """Evaluates whether a two-image AnalysisRun is eligible for curation.
+
+    Curated features contain reusable visual measurements only. Operational
+    genus-like hypotheses are intentionally removed to prevent pseudo-label
+    leakage into training datasets.
+    """
 
     def evaluate(
         self,
@@ -75,7 +83,9 @@ class DatasetCurationEvaluator:
             curation_status=status,
             exclusion_reason=reason,
             provenance=provenance,
-            feature_summary=prediction.feature_summary if prediction is not None else None,
+            feature_summary=feature_summary_without_operational_differential(
+                prediction.feature_summary if prediction is not None else None
+            ),
             quality_summary=prediction.quality_summary if prediction is not None else None,
         )
 
@@ -104,4 +114,3 @@ class DatasetCurationEvaluator:
             return DatasetCurationStatus.EXCLUDED_INVALID_LABEL, "final label is not allowed by policy"
 
         return DatasetCurationStatus.INCLUDED, None
-
