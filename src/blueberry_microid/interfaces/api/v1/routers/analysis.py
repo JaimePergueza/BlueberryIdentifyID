@@ -1,15 +1,16 @@
 """Router for the two-image upload preliminary analysis endpoints (Fase 40.1 / 42).
 
 Endpoints:
-- POST /api/v1/analysis/two-image-upload            (Fase 40.1 / 41)
-- GET  /api/v1/analysis-runs/{id}/preliminary-result (Fase 40.1 / 42 enriched)
-- GET  /api/v1/analysis-runs/{id}/final-result       (Fase 42 — NEW)
+- POST /api/v1/analysis/two-image-upload
+- GET  /api/v1/analysis-runs/{id}/preliminary-result
+- GET  /api/v1/analysis-runs/{id}/final-result
 
 All endpoints carry a mandatory disclaimer: results carry no diagnostic or
-taxonomic validity.  Human expert review is mandatory before any operational
+taxonomic validity. Human expert review is mandatory before any operational
 conclusion is drawn.
 """
 
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
@@ -37,11 +38,9 @@ from blueberry_microid.interfaces.api.v1.schemas.two_image_upload import (
 )
 
 _PRELIMINARY_DISCLAIMER = (
-    "PRELIMINARY RESULT — expert review required. "
-    "This result was produced by a classical image-processing heuristic (Fase 41). "
-    "It does not perform deep learning, has no diagnostic validity, and never "
-    "identifies a microorganism species or genus. "
-    "Human expert review is mandatory."
+    "RESULTADO PRELIMINAR — requiere revisión experta. "
+    "Las puntuaciones son heurísticas visuales no calibradas y no equivalen a probabilidades científicas. "
+    "El sistema no confirma género, especie, patogenicidad ni diagnóstico."
 )
 
 router = APIRouter(tags=["analysis"])
@@ -54,12 +53,8 @@ router = APIRouter(tags=["analysis"])
     summary="Preliminary two-image upload analysis — persisted (non-diagnostic)",
     description=(
         "Upload a Petri dish photograph and a microscopy photograph of the same "
-        "sample.  Both images are validated and stored; Sample, PetriImage, "
-        "MicroImage, AnalysisRun and Prediction are persisted.  Real DB identifiers "
-        "are returned so the AnalysisRun can be retrieved or reviewed later.  "
-        "``requires_human_review`` is always ``true`` — all preliminary uploads "
-        "require expert review.  "
-        "**Results carry no diagnostic or taxonomic validity.**"
+        "sample, together with optional structured sample, culture and microscopy "
+        "metadata. Results are preliminary and require expert review."
     ),
 )
 async def analyze_two_uploaded_images(
@@ -71,14 +66,18 @@ async def analyze_two_uploaded_images(
         ...,
         description="Microscopy photograph taken from the same Petri dish sample.",
     ),
-    sample_code: Optional[str] = Form(
-        default=None,
-        description="Optional lab sample code. Auto-generated if omitted.",
-    ),
-    notes: Optional[str] = Form(
-        default=None,
-        description="Optional free-text notes for the sample.",
-    ),
+    sample_code: Optional[str] = Form(default=None),
+    lot_code: Optional[str] = Form(default=None),
+    origin: Optional[str] = Form(default=None),
+    collection_date: Optional[date] = Form(default=None),
+    notes: Optional[str] = Form(default=None),
+    culture_medium: Optional[str] = Form(default=None),
+    incubation_temperature_c: Optional[float] = Form(default=None),
+    incubation_time_hours: Optional[float] = Form(default=None),
+    magnification: Optional[str] = Form(default=None),
+    microscope_type: Optional[str] = Form(default=None),
+    staining_method: Optional[str] = Form(default=None),
+    preparation_method: Optional[str] = Form(default=None),
     use_case: AnalyzeTwoUploadedImagesUseCase = Depends(get_analyze_two_uploaded_images_use_case),
 ) -> TwoImageUploadAnalysisRead:
     petri_content = await petri_image.read()
@@ -92,7 +91,17 @@ async def analyze_two_uploaded_images(
         micro_mime_type=micro_image.content_type or "application/octet-stream",
         micro_content=micro_content,
         sample_code=sample_code or None,
+        lot_code=lot_code or None,
+        origin=origin or None,
+        collection_date=collection_date,
         notes=notes or None,
+        culture_medium=culture_medium or None,
+        incubation_temperature_c=incubation_temperature_c,
+        incubation_time_hours=incubation_time_hours,
+        magnification=magnification or None,
+        microscope_type=microscope_type or None,
+        staining_method=staining_method or None,
+        preparation_method=preparation_method or None,
     )
     result = use_case.execute(request)
 
@@ -119,14 +128,6 @@ async def analyze_two_uploaded_images(
     "/analysis-runs/{analysis_run_id}/preliminary-result",
     response_model=PreliminaryResultRead,
     summary="Get preliminary result with human review status (non-diagnostic)",
-    description=(
-        "Retrieve the Prediction produced by a previously processed AnalysisRun, "
-        "formatted as a preliminary result.  Includes current human review status "
-        "(Fase 42): ``human_review_status``, ``human_review_completed``, "
-        "``final_label`` if a review has been submitted.  "
-        "The AnalysisRun must have a Prediction; if not, a 404 is returned.  "
-        "**Results carry no diagnostic or taxonomic validity.**"
-    ),
 )
 def get_preliminary_result(
     analysis_run_id: UUID,
@@ -161,13 +162,6 @@ def get_preliminary_result(
     "/analysis-runs/{analysis_run_id}/final-result",
     response_model=FinalAnalysisResultRead,
     summary="Get the final analysis result combining automatic prediction and expert review",
-    description=(
-        "Returns the full view of the analysis result: automatic Prediction "
-        "(unchanged from when it was created) plus the current expert HumanReview "
-        "(if submitted).  ``final_label`` and ``status`` reflect the expert decision; "
-        "they are ``null``/``pending_human_review`` until a review is submitted.  "
-        "**Results carry no diagnostic or taxonomic validity.**"
-    ),
 )
 def get_final_result(
     analysis_run_id: UUID,
