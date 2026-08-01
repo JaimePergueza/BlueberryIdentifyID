@@ -7,6 +7,7 @@ interface Candidate {
   displayName: string;
   compatibilityIndex: number | null;
   compatibilityLabel: string;
+  reportedExamples: string[];
   supportingEvidence: string[];
   missingEvidence: string[];
   requiredConfirmation: string[];
@@ -40,6 +41,7 @@ function parseCandidate(value: unknown): Candidate | null {
     compatibilityLabel: typeof record.compatibility_label === "string"
       ? record.compatibility_label
       : "sin valoración",
+    reportedExamples: stringList(record.reported_blueberry_examples),
     supportingEvidence: stringList(record.supporting_evidence),
     missingEvidence: stringList(record.missing_or_contradictory_evidence),
     requiredConfirmation: stringList(record.required_confirmation),
@@ -88,12 +90,10 @@ export function TaxonomicDifferential({ differential }: TaxonomicDifferentialPro
         <div className="section-heading taxonomy-heading">
           <div>
             <span className="eyebrow">Interpretación microbiológica orientativa</span>
-            <h2>Hipótesis taxonómica explicable</h2>
+            <h2>Diferencial morfológico para arándanos</h2>
             <p>{summary}</p>
           </div>
-          <span className={`taxonomy-status taxonomy-status-${String(status)}`}>
-            {statusLabel(status)}
-          </span>
+          <span className={`taxonomy-status taxonomy-status-${String(status)}`}>{statusLabel(status)}</span>
         </div>
 
         {Object.keys(broad).length > 0 && (
@@ -140,13 +140,17 @@ export function TaxonomicDifferential({ differential }: TaxonomicDifferentialPro
                   <p>{candidate.compatibilityLabel}</p>
                 </div>
                 <strong className="taxonomy-index">
-                  {candidate.compatibilityIndex === null
-                    ? "—"
-                    : `${Math.round(candidate.compatibilityIndex * 100)}%`}
+                  {candidate.compatibilityIndex === null ? "—" : `${Math.round(candidate.compatibilityIndex * 100)}%`}
                 </strong>
               </div>
               <progress max={1} value={candidate.compatibilityIndex ?? 0} />
-              <small>Índice heurístico de compatibilidad; no es una probabilidad de identificación.</small>
+              <small>Índice heurístico; no es una probabilidad ni confirma un género.</small>
+              {candidate.reportedExamples.length > 0 && (
+                <div className="taxonomy-evidence taxonomy-evidence-examples">
+                  <strong>Ejemplos reportados en arándanos</strong>
+                  <p>{candidate.reportedExamples.join(" · ")}</p>
+                </div>
+              )}
               <HypothesisList title="Rasgos que apoyan" items={candidate.supportingEvidence} tone="support" />
               <HypothesisList title="Rasgos ausentes o no demostrados" items={candidate.missingEvidence} tone="missing" />
               <HypothesisList title="Cómo confirmarlo" items={candidate.requiredConfirmation} tone="confirm" />

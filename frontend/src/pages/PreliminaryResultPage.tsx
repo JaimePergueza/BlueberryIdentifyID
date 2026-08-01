@@ -19,7 +19,7 @@ export function PreliminaryResultPage() {
   if (query.isError) return <ErrorState error={query.error} />;
 
   const result = query.data!;
-  const probabilities = Object.entries(result.class_probabilities ?? {}).sort((a, b) => b[1] - a[1]);
+  const categoryScores = Object.entries(result.class_probabilities ?? {}).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="page page-narrow">
@@ -39,9 +39,9 @@ export function PreliminaryResultPage() {
           <h2>{labelName(result.predicted_label)}</h2>
           <p>{result.explanation ?? "El motor no proporcionó una explicación adicional."}</p>
         </div>
-        <div className="confidence-ring" aria-label={`Confianza ${formatPercent(result.confidence_score)}`}>
+        <div className="confidence-ring" aria-label={`Puntuación técnica ${formatPercent(result.confidence_score)}`}>
           <strong>{formatPercent(result.confidence_score)}</strong>
-          <span>confianza técnica limitada</span>
+          <span>puntuación heurística limitada</span>
         </div>
       </section>
 
@@ -53,12 +53,13 @@ export function PreliminaryResultPage() {
 
       <div className="two-column">
         <section className="card">
-          <div className="section-heading"><h2>Distribución de categorías</h2></div>
+          <div className="section-heading"><h2>Puntuaciones heurísticas por categoría</h2></div>
+          <p>No son probabilidades calibradas ni frecuencias biológicas.</p>
           <div className="probability-list">
-            {probabilities.map(([label, probability]) => (
+            {categoryScores.map(([label, score]) => (
               <div className="probability-row" key={label}>
-                <div><span>{labelName(label as PreliminaryResult["predicted_label"])}</span><strong>{formatPercent(probability)}</strong></div>
-                <progress max={1} value={probability} />
+                <div><span>{labelName(label as PreliminaryResult["predicted_label"])}</span><strong>{formatPercent(score)}</strong></div>
+                <progress max={1} value={score} />
               </div>
             ))}
           </div>
@@ -69,8 +70,8 @@ export function PreliminaryResultPage() {
           <ul className="scope-list">
             <li>Compara evidencia macroscópica y microscópica de la misma muestra.</li>
             <li>Describe crecimiento y patrones morfológicos amplios.</li>
-            <li>No afirma género, especie, patogenicidad ni diagnóstico.</li>
-            <li>Debe confirmarse o corregirse mediante revisión experta.</li>
+            <li>Puede abstenerse como no concluyente ante señales contradictorias.</li>
+            <li>Las hipótesis de género son orientativas y deben confirmarse en laboratorio.</li>
           </ul>
         </section>
       </div>

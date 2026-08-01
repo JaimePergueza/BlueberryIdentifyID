@@ -54,6 +54,13 @@ const qualityLabels: Record<string, string> = {
   micro_extraction_ok: "Extracción microscópica completada",
 };
 
+const dimensionLabels: Record<string, string> = {
+  technical_capture: "Calidad técnica de captura",
+  segmentation: "Calidad de segmentación",
+  morphological_sufficiency: "Suficiencia morfológica",
+  metadata_sufficiency: "Suficiencia de metadatos",
+};
+
 const simpleQualityKeys = Object.keys(qualityLabels);
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -66,23 +73,20 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function recordList(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord).filter((item) => Object.keys(item).length > 0) : [];
+}
+
 function formatMetric(value: unknown, definition: MetricDefinition): string {
   if (definition.kind === "boolean") return value === true ? "Sí" : value === false ? "No" : "—";
   if (typeof value !== "number" || Number.isNaN(value)) return "—";
   if (definition.kind === "percent") {
     return new Intl.NumberFormat("es-EC", { style: "percent", maximumFractionDigits: 2 }).format(value);
   }
-  return new Intl.NumberFormat("es-EC", {
-    maximumFractionDigits: definition.digits ?? 2,
-  }).format(value);
+  return new Intl.NumberFormat("es-EC", { maximumFractionDigits: definition.digits ?? 2 }).format(value);
 }
 
-function MetricCard({
-  eyebrow,
-  title,
-  metrics,
-  values,
-}: {
+function MetricCard({ eyebrow, title, metrics, values }: {
   eyebrow: string;
   title: string;
   metrics: MetricDefinition[];
@@ -111,15 +115,73 @@ function qualityStatusName(status: unknown): string {
   return "Estado de calidad no disponible";
 }
 
+function dimensionStatusName(status: unknown): string {
+  if (status === "sufficient") return "Suficiente";
+  if (status === "partial") return "Parcial";
+  if (status === "insufficient") return "Insuficiente";
+  return "No disponible";
+}
+
 function isPositiveQualityFlag(key: string, value: boolean): boolean {
-  const negativeWhenTrue = [
-    "overexposed",
-    "underexposed",
-    "empty",
-    "conflict",
-    "confluent",
-  ].some((token) => key.includes(token));
+  const negativeWhenTrue = ["overexposed", "underexposed", "empty", "conflict", "confluent"]
+    .some((token) => key.includes(token));
   return negativeWhenTrue ? value === false : value === true;
+}
+
+function CoherenceAssessment({ value }: { value: unknown }) {
+  const assessment = asRecord(value);
+  if (Object.keys(assessment).length === 0) return null;
+  const conflicts = recordList(assessment.conflicts);
+  const dimensions = asRecord(assessment.quality_dimensions);
+  const metadata = asRecord(assessment.metadata);
+  const missingFields = stringList(metadata.missing_fields);
+  const status = assessment.status;
+
+  return (
+    <article className={`card coherence-card coherence-card-${String(status)}`}>
+      <div className="section-heading quality-heading">
+        <div>
+          <span className="eyebrow">Coherencia entre motores</span>
+          <h2>{status === "conflict" ? "Se detectaron señales contradictorias" : "Conclusiones automáticas coherentes"}</h2>
+          <p>El sistema compara la categoría general, la evidencia macro/micro y el diferencial antes de guardar el resultado.</p>
+        </div>
+        <span className={`quality-status quality-status-${status === "conflict" ? "rejected" : "accepted"}`}>
+          {status === "conflict" ? "Conflicto" : "Coherente"}
+        </span>
+      </div>
+
+      {conflicts.length > 0 && (
+        <div className="quality-reason-block quality-reason-blocking">
+          <strong>Motivo de abstención</strong>
+          <ul>{conflicts.map((item, index) => <li key={`${String(item.type)}-${index}`}>{String(item.message ?? "Conflicto morfológico")}</li>)}</ul>
+        </div>
+      )}
+
+      {Object.keys(dimensions).length > 0 && (
+        <div className="evidence-score-grid">
+          {Object.entries(dimensions).map(([key, raw]) => {
+            const dimension = asRecord(raw);
+            const score = typeof dimension.score === "number" ? dimension.score : null;
+            return (
+              <div key={key}>
+                <span>{dimensionLabels[key] ?? key}</span>
+                <strong>{score === null ? "—" : `${Math.round(score * 100)}%`}</strong>
+                <small>{dimensionStatusName(dimension.status)}</small>
+                <progress max={1} value={score ?? 0} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {missingFields.length > 0 && (
+        <div className="quality-reason-block quality-reason-warning">
+          <strong>Metadatos todavía faltantes</strong>
+          <p>{missingFields.join(" · ")}</p>
+        </div>
+      )}
+    </article>
+  );
 }
 
 export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTrace }: MorphologyEvidenceProps) {
@@ -128,14 +190,13 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
   const petri = asRecord(featureSummary?.petri);
   const micro = asRecord(featureSummary?.micro);
   const taxonomicDifferential = featureSummary?.taxonomic_differential;
+  const coherenceAssessment = featureSummary?.coherence_assessment;
   const quality = asRecord(qualitySummary);
   const status = quality.overall_status;
   const blockingReasons = stringList(quality.blocking_reasons);
   const warningReasons = stringList(quality.warning_reasons);
   const qualityScore = typeof quality.quality_score === "number" ? quality.quality_score : null;
-  const fusion = (decisionTrace ?? [])
-    .map(asRecord)
-    .find((step) => step.step === "evidence_fusion") ?? {};
+  const fusion = (decisionTrace ?? []).map(asRecord).find((step) => step.step === "evidence_fusion") ?? {};
 
   const scores = [
     ["Evidencia macroscópica", fusion.macro_growth_score],
@@ -149,7 +210,7 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
         <div>
           <span className="eyebrow">Análisis explicable</span>
           <h2>Evidencia morfológica</h2>
-          <p>Mediciones visuales empleadas por el motor. No equivalen a una identificación taxonómica.</p>
+          <p>Mediciones visuales y puntuaciones heurísticas. No equivalen a una identificación taxonómica.</p>
         </div>
       </div>
 
@@ -161,6 +222,7 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
       {Object.keys(fusion).length > 0 && (
         <article className="card morphology-score-card">
           <div className="section-heading"><h2>Fusión de evidencia</h2></div>
+          <p>Estas puntuaciones no están calibradas como probabilidades.</p>
           <div className="evidence-score-grid">
             {scores.map(([label, value]) => (
               <div key={label}>
@@ -173,15 +235,17 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
         </article>
       )}
 
+      <CoherenceAssessment value={coherenceAssessment} />
+
       {Object.keys(quality).length > 0 && (
         <article className="card morphology-quality-card">
           <div className="section-heading quality-heading">
             <div>
-              <span className="eyebrow">Puerta de calidad</span>
+              <span className="eyebrow">Puerta de calidad técnica</span>
               <h2>{qualityStatusName(status)}</h2>
-              {qualityScore !== null && <p>Puntuación técnica de captura: {Math.round(qualityScore * 100)}%</p>}
+              {qualityScore !== null && <p>Puntuación técnica de archivos y captura: {Math.round(qualityScore * 100)}%</p>}
             </div>
-            <span className={`quality-status quality-status-${String(status)}`}>{String(status ?? "unknown")}</span>
+            <span className={`quality-status quality-status-${String(status)}`}>{qualityStatusName(status)}</span>
           </div>
 
           {blockingReasons.length > 0 && (

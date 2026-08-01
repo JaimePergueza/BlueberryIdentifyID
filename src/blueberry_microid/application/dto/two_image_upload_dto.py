@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
@@ -16,7 +17,17 @@ class TwoImageUploadRequest:
     micro_mime_type: str
     micro_content: bytes
     sample_code: Optional[str] = None
+    lot_code: Optional[str] = None
+    origin: Optional[str] = None
+    collection_date: Optional[date] = None
     notes: Optional[str] = None
+    culture_medium: Optional[str] = None
+    incubation_temperature_c: Optional[float] = None
+    incubation_time_hours: Optional[float] = None
+    magnification: Optional[str] = None
+    microscope_type: Optional[str] = None
+    staining_method: Optional[str] = None
+    preparation_method: Optional[str] = None
 
 
 @dataclass(frozen=True, slots=True)

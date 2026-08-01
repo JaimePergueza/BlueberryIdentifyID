@@ -179,10 +179,7 @@ class _FakeAnalysisRunRepository(AnalysisRunRepositoryPort):
         return None
 
     def get_by_id(self, analysis_run_id: UUID) -> Optional[AnalysisRun]:
-        return next(
-            (run for run in self.added if run.id == analysis_run_id),
-            None,
-        )
+        return next((run for run in self.added if run.id == analysis_run_id), None)
 
     def list_by_sample_id(self, sample_id: UUID) -> list[AnalysisRun]:
         return [run for run in self.added if run.sample_id == sample_id]
@@ -211,11 +208,7 @@ class _FakePredictionRepository(PredictionRepositoryPort):
 
     def get_by_id(self, prediction_id: UUID) -> Optional[Prediction]:
         return next(
-            (
-                prediction
-                for prediction in self.added
-                if prediction.id == prediction_id
-            ),
+            (prediction for prediction in self.added if prediction.id == prediction_id),
             None,
         )
 
@@ -316,9 +309,7 @@ def test_does_not_create_human_review():
     use_case, uow = _make_use_case()
     use_case.execute(_make_request())
     assert not hasattr(uow, "human_review_repository") or not getattr(
-        uow,
-        "_human_reviews_created",
-        False,
+        uow, "_human_reviews_created", False
     )
 
 
@@ -386,18 +377,18 @@ def test_registers_classical_model_version_for_mvp_flow():
     assert len(model_repo._store) == 1
     model_version = model_repo._store[0]
     assert model_version.name == "PreliminaryTwoImageEngine"
-    assert model_version.version == "0.4.1"
+    assert model_version.version == "0.5.0"
     assert model_version.model_type == ModelType.CLASSICAL
-    assert "Petri colony" in model_version.description
-    assert "microscopy filament" in model_version.description
-    assert "segmentation" in model_version.description
+    assert "structured laboratory metadata" in model_version.description
+    assert "quality dimensions" in model_version.description
+    assert "abstention" in model_version.description
     assert uow.analysis_run_repository.added[0].model_version_id == model_version.id
 
 
 def test_reuses_existing_classical_model_version_on_duplicate():
     existing_model = ModelVersion(
         name="PreliminaryTwoImageEngine",
-        version="0.4.1",
+        version="0.5.0",
         model_type=ModelType.CLASSICAL,
     )
     model_repo = _FakeModelVersionRepository(raise_duplicate=True)
