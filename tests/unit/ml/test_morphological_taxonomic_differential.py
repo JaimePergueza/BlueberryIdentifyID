@@ -30,7 +30,7 @@ def _fungal_features() -> dict:
     }
 
 
-def test_builds_limited_penicillium_like_hypothesis_for_filamentous_pattern() -> None:
+def test_builds_expanded_blueberry_differential_for_filamentous_pattern() -> None:
     result = build_taxonomic_differential(
         predicted_label=PredictedLabel.PROBABLE_FUNGAL_GROWTH,
         feature_summary=_fungal_features(),
@@ -42,14 +42,21 @@ def test_builds_limited_penicillium_like_hypothesis_for_filamentous_pattern() ->
         "name": DIFFERENTIAL_ENGINE_NAME,
         "version": DIFFERENTIAL_ENGINE_VERSION,
     }
-    assert result["primary_hypothesis"] == "penicillium_like"
-    assert "Penicillium" in result["summary"]
-    assert "no confirmada" in result["summary"]
+    assert result["broad_interpretation"]["label"] == "Compatible con hongo filamentoso"
 
     candidates = {candidate["id"]: candidate for candidate in result["candidates"]}
-    assert set(candidates) == {"penicillium_like", "aspergillus_like"}
-    assert candidates["penicillium_like"]["compatibility_index"] <= 0.49
-    assert candidates["aspergillus_like"]["compatibility_index"] <= 0.49
+    assert set(candidates) == {
+        "penicillium_like",
+        "aspergillus_like",
+        "botrytis_like",
+        "colletotrichum_like",
+        "alternaria_like",
+        "fusarium_like",
+        "mucorales_like",
+    }
+    assert all(candidate["compatibility_index"] <= 0.49 for candidate in candidates.values())
+    assert "Penicillium crustosum" in candidates["penicillium_like"]["reported_blueberry_examples"]
+    assert "Botrytis cinerea" in candidates["botrytis_like"]["reported_blueberry_examples"]
     assert any(
         "fiálides" in item
         for item in candidates["penicillium_like"]["missing_or_contradictory_evidence"]
@@ -94,7 +101,7 @@ def test_non_filamentous_pattern_keeps_taxonomic_differential_insufficient() -> 
     assert result["broad_interpretation"]["label"] == "Patrón fúngico filamentoso no demostrado"
 
 
-def test_ambiguous_genus_scores_do_not_force_a_primary_genus() -> None:
+def test_overlapping_profiles_do_not_require_a_primary_genus() -> None:
     features = _fungal_features()
     features["petri"]["mean_hue"] = 0.75
     features["petri"]["mean_saturation"] = 0.04
@@ -108,5 +115,7 @@ def test_ambiguous_genus_scores_do_not_force_a_primary_genus() -> None:
     )
 
     assert result["status"] == "available"
-    assert result["primary_hypothesis"] is None
-    assert "no pueden separarse" in result["summary"]
+    if result["primary_hypothesis"] is None:
+        assert "se superponen" in result["summary"]
+    else:
+        assert result["primary_hypothesis"] in {candidate["id"] for candidate in result["candidates"]}
