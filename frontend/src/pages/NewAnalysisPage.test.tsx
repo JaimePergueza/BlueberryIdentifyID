@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -56,7 +56,9 @@ describe("NewAnalysisPage", () => {
     await user.type(screen.getByLabelText(/Código de muestra/), "BB-TEST-01");
     await user.type(screen.getByLabelText(/^Lote/), "LOTE-07");
     await user.type(screen.getByLabelText(/Origen o procedencia/), "Tulcán, Carchi");
-    await user.type(screen.getByLabelText(/Fecha de recolección/), "2026-07-31");
+    fireEvent.change(screen.getByLabelText(/Fecha de recolección/), {
+      target: { value: "2026-07-31" },
+    });
     await user.type(screen.getByLabelText(/Medio de cultivo/), "PDA");
     await user.type(screen.getByLabelText(/Temperatura de incubación/), "25");
     await user.type(screen.getByLabelText(/Tiempo de incubación/), "168");
