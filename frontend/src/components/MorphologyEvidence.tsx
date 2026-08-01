@@ -1,3 +1,5 @@
+import { TaxonomicDifferential } from "./TaxonomicDifferential";
+
 interface MorphologyEvidenceProps {
   featureSummary: Record<string, unknown> | null;
   qualitySummary: Record<string, unknown> | null;
@@ -125,6 +127,7 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
 
   const petri = asRecord(featureSummary?.petri);
   const micro = asRecord(featureSummary?.micro);
+  const taxonomicDifferential = featureSummary?.taxonomic_differential;
   const quality = asRecord(qualitySummary);
   const status = quality.overall_status;
   const blockingReasons = stringList(quality.blocking_reasons);
@@ -208,6 +211,8 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
           </div>
         </article>
       )}
+
+      <TaxonomicDifferential differential={taxonomicDifferential} />
     </section>
   );
 }
