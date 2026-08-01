@@ -98,7 +98,8 @@ def test_ambiguous_genus_scores_do_not_force_a_primary_genus() -> None:
     features = _fungal_features()
     features["petri"]["mean_hue"] = 0.75
     features["petri"]["mean_saturation"] = 0.04
-    features["micro"]["round_component_density"] = 0.0007
+    features["micro"]["branch_point_density"] = 0.0008
+    features["micro"]["round_component_density"] = 0.0012
 
     result = build_taxonomic_differential(
         predicted_label=PredictedLabel.PROBABLE_FUNGAL_GROWTH,
