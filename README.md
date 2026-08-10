@@ -1,53 +1,55 @@
 # BlueberryMicroID
 
-> The GitHub repository keeps the historical name `BlueberryIdentifyID`; the
-> application and Python package are named **BlueberryMicroID**.
+> The GitHub repository keeps the historical name `BlueberryIdentifyID`; the application and Python package are named **BlueberryMicroID**.
 
-BlueberryMicroID is a web platform for preliminary analysis of
-microorganism-associated visual patterns in blueberry laboratory samples.
-Each analysis combines two photographs from the same sample:
+BlueberryMicroID is a full-stack web platform for **preliminary, explainable analysis of microorganism-associated visual patterns in blueberry laboratory samples**. Each analysis combines a Petri-dish photograph and a microscopy photograph, extracts classical visual evidence from both, resolves contradictory signals conservatively, and requires a human specialist to confirm or correct the result.
 
-1. a Petri dish image;
-2. a microscopy image.
+The project is designed around traceability rather than black-box automation: every analysis stores extracted features, quality indicators, model/engine version, decision trace, review history and final expert resolution.
 
-The system extracts classical visual signals from both images, produces an
-explainable preliminary category, requires a human expert to confirm or correct
-the result, and preserves the complete audit trail through an operational
-React/TypeScript interface.
+## Portfolio highlights
+
+This repository demonstrates practical experience with:
+
+- **Backend engineering:** FastAPI, SQLAlchemy 2, Alembic, PostgreSQL and application-layer use cases.
+- **Frontend engineering:** React, TypeScript, Vite, React Router and TanStack Query.
+- **Distributed processing:** Celery with Redis and authenticated worker smoke paths.
+- **Computer vision:** Pillow, NumPy and OpenCV for Petri and microscopy feature extraction.
+- **Security:** Argon2 password hashing, opaque revocable bearer sessions, role-based authorization and protected image access.
+- **Architecture:** Clean Architecture / Ports and Adapters with explicit domain, application and infrastructure boundaries.
+- **Quality engineering:** unit, API, PostgreSQL, frontend, Celery and full-stack Docker validation in CI.
+- **Scientific restraint:** automatic outputs are explicitly preliminary, non-diagnostic and subject to mandatory expert review.
 
 ## Scientific scope
 
-BlueberryMicroID is **not a diagnostic system**. It does not identify
-microorganism genus or species and must not replace laboratory protocols or
-expert assessment.
+BlueberryMicroID is **not a diagnostic system** and does not claim confirmed genus or species identification. The current image-analysis rules are transparent, non-trained heuristics and have not been scientifically validated against a labelled dataset.
 
-The current image-analysis rules are transparent, non-trained heuristics. They
-inspect real pixels but have not been scientifically validated against a
-labelled dataset. Every automatic result is therefore preliminary and always
-requires expert review.
+The morphology differential may compare broad visual compatibility with patterns reported for blueberry-associated fungi, but these values are **not calibrated probabilities** and are never treated as ground truth. Every automatic result requires expert review.
 
-## Official MVP workflow
+## Official analysis workflow
 
-An authenticated user with role `specialist` or `admin` can complete the
-workflow from the web interface or through:
+An authenticated user with role `specialist` or `admin` can submit a paired sample through the web interface or via:
 
 ```http
 POST /api/v1/analysis/two-image-upload
 Authorization: Bearer <access_token>
 ```
 
-This endpoint:
+The official workflow:
 
-- validates and stores both images;
-- creates `Sample`, `PetriImage`, `MicroImage`, `AnalysisRun`, and `Prediction`;
-- analyzes real pixel signals with `PreliminaryTwoImageEngine` version `0.2.0`;
-- records the engine as `ModelType.CLASSICAL`;
-- returns explanations, extracted features, image-quality indicators, warnings,
-  and a decision trace;
-- marks the analysis as `needs_review`;
-- always returns `requires_human_review=true`.
+1. validates and stores the Petri and microscopy images;
+2. persists sample and capture metadata;
+3. isolates the relevant visual regions and evaluates capture quality;
+4. extracts macroscopic and microscopic morphology signals;
+5. produces an explainable preliminary category;
+6. evaluates coherence between broad classification and morphology evidence;
+7. abstains as `inconclusive` when evidence is insufficient or contradictory;
+8. records the engine identity and full decision trace;
+9. marks the result as requiring human review;
+10. lets a specialist confirm or correct the result without overwriting the original automatic evidence.
 
-The result can then be reviewed and retrieved through:
+Current analyses use **`PreliminaryTwoImageEngine` 0.5.0**. Historical predictions remain immutable and retain the engine version that produced them.
+
+Relevant endpoints include:
 
 ```http
 POST /api/v1/analysis-runs/{analysis_run_id}/reviews
@@ -57,91 +59,109 @@ GET  /api/v1/analysis-runs
 GET  /api/v1/analysis-runs/{analysis_run_id}/detail
 ```
 
-The repository still contains `MockInferenceEngine` for legacy orchestration and
-Celery smoke tests. Those paths do not inspect image pixels and are not the
-official MVP analysis entry point.
+The repository also keeps `MockInferenceEngine` for legacy orchestration and smoke-test paths. It is not the official image-analysis entry point.
 
-## Authentication and roles
+## Authentication and authorization
 
-Only `GET /health` and `POST /api/v1/auth/login` are public. Operational routes
-require a revocable bearer session.
+Only `GET /health` and `POST /api/v1/auth/login` are public. Operational routes require an authenticated bearer session.
 
 - `specialist`: samples, images, analyses, history and human review.
-- `admin`: all specialist operations plus user management and technical routes
-  for models, datasets, auditing and experimental training.
+- `admin`: all specialist operations plus user administration and technical model/dataset/audit routes.
 
-Passwords are hashed with Argon2. Session tokens are opaque, expire after a
-configurable period and are stored only as SHA-256 hashes. Changing a user's
-password, role or active status revokes every active session for that user.
+Security properties:
 
-See [`docs/api/authentication.md`](docs/api/authentication.md) and
-[`docs/security/access_control_matrix.md`](docs/security/access_control_matrix.md).
+- passwords hashed with Argon2;
+- opaque high-entropy session tokens;
+- only SHA-256 token hashes persisted;
+- configurable expiration;
+- session revocation on password, role or active-state changes;
+- administrator bootstrap without committed default credentials;
+- protected image-content endpoints that do not expose physical storage paths;
+- interactive API documentation disabled in production.
+
+See [`docs/api/authentication.md`](docs/api/authentication.md) and [`docs/security/access_control_matrix.md`](docs/security/access_control_matrix.md).
 
 ## Web interface
 
-The application under [`frontend/`](frontend/) implements the demonstrable
-product without requiring Swagger:
+The React/TypeScript application under [`frontend/`](frontend/) supports the complete operational workflow without requiring Swagger:
 
 - login and expired-session handling;
+- role-aware navigation;
+- administrator user management;
 - operational dashboard;
-- paired Petri/microscopy upload with previews;
-- preliminary result and warnings;
+- paired Petri/microscopy upload with metadata and previews;
+- visual segmentation overlays;
+- quality-gate warnings and blocking reasons;
+- explainable preliminary result;
+- morphology differential and coherence assessment;
 - expert review;
-- searchable, paginated history;
-- consolidated automatic-versus-human detail.
-
-The interface is responsive, uses Spanish labels for operational categories and
-keeps the backend as the only source of business rules. See
-[`frontend/README.md`](frontend/README.md).
+- searchable and paginated history;
+- consolidated automatic-versus-human traceability detail.
 
 ## Current product status
 
 Implemented:
 
 - authentication with revocable sessions;
-- roles `admin` and `specialist`;
+- `admin` and `specialist` roles;
 - administrator user management and secure bootstrap command;
 - operational React/TypeScript frontend;
-- sample and image persistence;
+- sample, metadata and protected image persistence;
 - strict upload validation;
-- classical Petri and microscopy feature extraction;
+- Petri and microscopy segmentation;
+- capture-quality gating;
+- classical morphology feature extraction;
 - explainable preliminary classification;
+- blueberry-focused morphology differential;
+- coherence resolution and conservative abstention;
 - human review and final-result resolution;
-- paginated analysis history, filters, and consolidated traceability detail;
-- auditable dataset curation, snapshots, and releases;
+- paginated analysis history and filters;
+- auditable dataset curation, snapshots and releases;
 - PostgreSQL migrations;
-- synchronous and Celery-backed technical processing paths;
-- automated backend, frontend, PostgreSQL, and authenticated Celery smoke tests.
+- synchronous and Celery-backed processing paths;
+- reproducible Docker Compose deployment;
+- synthetic demonstration data and demo seeding;
+- backend, frontend, PostgreSQL, Celery and full-stack smoke validation in GitHub Actions.
 
-Still required for the demonstrable product:
-
-- reproducible full-stack deployment;
-- controlled demonstration data and presentation runbook;
-- browser-level end-to-end validation of the deployed stack.
-
-See [`docs/mvp/README.md`](docs/mvp/README.md) for the delivery scope and
-priorities.
+The main remaining product-quality work is scientific validation with a controlled labelled dataset, stronger browser-level end-to-end coverage, observability and production deployment hardening.
 
 ## Technology
 
-Backend:
+### Backend
 
 - Python 3.10+
 - FastAPI
-- SQLAlchemy 2 and Alembic
+- SQLAlchemy 2
+- Alembic
 - PostgreSQL 16
-- Celery and Redis
-- pwdlib and Argon2
-- Pillow, NumPy, OpenCV and scikit-learn
+- Celery
+- Redis
+- pwdlib / Argon2
+- Pillow
+- NumPy
+- OpenCV
+- scikit-learn
 - pytest
 
-Frontend:
+### Frontend
 
-- React and TypeScript
+- React
+- TypeScript
 - Vite
 - React Router
 - TanStack Query
-- Vitest and Testing Library
+- Vitest
+- Testing Library
+
+### Deployment
+
+- Docker / Docker Compose
+- Nginx frontend gateway
+- PostgreSQL and Redis persistent volumes
+- isolated API and worker services
+- migration-gated startup
+
+## Architecture
 
 The backend follows Clean Architecture / Ports and Adapters:
 
@@ -150,10 +170,12 @@ interfaces/       HTTP and external entry points
 application/      use cases, DTOs, ports, application services
 domain/           entities, enums, value objects, business rules
 infrastructure/   SQLAlchemy, storage, security, configuration, tasks
-ml/               image processing, validation, and training contracts
+ml/               image processing, validation, differential and training contracts
 ```
 
-## Local setup
+The backend remains the source of business and scientific workflow rules; the frontend consumes typed contracts and does not duplicate analysis logic.
+
+## Local development
 
 ### 1. Create the backend environment
 
@@ -167,7 +189,7 @@ Activate it and install development dependencies:
 pip install -e ".[dev]"
 ```
 
-### 2. Configure variables
+### 2. Configure local variables
 
 ```bash
 cp .env.example .env
@@ -178,6 +200,8 @@ On Windows:
 ```powershell
 Copy-Item .env.example .env
 ```
+
+Real environment files are excluded from Git. Do not commit credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -197,8 +221,7 @@ alembic upgrade head
 python scripts/create_admin.py
 ```
 
-The command prompts for a username and a hidden password. The repository has no
-default administrator password.
+The command prompts for credentials; there is no committed default administrator password.
 
 ### 6. Start the API
 
@@ -208,15 +231,10 @@ python -m uvicorn blueberry_microid.interfaces.api.app:create_app --factory --re
 
 Development endpoints:
 
-- API documentation: `http://127.0.0.1:8000/docs`
-- Health check: `http://127.0.0.1:8000/health`
+- API docs: `http://127.0.0.1:8000/docs`
+- health: `http://127.0.0.1:8000/health`
 
-Interactive API documentation is disabled automatically when
-`ENVIRONMENT=production`.
-
-### 7. Start the web interface
-
-In a second terminal:
+### 7. Start the frontend
 
 ```bash
 cd frontend
@@ -224,10 +242,21 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. Vite proxies `/api` and `/health` to the local
-FastAPI service.
+Open `http://127.0.0.1:5173`.
 
-## Tests
+## Full-stack Docker demo
+
+Copy the Docker environment template and replace all placeholder credentials:
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+Then start the stack with the Compose environment file configured for your shell/workflow. The Compose topology includes PostgreSQL, Redis, migrations, API, Celery worker and the production frontend gateway.
+
+The optional demo profile requires explicit demo passwords; empty passwords are not treated as valid defaults.
+
+## Tests and validation
 
 Backend:
 
@@ -243,27 +272,32 @@ cd frontend
 npm run check
 ```
 
-GitHub Actions validates the backend suite, the frontend build and component
-tests, PostgreSQL-specific behavior and a real authenticated
-FastAPI/Celery/Redis smoke path.
+CI covers:
+
+- backend unit and API tests;
+- frontend component tests and production build;
+- PostgreSQL migration/integration behavior;
+- authenticated Celery/Redis/API smoke flow;
+- production Docker Compose build, startup, migration, demo seed and public-origin smoke validation.
 
 ## Key documentation
 
 - [`docs/mvp/README.md`](docs/mvp/README.md): demonstrable MVP scope.
+- [`docs/morphology_engine.md`](docs/morphology_engine.md): morphology, quality and scientific limitations.
 - [`frontend/README.md`](frontend/README.md): frontend architecture and local use.
-- [`docs/api/authentication.md`](docs/api/authentication.md): login, sessions and user administration.
-- [`docs/security/access_control_matrix.md`](docs/security/access_control_matrix.md): public/protected route policy.
+- [`docs/api/authentication.md`](docs/api/authentication.md): authentication and user administration.
+- [`docs/security/access_control_matrix.md`](docs/security/access_control_matrix.md): route-access policy.
 - [`docs/api/two_image_upload_analysis.md`](docs/api/two_image_upload_analysis.md): official analysis API.
-- [`docs/api/analysis_history.md`](docs/api/analysis_history.md): history, filters, and consolidated detail API.
+- [`docs/api/analysis_history.md`](docs/api/analysis_history.md): history and consolidated detail API.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): architecture and historical phase detail.
 - [`docs/development.md`](docs/development.md): development procedures.
-- [`CLAUDE.md`](CLAUDE.md): repository development constraints and historical decisions.
 
-## Non-goals for the MVP
+## Non-goals
 
 - confirmed genus or species identification;
-- claims of diagnostic or scientific accuracy;
-- replacing expert review;
+- diagnostic or clinical claims;
+- replacing laboratory protocols or expert assessment;
+- treating morphology compatibility scores as calibrated probabilities;
 - automatic inclusion of uploads in training datasets;
-- training or promoting a production YOLO model during normal API execution;
-- OAuth social login or automated password recovery in this phase.
+- silently rewriting historical predictions when an engine version changes;
+- training or promoting a production YOLO model during normal API execution.
