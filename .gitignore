@@ -10,10 +10,13 @@ build/
 dist/
 .venv/
 venv/
+
+# Environment files / local secrets
 .env
-.env.local
-.env.docker
-.env.ci
+.env.*
+!.env.example
+!.env.docker.example
+
 *.db
 *.sqlite
 *.sqlite3
