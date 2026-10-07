@@ -400,6 +400,8 @@ class SqlAlchemyAnalysisHistoryQuery(AnalysisHistoryQueryPort):
                 HumanReviewDetailDTO(
                     id=review.id,
                     reviewer_name=review.reviewer_name,
+                    reviewer_user_id=review.reviewer_user_id,
+                    reviewed_colony_count=review.reviewed_colony_count,
                     review_decision=review.review_decision,
                     corrected_label=review.corrected_label,
                     comments=review.comments,

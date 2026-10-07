@@ -9,6 +9,7 @@ import {
 } from "react";
 import { apiRequest, clearStoredToken, formBody, getStoredToken, storeToken } from "./api";
 import type { LoginResponse, User } from "../types/api";
+import { queryClient } from "./queryClient";
 
 const USER_KEY = "blueberry-microid.user";
 
@@ -37,6 +38,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(() => loadStoredUser());
 
   const clearSession = useCallback(() => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
     clearStoredToken();
     sessionStorage.removeItem(USER_KEY);
     setUser(null);
@@ -49,6 +52,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [clearSession]);
 
   const login = useCallback(async (username: string, password: string) => {
+    await queryClient.cancelQueries();
+    queryClient.clear();
     const response = await apiRequest<LoginResponse>(
       "/api/v1/auth/login",
       {

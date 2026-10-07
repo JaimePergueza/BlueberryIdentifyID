@@ -130,6 +130,8 @@ export interface HumanReview {
   id: string;
   analysis_run_id: string;
   reviewer_name: string;
+  reviewer_user_id?: string | null;
+  reviewed_colony_count?: number | null;
   review_decision: ReviewDecision;
   corrected_label: PredictedLabel | null;
   comments: string | null;

@@ -127,6 +127,17 @@ from blueberry_microid.infrastructure.db.repositories.sqlalchemy_training_run_re
 )
 
 
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_sample_repository import (
+    SqlAlchemySampleRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_petri_image_repository import (
+    SqlAlchemyPetriImageRepository,
+)
+from blueberry_microid.infrastructure.db.repositories.sqlalchemy_micro_image_repository import (
+    SqlAlchemyMicroImageRepository,
+)
+
+
 class SqlAlchemyUnitOfWork(UnitOfWorkPort):
     """Wraps one SQLAlchemy Session as a single commit/rollback boundary.
 
@@ -152,6 +163,9 @@ class SqlAlchemyUnitOfWork(UnitOfWorkPort):
 
     def __enter__(self) -> "SqlAlchemyUnitOfWork":
         self.session = self._session_factory()
+        self.micro_image_repository = SqlAlchemyMicroImageRepository(self.session, auto_commit=False)
+        self.petri_image_repository = SqlAlchemyPetriImageRepository(self.session, auto_commit=False)
+        self.sample_repository = SqlAlchemySampleRepository(self.session, auto_commit=False)
         self.analysis_run_repository = SqlAlchemyAnalysisRunRepository(self.session, auto_commit=False)
         self.annotation_bundle_file_repository = SqlAlchemyAnnotationBundleFileRepository(self.session, auto_commit=False)
         self.annotation_bundle_run_repository = SqlAlchemyAnnotationBundleRunRepository(self.session, auto_commit=False)

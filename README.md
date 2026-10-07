@@ -47,7 +47,9 @@ The official workflow:
 9. marks the result as requiring human review;
 10. lets a specialist confirm or correct the result without overwriting the original automatic evidence.
 
-Current analyses use **`PreliminaryTwoImageEngine` 0.5.0**. Historical predictions remain immutable and retain the engine version that produced them.
+Current analyses use **`PreliminaryTwoImageEngine` 0.6.0**. Historical predictions remain immutable and retain the engine version that produced them.
+
+Version 0.6.0 adds a preliminary count of Petri candidate regions, abstains from counting unsuitable or confluent captures, and preserves an optional specialist-confirmed count alongside the automatic evidence. It does not estimate CFU/mL or establish biological colony identity. See [`docs/product/colony_count.md`](docs/product/colony_count.md).
 
 Relevant endpoints include:
 

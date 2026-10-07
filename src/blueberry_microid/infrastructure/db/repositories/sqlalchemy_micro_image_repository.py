@@ -13,8 +13,9 @@ from blueberry_microid.infrastructure.db.repositories.mappers import micro_image
 class SqlAlchemyMicroImageRepository(MicroImageRepositoryPort):
     """SQLAlchemy-backed MicroImageRepositoryPort."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, auto_commit: bool = True) -> None:
         self._session = session
+        self._auto_commit = auto_commit
 
     def add(self, micro_image: MicroImage) -> MicroImage:
         model = MicroImageModel(
@@ -36,7 +37,7 @@ class SqlAlchemyMicroImageRepository(MicroImageRepositoryPort):
             created_at=micro_image.created_at,
         )
         self._session.add(model)
-        self._session.commit()
+        self._session.commit() if self._auto_commit else self._session.flush()
         self._session.refresh(model)
         return micro_image_to_entity(model)
 
@@ -48,3 +49,4 @@ class SqlAlchemyMicroImageRepository(MicroImageRepositoryPort):
         statement = select(MicroImageModel).where(MicroImageModel.sample_id == sample_id)
         models = self._session.execute(statement).scalars().all()
         return [micro_image_to_entity(model) for model in models]
+

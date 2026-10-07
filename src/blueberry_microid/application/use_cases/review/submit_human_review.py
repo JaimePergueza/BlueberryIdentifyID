@@ -44,6 +44,8 @@ class SubmitHumanReviewUseCase:
         review = HumanReview(
             analysis_run_id=request.analysis_run_id,
             reviewer_name=request.reviewer_name,
+            reviewer_user_id=request.reviewer_user_id,
+            reviewed_colony_count=request.reviewed_colony_count,
             review_decision=request.review_decision,
             corrected_label=request.corrected_label,
             comments=request.comments,

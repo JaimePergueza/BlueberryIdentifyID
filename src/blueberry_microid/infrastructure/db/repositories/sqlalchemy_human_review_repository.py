@@ -28,6 +28,8 @@ class SqlAlchemyHumanReviewRepository(HumanReviewRepositoryPort):
             id=human_review.id,
             analysis_run_id=human_review.analysis_run_id,
             reviewer_name=human_review.reviewer_name,
+            reviewer_user_id=human_review.reviewer_user_id,
+            reviewed_colony_count=human_review.reviewed_colony_count,
             review_decision=human_review.review_decision,
             corrected_label=human_review.corrected_label,
             comments=human_review.comments,

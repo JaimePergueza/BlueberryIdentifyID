@@ -44,15 +44,19 @@ function authenticatedHeaders(init: RequestInit, authenticated: boolean): Header
   return headers;
 }
 
-async function apiError(response: Response, authenticated: boolean): Promise<ApiError> {
+async function apiError(response: Response, authenticated: boolean, requestToken: string | null): Promise<ApiError> {
   const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
   const error = new ApiError(
     response.status,
     payload.error?.code ?? "request_failed",
-    messageFromPayload(payload, "No se pudo completar la solicitud."),
+    messageFromPayload(payload, response.status === 413
+      ? "Las imágenes superan el tamaño permitido. Reduce su tamaño e inténtalo de nuevo."
+      : response.status === 429
+        ? "Demasiados intentos de acceso. Espera un minuto antes de intentarlo de nuevo."
+        : "No se pudo completar la solicitud."),
     payload.error?.request_id,
   );
-  if (response.status === 401 && authenticated) {
+  if (response.status === 401 && authenticated && requestToken === getStoredToken()) {
     clearStoredToken();
     window.dispatchEvent(new CustomEvent("blueberry-auth-expired"));
   }
@@ -66,20 +70,28 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const authenticated = options.authenticated !== false;
   const headers = authenticatedHeaders(init, authenticated);
+  const requestToken = authenticated ? getStoredToken() : null;
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  if (authenticated && requestToken !== getStoredToken()) {
+    throw new DOMException("Session changed during the request", "AbortError");
+  }
   if (response.status === 204) return undefined as T;
-  if (!response.ok) throw await apiError(response, authenticated);
+  if (!response.ok) throw await apiError(response, authenticated, requestToken);
   return (await response.json()) as T;
 }
 
 export async function apiBlob(path: string): Promise<Blob> {
   const headers = authenticatedHeaders({}, true);
+  const requestToken = getStoredToken();
   const response = await fetch(`${API_BASE_URL}${path}`, { headers });
-  if (!response.ok) throw await apiError(response, true);
+  if (requestToken !== getStoredToken()) {
+    throw new DOMException("Session changed during the request", "AbortError");
+  }
+  if (!response.ok) throw await apiError(response, true, requestToken);
   return response.blob();
 }
 

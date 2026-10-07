@@ -20,6 +20,8 @@ class SubmitHumanReviewRequest:
     corrected_label: Optional[PredictedLabel] = None
     comments: Optional[str] = None
     is_final: bool = True
+    reviewer_user_id: Optional[UUID] = None
+    reviewed_colony_count: Optional[int] = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +36,8 @@ class HumanReviewDTO:
     comments: Optional[str]
     is_final: bool
     created_at: datetime
+    reviewer_user_id: Optional[UUID] = None
+    reviewed_colony_count: Optional[int] = None
 
     @classmethod
     def from_entity(cls, review: HumanReview) -> "HumanReviewDTO":
@@ -46,4 +50,6 @@ class HumanReviewDTO:
             comments=review.comments,
             is_final=review.is_final,
             created_at=review.created_at,
+            reviewer_user_id=review.reviewer_user_id,
+            reviewed_colony_count=review.reviewed_colony_count,
         )

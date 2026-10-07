@@ -27,6 +27,11 @@ class PillowImageValidator(ImageValidatorPort):
     allowed, decodes fine) would pass on its own.
     """
 
+    def __init__(self, max_pixels: int = 25_000_000) -> None:
+        if max_pixels <= 0:
+            raise ValueError("max_pixels must be positive")
+        self._max_pixels = max_pixels
+
     def validate(self, *, file_name: str, mime_type: str, content: bytes) -> ImageValidationResult:
         if len(content) == 0:
             raise InvalidImageError("uploaded file is empty")
@@ -42,8 +47,10 @@ class PillowImageValidator(ImageValidatorPort):
 
         try:
             with Image.open(BytesIO(content)) as probe:
+                if probe.width * probe.height > self._max_pixels:
+                    raise InvalidImageError("Image exceeds the decoded pixel limit")
                 probe.verify()
-        except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+        except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
             raise InvalidImageError(f"file is not a valid or is a corrupted image: {exc}") from exc
 
         # Image.verify() leaves the file object unusable for further reads,

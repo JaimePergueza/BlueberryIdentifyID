@@ -13,7 +13,9 @@ class HumanReviewCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    reviewer_name: str = Field(min_length=1, max_length=255)
+    # Accepted for older clients; audited identity always comes from the session.
+    reviewer_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    reviewed_colony_count: Optional[int] = Field(default=None, ge=0, le=100000, strict=True)
     review_decision: ReviewDecision
     corrected_label: Optional[PredictedLabel] = None
     comments: Optional[str] = None
@@ -21,6 +23,11 @@ class HumanReviewCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_review_decision_details(self) -> "HumanReviewCreate":
+        if (
+            self.review_decision == ReviewDecision.REJECTED_INVALID_SAMPLE
+            and self.reviewed_colony_count is not None
+        ):
+            raise ValueError("an invalid sample cannot have a confirmed colony count")
         if self.review_decision == ReviewDecision.CORRECTED and self.corrected_label is None:
             raise ValueError("corrected_label is required when review_decision is 'corrected'")
         if (
@@ -45,6 +52,8 @@ class HumanReviewRead(BaseModel):
     comments: Optional[str]
     is_final: bool
     created_at: datetime
+    reviewer_user_id: Optional[UUID] = None
+    reviewed_colony_count: Optional[int] = None
 
 
 class HumanReviewListResponse(BaseModel):

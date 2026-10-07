@@ -15,13 +15,13 @@ from blueberry_microid.infrastructure.db.repositories.mappers import sample_to_e
 class SqlAlchemySampleRepository(SampleRepositoryPort):
     """SQLAlchemy-backed SampleRepositoryPort.
 
-    Each method manages its own transaction: Phase 2 use cases only ever
-    write to a single aggregate per call, so a dedicated Unit of Work is not
-    yet justified (see ARCHITECTURE.md).
+    Standalone operations commit by default. Inside a Unit of Work,
+    auto_commit=False flushes without committing the encompassing transaction.
     """
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, auto_commit: bool = True) -> None:
         self._session = session
+        self._auto_commit = auto_commit
 
     def add(self, sample: Sample) -> Sample:
         model = SampleModel(
@@ -37,7 +37,7 @@ class SqlAlchemySampleRepository(SampleRepositoryPort):
         )
         self._session.add(model)
         try:
-            self._session.commit()
+            self._session.commit() if self._auto_commit else self._session.flush()
         except IntegrityError as exc:
             self._session.rollback()
             raise DuplicateSampleCodeError(f"sample_code '{sample.sample_code}' already exists") from exc

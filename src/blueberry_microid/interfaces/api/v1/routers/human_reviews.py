@@ -16,6 +16,8 @@ from blueberry_microid.interfaces.api.v1.schemas.human_review import (
     HumanReviewListResponse,
     HumanReviewRead,
 )
+from blueberry_microid.domain.entities.user import User
+from blueberry_microid.interfaces.api.security import require_specialist
 
 router = APIRouter(prefix="/analysis-runs/{analysis_run_id}/reviews", tags=["human-reviews"])
 
@@ -24,11 +26,14 @@ router = APIRouter(prefix="/analysis-runs/{analysis_run_id}/reviews", tags=["hum
 def submit_human_review(
     analysis_run_id: UUID,
     payload: HumanReviewCreate,
+    current_user: User = Depends(require_specialist),
     use_case: SubmitHumanReviewUseCase = Depends(get_submit_human_review_use_case),
 ) -> HumanReviewRead:
     request = SubmitHumanReviewRequest(
         analysis_run_id=analysis_run_id,
-        reviewer_name=payload.reviewer_name,
+        reviewer_name=current_user.username,
+        reviewer_user_id=current_user.id,
+        reviewed_colony_count=payload.reviewed_colony_count,
         review_decision=payload.review_decision,
         corrected_label=payload.corrected_label,
         comments=payload.comments,

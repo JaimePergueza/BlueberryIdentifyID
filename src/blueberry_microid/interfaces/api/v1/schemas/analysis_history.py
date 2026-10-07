@@ -152,6 +152,8 @@ class HumanReviewDetailRead(BaseModel):
     comments: Optional[str]
     is_final: bool
     created_at: datetime
+    reviewer_user_id: Optional[UUID] = None
+    reviewed_colony_count: Optional[int] = None
 
 
 class AnalysisRunDetailRead(BaseModel):

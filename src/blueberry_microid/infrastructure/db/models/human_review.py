@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,6 +32,14 @@ class HumanReviewModel(Base):
     __tablename__ = "human_reviews"
     __table_args__ = (
         CheckConstraint(
+            "reviewed_colony_count IS NULL OR (reviewed_colony_count >= 0 AND reviewed_colony_count <= 100000)",
+            name="ck_human_reviews_colony_count_range",
+        ),
+        CheckConstraint(
+            "review_decision != 'rejected_invalid_sample' OR reviewed_colony_count IS NULL",
+            name="ck_human_reviews_invalid_sample_no_count",
+        ),
+        CheckConstraint(
             "review_decision != 'corrected' OR corrected_label IS NOT NULL",
             name="ck_human_reviews_corrected_label_required",
         ),
@@ -49,6 +57,10 @@ class HumanReviewModel(Base):
         UUID(as_uuid=True), ForeignKey("analysis_runs.id"), nullable=False, index=True
     )
     reviewer_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    reviewer_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
+    reviewed_colony_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     review_decision: Mapped[ReviewDecision] = mapped_column(review_decision_enum, nullable=False)
     corrected_label: Mapped[Optional[PredictedLabel]] = mapped_column(corrected_label_enum, nullable=True)
     comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

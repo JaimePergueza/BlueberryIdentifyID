@@ -89,6 +89,23 @@ def test_full_flow_creates_final_human_review(api_client):
     assert body["is_final"] is True
 
 
+def test_review_identity_comes_from_session_and_manual_count_survives_detail(api_client):
+    run_id, _ = _create_processed_run(api_client, "identity-count")
+    current_user = api_client.get("/api/v1/auth/me").json()
+    response = api_client.post(
+        f"/api/v1/analysis-runs/{run_id}/reviews",
+        json={"reviewer_name": "Someone else", "review_decision": "confirmed", "reviewed_colony_count": 0},
+    )
+    assert response.status_code == 201
+    review = response.json()
+    assert review["reviewer_name"] == current_user["username"]
+    assert review["reviewer_user_id"] == current_user["id"]
+    assert review["reviewed_colony_count"] == 0
+    detail = api_client.get(f"/api/v1/analysis-runs/{run_id}/detail").json()
+    assert detail["human_review"]["reviewer_user_id"] == current_user["id"]
+    assert detail["human_review"]["reviewed_colony_count"] == 0
+
+
 def test_get_final_human_review(api_client):
     run_id, _prediction = _create_processed_run(api_client, "2")
     created = api_client.post(
