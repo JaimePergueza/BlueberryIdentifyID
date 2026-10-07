@@ -1,5 +1,6 @@
 """Unit tests for AnalyzeTwoUploadedImagesUseCase persistent MVP flow."""
 
+from copy import deepcopy
 from types import TracebackType
 from typing import Optional
 from uuid import UUID
@@ -220,6 +221,13 @@ class _FakeUnitOfWork(UnitOfWorkPort):
         self.committed = False
 
     def __enter__(self) -> "_FakeUnitOfWork":
+        self.committed = False
+        self._snapshots = []
+        for repo in (self.sample_repository, self.petri_image_repository,
+                     self.micro_image_repository, self.analysis_run_repository,
+                     self.prediction_repository):
+            attribute = "_store" if hasattr(repo, "_store") else "added"
+            self._snapshots.append((repo, attribute, deepcopy(getattr(repo, attribute))))
         return self
 
     def __exit__(
@@ -228,13 +236,15 @@ class _FakeUnitOfWork(UnitOfWorkPort):
         exc: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
-        pass
+        if exc_type is not None or not self.committed:
+            self.rollback()
 
     def commit(self) -> None:
         self.committed = True
 
     def rollback(self) -> None:
-        pass
+        for repo, attribute, snapshot in self._snapshots:
+            setattr(repo, attribute, snapshot)
 
 
 def _make_use_case(
@@ -248,13 +258,13 @@ def _make_use_case(
     max_bytes=None,
 ):
     uow = uow or _FakeUnitOfWork()
+    uow.sample_repository = sample_repo or _FakeSampleRepository()
+    uow.petri_image_repository = petri_repo or _FakePetriImageRepository()
+    uow.micro_image_repository = micro_repo or _FakeMicroImageRepository()
     return AnalyzeTwoUploadedImagesUseCase(
         image_validator=validator or _FakeValidator(),
         upload_storage=storage or _FakeStorage(),
         engine=PreliminaryTwoImageAnalysisEngine(),
-        sample_repository=sample_repo or _FakeSampleRepository(),
-        petri_image_repository=petri_repo or _FakePetriImageRepository(),
-        micro_image_repository=micro_repo or _FakeMicroImageRepository(),
         model_version_repository=mv_repo or _FakeModelVersionRepository(),
         unit_of_work=uow,
         max_upload_size_bytes=max_bytes,
@@ -377,7 +387,7 @@ def test_registers_classical_model_version_for_mvp_flow():
     assert len(model_repo._store) == 1
     model_version = model_repo._store[0]
     assert model_version.name == "PreliminaryTwoImageEngine"
-    assert model_version.version == "0.5.0"
+    assert model_version.version == "0.6.0"
     assert model_version.model_type == ModelType.CLASSICAL
     assert "structured laboratory metadata" in model_version.description
     assert "quality dimensions" in model_version.description
@@ -388,7 +398,7 @@ def test_registers_classical_model_version_for_mvp_flow():
 def test_reuses_existing_classical_model_version_on_duplicate():
     existing_model = ModelVersion(
         name="PreliminaryTwoImageEngine",
-        version="0.5.0",
+        version="0.6.0",
         model_type=ModelType.CLASSICAL,
     )
     model_repo = _FakeModelVersionRepository(raise_duplicate=True)
@@ -408,3 +418,43 @@ def test_unique_run_ids_per_call():
     first = use_case.execute(request)
     second = use_case.execute(request)
     assert first.analysis_run_id != second.analysis_run_id
+
+
+def test_engine_failure_rolls_back_sample_images_and_removes_both_files():
+    storage = _FakeStorage()
+    use_case, uow = _make_use_case(storage=storage)
+
+    class FailingEngine:
+        def analyze(self, **kwargs):
+            raise RuntimeError("engine unavailable")
+
+    use_case._engine = FailingEngine()
+    with pytest.raises(RuntimeError, match="engine unavailable"):
+        use_case.execute(_make_request())
+
+    assert not uow.committed
+    assert not uow.sample_repository._store
+    assert not uow.petri_image_repository._store
+    assert not uow.micro_image_repository._store
+    assert not uow.analysis_run_repository.added
+    assert not uow.prediction_repository.added
+    assert sorted(storage.deleted) == sorted(storage.saved)
+
+
+def test_commit_failure_rolls_back_all_sample_data_and_removes_files(monkeypatch):
+    storage = _FakeStorage()
+    use_case, uow = _make_use_case(storage=storage)
+
+    def fail_commit():
+        raise RuntimeError("commit failed")
+
+    monkeypatch.setattr(uow, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="commit failed"):
+        use_case.execute(_make_request())
+
+    assert not uow.sample_repository._store
+    assert not uow.petri_image_repository._store
+    assert not uow.micro_image_repository._store
+    assert not uow.analysis_run_repository.added
+    assert not uow.prediction_repository.added
+    assert sorted(storage.deleted) == sorted(storage.saved)

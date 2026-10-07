@@ -87,6 +87,9 @@ from blueberry_microid.application.ports.training_run_comparison_entry_repositor
 )
 from blueberry_microid.application.ports.training_run_comparison_repository import TrainingRunComparisonRepositoryPort
 from blueberry_microid.application.ports.training_run_repository import TrainingRunRepositoryPort
+from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
+from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
+from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
 
 
 class UnitOfWorkPort(ABC):
@@ -106,6 +109,9 @@ class UnitOfWorkPort(ABC):
     in a single commit.
     """
 
+    sample_repository: SampleRepositoryPort
+    petri_image_repository: PetriImageRepositoryPort
+    micro_image_repository: MicroImageRepositoryPort
     analysis_run_repository: AnalysisRunRepositoryPort
     annotation_bundle_file_repository: AnnotationBundleFileRepositoryPort
     annotation_bundle_run_repository: AnnotationBundleRunRepositoryPort

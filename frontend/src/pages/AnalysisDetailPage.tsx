@@ -86,6 +86,9 @@ export function AnalysisDetailPage() {
           <LabelBadge label={detail.final_label} />
           <div className="review-decision">{decisionName(review?.review_decision)}</div>
           <p>{review?.comments ?? "La muestra permanece pendiente de revisión experta."}</p>
+          {review?.reviewed_colony_count != null && (
+            <p><strong>Conteo manual confirmado: {review.reviewed_colony_count} colonias</strong></p>
+          )}
           {review ? (
             <small>Revisado por {review.reviewer_name} · {formatDate(review.created_at)}</small>
           ) : (

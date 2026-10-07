@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     api_base_url: str = Field(default="http://127.0.0.1:8000")
     max_upload_size_mb: float = Field(
         default=20.0,
+        gt=0,
         description="Maximum accepted size, in megabytes, for a single Petri/micro image upload.",
     )
     auth_session_ttl_hours: int = Field(

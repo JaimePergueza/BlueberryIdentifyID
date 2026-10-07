@@ -13,8 +13,9 @@ from blueberry_microid.infrastructure.db.repositories.mappers import petri_image
 class SqlAlchemyPetriImageRepository(PetriImageRepositoryPort):
     """SQLAlchemy-backed PetriImageRepositoryPort."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, auto_commit: bool = True) -> None:
         self._session = session
+        self._auto_commit = auto_commit
 
     def add(self, petri_image: PetriImage) -> PetriImage:
         model = PetriImageModel(
@@ -39,7 +40,7 @@ class SqlAlchemyPetriImageRepository(PetriImageRepositoryPort):
             created_at=petri_image.created_at,
         )
         self._session.add(model)
-        self._session.commit()
+        self._session.commit() if self._auto_commit else self._session.flush()
         self._session.refresh(model)
         return petri_image_to_entity(model)
 
@@ -51,3 +52,4 @@ class SqlAlchemyPetriImageRepository(PetriImageRepositoryPort):
         statement = select(PetriImageModel).where(PetriImageModel.sample_id == sample_id)
         models = self._session.execute(statement).scalars().all()
         return [petri_image_to_entity(model) for model in models]
+

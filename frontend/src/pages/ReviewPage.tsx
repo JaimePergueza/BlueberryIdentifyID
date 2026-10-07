@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorState, LoadingState } from "../components/Feedback";
 import { LabelBadge } from "../components/StatusBadge";
+import { ColonyCount } from "../components/ColonyCount";
 import { ApiError, apiRequest } from "../lib/api";
 import { labelName } from "../lib/format";
-import { useAuth } from "../lib/auth";
 import type { HumanReview, PredictedLabel, PreliminaryResult, ReviewDecision } from "../types/api";
 
 const labels: PredictedLabel[] = [
@@ -20,10 +20,10 @@ export function ReviewPage() {
   const { analysisRunId = "" } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const [decision, setDecision] = useState<ReviewDecision>("confirmed");
   const [correctedLabel, setCorrectedLabel] = useState<PredictedLabel>("inconclusive");
   const [comments, setComments] = useState("");
+  const [colonyCount, setColonyCount] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const resultQuery = useQuery({
@@ -37,7 +37,8 @@ export function ReviewPage() {
       apiRequest<HumanReview>(`/api/v1/analysis-runs/${analysisRunId}/reviews`, {
         method: "POST",
         body: JSON.stringify({
-          reviewer_name: user?.username ?? "especialista",
+          reviewed_colony_count: decision === "rejected_invalid_sample" || colonyCount.trim() === ""
+            ? null : Number(colonyCount),
           review_decision: decision,
           corrected_label: decision === "corrected" ? correctedLabel : null,
           comments: comments.trim() || null,
@@ -64,6 +65,12 @@ export function ReviewPage() {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    if (decision !== "rejected_invalid_sample" && colonyCount.trim() !== "" && (
+      !Number.isInteger(Number(colonyCount)) || Number(colonyCount) < 0 || Number(colonyCount) > 100000
+    )) {
+      setError("El conteo debe ser un número entero entre 0 y 100000.");
+      return;
+    }
     mutation.mutate();
   };
 
@@ -87,6 +94,7 @@ export function ReviewPage() {
       </section>
 
       <form className="card review-form" onSubmit={handleSubmit}>
+        <ColonyCount assessment={result.feature_summary?.colony_count} />
         <div className="section-heading"><h2>Decisión del especialista</h2></div>
         <fieldset className="decision-grid">
           <legend className="sr-only">Selecciona una decisión</legend>
@@ -116,6 +124,19 @@ export function ReviewPage() {
             <select value={correctedLabel} onChange={(event) => setCorrectedLabel(event.target.value as PredictedLabel)}>
               {labels.map((label) => <option value={label} key={label}>{labelName(label)}</option>)}
             </select>
+          </label>
+        )}
+
+        {decision !== "rejected_invalid_sample" && (
+          <label className="field">
+            <span>Conteo manual confirmado <small>(opcional)</small></span>
+            <input
+              type="number" min={0} max={100000} step={1}
+              value={colonyCount}
+              onChange={(event) => setColonyCount(event.target.value)}
+              aria-describedby="colony-count-help"
+            />
+            <small id="colony-count-help">Registra 0 si verificaste que no hay colonias. Deja vacío si no se puede contar. El resultado automático se conserva.</small>
           </label>
         )}
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from blueberry_microid.domain.enums.predicted_label import PredictedLabel
+from blueberry_microid.ml.inference_engine.colony_count_assessment import assess_colony_count
 from blueberry_microid.ml.inference_engine.micro_visual_signal_extractor import (
     _EMPTY_FIELD_EDGE_THRESHOLD,
     _EMPTY_FIELD_STD_THRESHOLD,
@@ -105,6 +106,16 @@ class PreliminaryTwoImageAnalysisEngine:
             quality_summary["overall_status"],
         )
 
+        feature_summary = _build_feature_summary(petri_signals, micro_signals)
+        colony_count = assess_colony_count(feature_summary["petri"])
+        feature_summary["colony_count"] = colony_count
+        trace.append({
+            "step": "colony_count_assessment",
+            "method_version": colony_count["method_version"],
+            "status": colony_count["status"],
+            "reason_codes": colony_count["reason_codes"],
+        })
+
         return PreliminaryAnalysisOutput(
             upload_id=upload_id,
             predicted_label=label,
@@ -113,7 +124,7 @@ class PreliminaryTwoImageAnalysisEngine:
             requires_human_review=True,
             disclaimer=PRELIMINARY_DISCLAIMER,
             explanation=explanation,
-            feature_summary=_build_feature_summary(petri_signals, micro_signals),
+            feature_summary=feature_summary,
             quality_summary=quality_summary,
             decision_trace=trace,
             warnings=warnings or None,

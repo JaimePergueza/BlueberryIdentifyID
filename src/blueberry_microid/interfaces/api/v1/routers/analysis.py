@@ -15,6 +15,10 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from starlette.concurrency import run_in_threadpool
+
+from blueberry_microid.infrastructure.config.settings import Settings
+from blueberry_microid.interfaces.api.upload_limits import read_bounded_upload
 
 from blueberry_microid.application.dto.two_image_upload_dto import TwoImageUploadRequest
 from blueberry_microid.application.use_cases.analysis.analyze_two_uploaded_images import (
@@ -27,6 +31,7 @@ from blueberry_microid.application.use_cases.analysis.get_preliminary_result_wit
     GetPreliminaryResultWithReviewUseCase,
 )
 from blueberry_microid.interfaces.api.v1.dependencies import (
+    get_settings_dependency,
     get_analyze_two_uploaded_images_use_case,
     get_get_final_analysis_result_use_case,
     get_get_preliminary_result_with_review_use_case,
@@ -79,9 +84,10 @@ async def analyze_two_uploaded_images(
     staining_method: Optional[str] = Form(default=None),
     preparation_method: Optional[str] = Form(default=None),
     use_case: AnalyzeTwoUploadedImagesUseCase = Depends(get_analyze_two_uploaded_images_use_case),
+    settings: Settings = Depends(get_settings_dependency),
 ) -> TwoImageUploadAnalysisRead:
-    petri_content = await petri_image.read()
-    micro_content = await micro_image.read()
+    petri_content = await read_bounded_upload(petri_image, settings.max_upload_size_bytes)
+    micro_content = await read_bounded_upload(micro_image, settings.max_upload_size_bytes)
 
     request = TwoImageUploadRequest(
         petri_file_name=petri_image.filename or "petri_upload",
@@ -103,7 +109,7 @@ async def analyze_two_uploaded_images(
         staining_method=staining_method or None,
         preparation_method=preparation_method or None,
     )
-    result = use_case.execute(request)
+    result = await run_in_threadpool(use_case.execute, request)
 
     return TwoImageUploadAnalysisRead(
         analysis_run_id=result.analysis_run_id,

@@ -2,6 +2,27 @@ import { describe, expect, it, vi } from "vitest";
 import { apiRequest, clearStoredToken, getStoredToken, storeToken } from "./api";
 
 describe("apiRequest", () => {
+  it("does not invalidate a new session when an old request returns 401", async () => {
+    storeToken("old-token");
+    let resolve!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((done) => { resolve = done; })));
+    const pending = apiRequest("/api/v1/analysis-runs");
+    storeToken("new-token");
+    resolve(new Response("{}", { status: 401 }));
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(getStoredToken()).toBe("new-token");
+  });
+
+  it("discards private data returned after a session change", async () => {
+    storeToken("old-token");
+    let resolve!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((done) => { resolve = done; })));
+    const pending = apiRequest("/api/v1/analysis-runs");
+    storeToken("new-token");
+    resolve(new Response(JSON.stringify({ private: true }), { status: 200 }));
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("adds the stored bearer token to authenticated requests", async () => {
     storeToken("test-token");
     const fetchMock = vi.fn().mockResolvedValue(

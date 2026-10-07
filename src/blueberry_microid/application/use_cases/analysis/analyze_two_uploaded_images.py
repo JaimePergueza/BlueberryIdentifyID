@@ -5,21 +5,25 @@ classical visual engine, builds a blueberry-oriented differential and resolves
 contradictions conservatively before persisting the immutable prediction.
 """
 
+from __future__ import annotations
+
 import logging
 import uuid
 from datetime import datetime, time, timezone
+from typing import TYPE_CHECKING
 
 from blueberry_microid.application.dto.two_image_upload_dto import (
     TwoImageUploadRequest,
     TwoImageUploadResult,
 )
-from blueberry_microid.application.exceptions import DuplicateModelVersionError, ImageTooLargeError
+from blueberry_microid.application.exceptions import (
+    DuplicateModelVersionError,
+    ImageTooLargeError,
+    ImageStorageCompensationError,
+)
 from blueberry_microid.application.ports.image_storage import ImageCategory, ImageStoragePort
-from blueberry_microid.application.ports.image_validator import ImageValidatorPort
-from blueberry_microid.application.ports.micro_image_repository import MicroImageRepositoryPort
+from blueberry_microid.application.ports.image_validator import ImageValidatorPort, ImageValidationResult
 from blueberry_microid.application.ports.model_version_repository import ModelVersionRepositoryPort
-from blueberry_microid.application.ports.petri_image_repository import PetriImageRepositoryPort
-from blueberry_microid.application.ports.sample_repository import SampleRepositoryPort
 from blueberry_microid.application.ports.unit_of_work import UnitOfWorkPort
 from blueberry_microid.application.services.analysis_coherence_resolver import (
     resolve_analysis_coherence,
@@ -34,14 +38,15 @@ from blueberry_microid.domain.enums.model_type import ModelType
 from blueberry_microid.ml.inference_engine.morphological_taxonomic_differential import (
     build_taxonomic_differential,
 )
-from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine import (
-    PreliminaryTwoImageAnalysisEngine,
-)
+if TYPE_CHECKING:
+    from blueberry_microid.ml.inference_engine.preliminary_two_image_analysis_engine import (
+        PreliminaryTwoImageAnalysisEngine,
+    )
 
 logger = logging.getLogger("blueberry_microid.business.analyze_two_uploaded_images")
 
 _PRELIMINARY_ENGINE_NAME = "PreliminaryTwoImageEngine"
-_PRELIMINARY_ENGINE_VERSION = "0.5.0"
+_PRELIMINARY_ENGINE_VERSION = "0.6.0"
 
 
 class AnalyzeTwoUploadedImagesUseCase:
@@ -52,9 +57,6 @@ class AnalyzeTwoUploadedImagesUseCase:
         image_validator: ImageValidatorPort,
         upload_storage: ImageStoragePort,
         engine: PreliminaryTwoImageAnalysisEngine,
-        sample_repository: SampleRepositoryPort,
-        petri_image_repository: PetriImageRepositoryPort,
-        micro_image_repository: MicroImageRepositoryPort,
         model_version_repository: ModelVersionRepositoryPort,
         unit_of_work: UnitOfWorkPort,
         max_upload_size_bytes: int | None = None,
@@ -62,9 +64,6 @@ class AnalyzeTwoUploadedImagesUseCase:
         self._validator = image_validator
         self._storage = upload_storage
         self._engine = engine
-        self._sample_repo = sample_repository
-        self._petri_repo = petri_image_repository
-        self._micro_repo = micro_image_repository
         self._mv_repo = model_version_repository
         self._uow = unit_of_work
         self._max_size = max_upload_size_bytes
@@ -77,28 +76,64 @@ class AnalyzeTwoUploadedImagesUseCase:
             request.micro_file_name, request.micro_mime_type, request.micro_content
         )
 
-        petri_path = self._storage.save(
-            category=ImageCategory.PETRI,
-            original_file_name=request.petri_file_name,
-            content=request.petri_content,
-        )
+        # Engine registration is shared metadata; per-sample writes below share
+        # one transaction and compensate every saved file on failure.
+        model_version = self._get_or_create_model_version()
+        saved_paths: list[str] = []
+        committed = False
         try:
+            petri_path = self._storage.save(
+                category=ImageCategory.PETRI,
+                original_file_name=request.petri_file_name,
+                content=request.petri_content,
+            )
+            saved_paths.append(petri_path)
             micro_path = self._storage.save(
                 category=ImageCategory.MICRO,
                 original_file_name=request.micro_file_name,
                 content=request.micro_content,
             )
-        except Exception:
-            self._storage.delete(petri_path)
+            saved_paths.append(micro_path)
+            with self._uow:
+                result = self._analyze_and_persist(
+                    request, petri_validation, micro_validation,
+                    petri_path, micro_path, model_version,
+                )
+                self._uow.commit()
+                committed = True
+            return result
+        except Exception as original_error:
+            # A session-close failure after commit must never delete files
+            # referenced by durable rows.
+            if committed:
+                raise
+            cleanup_failed = False
+            for path in reversed(saved_paths):
+                try:
+                    self._storage.delete(path)
+                except Exception:
+                    cleanup_failed = True
+                    logger.exception("failed to compensate analysis image storage")
+            if cleanup_failed:
+                raise ImageStorageCompensationError(
+                    "Analysis failed and saved image cleanup requires recovery"
+                ) from original_error
             raise
 
+    def _analyze_and_persist(
+        self,
+        request: TwoImageUploadRequest,
+        petri_validation: ImageValidationResult,
+        micro_validation: ImageValidationResult,
+        petri_path: str, micro_path: str, model_version: ModelVersion,
+    ) -> TwoImageUploadResult:
         sample_code = request.sample_code or f"AUTO-{uuid.uuid4().hex[:8].upper()}"
         collection_datetime = (
             datetime.combine(request.collection_date, time.min, tzinfo=timezone.utc)
             if request.collection_date is not None
             else None
         )
-        sample = self._sample_repo.add(
+        sample = self._uow.sample_repository.add(
             Sample(
                 sample_code=sample_code,
                 lot_code=request.lot_code,
@@ -108,7 +143,7 @@ class AnalyzeTwoUploadedImagesUseCase:
             )
         )
 
-        petri_image = self._petri_repo.add(
+        petri_image = self._uow.petri_image_repository.add(
             PetriImage(
                 sample_id=sample.id,
                 file_path=petri_path,
@@ -123,7 +158,7 @@ class AnalyzeTwoUploadedImagesUseCase:
             )
         )
 
-        micro_image = self._micro_repo.add(
+        micro_image = self._uow.micro_image_repository.add(
             MicroImage(
                 sample_id=sample.id,
                 file_path=micro_path,
@@ -139,7 +174,6 @@ class AnalyzeTwoUploadedImagesUseCase:
             )
         )
 
-        model_version = self._get_or_create_model_version()
         analysis_run = AnalysisRun.create(
             petri_image=petri_image,
             micro_image=micro_image,
@@ -235,15 +269,13 @@ class AnalyzeTwoUploadedImagesUseCase:
             warnings=output.warnings,
         )
 
-        with self._uow:
-            analysis_run.mark_processing()
-            analysis_run.mark_needs_review()
-            self._uow.analysis_run_repository.add(analysis_run)
-            saved_prediction = self._uow.prediction_repository.add(prediction)
-            self._uow.commit()
+        analysis_run.mark_processing()
+        analysis_run.mark_needs_review()
+        self._uow.analysis_run_repository.add(analysis_run)
+        saved_prediction = self._uow.prediction_repository.add(prediction)
 
         logger.info(
-            "preliminary_two_image_analysis persisted",
+            "preliminary_two_image_analysis prepared for commit",
             extra={
                 "analysis_run_id": str(analysis_run.id),
                 "sample_id": str(sample.id),
@@ -272,7 +304,7 @@ class AnalyzeTwoUploadedImagesUseCase:
             warnings=output.warnings,
         )
 
-    def _validate_bytes(self, file_name: str, mime_type: str, content: bytes):
+    def _validate_bytes(self, file_name: str, mime_type: str, content: bytes) -> ImageValidationResult:
         actual_size = len(content)
         if self._max_size is not None and actual_size > self._max_size:
             raise ImageTooLargeError(
@@ -287,7 +319,7 @@ class AnalyzeTwoUploadedImagesUseCase:
             version=_PRELIMINARY_ENGINE_VERSION,
             model_type=ModelType.CLASSICAL,
             description=(
-                "Explainable classical two-image engine. Version 0.5.0 persists structured "
+                "Explainable classical two-image engine. Version 0.6.0 adds reviewed colony counting and persists structured "
                 "laboratory metadata, separates quality dimensions, resolves bacterial-versus-"
                 "filamentous conflicts by abstention and attaches the blueberry morphology "
                 "differential 0.2.0. Non-trained, non-diagnostic and non-taxonomic."

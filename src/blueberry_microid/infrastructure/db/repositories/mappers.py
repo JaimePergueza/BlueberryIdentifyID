@@ -281,6 +281,8 @@ def human_review_to_entity(model: HumanReviewModel) -> HumanReview:
     return HumanReview(
         analysis_run_id=model.analysis_run_id,
         reviewer_name=model.reviewer_name,
+        reviewer_user_id=model.reviewer_user_id,
+        reviewed_colony_count=model.reviewed_colony_count,
         review_decision=model.review_decision,
         id=model.id,
         corrected_label=model.corrected_label,

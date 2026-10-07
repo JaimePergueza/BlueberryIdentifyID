@@ -39,8 +39,20 @@ class HumanReview:
     comments: Optional[str] = None
     is_final: bool = True
     created_at: datetime = field(default_factory=_utcnow)
+    reviewer_user_id: Optional[UUID] = None
+    reviewed_colony_count: Optional[int] = None
 
     def __post_init__(self) -> None:
+        if self.reviewed_colony_count is not None and (
+            type(self.reviewed_colony_count) is not int
+            or not 0 <= self.reviewed_colony_count <= 100000
+        ):
+            raise ValueError("reviewed_colony_count must be an integer between 0 and 100000")
+        if (
+            self.review_decision == ReviewDecision.REJECTED_INVALID_SAMPLE
+            and self.reviewed_colony_count is not None
+        ):
+            raise ValueError("an invalid sample cannot have a confirmed colony count")
         if self.review_decision == ReviewDecision.CORRECTED and self.corrected_label is None:
             raise MissingCorrectedLabelError(
                 "corrected_label is required when review_decision is 'corrected'"

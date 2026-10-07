@@ -1,4 +1,5 @@
 import { TaxonomicDifferential } from "./TaxonomicDifferential";
+import { ColonyCount } from "./ColonyCount";
 
 interface MorphologyEvidenceProps {
   featureSummary: Record<string, unknown> | null;
@@ -218,6 +219,8 @@ export function MorphologyEvidence({ featureSummary, qualitySummary, decisionTra
         <MetricCard eyebrow="Macroscopia" title="Caja Petri" metrics={petriMetrics} values={petri} />
         <MetricCard eyebrow="Microscopía" title="Estructuras visibles" metrics={microMetrics} values={micro} />
       </div>
+
+      <ColonyCount assessment={featureSummary?.colony_count} />
 
       {Object.keys(fusion).length > 0 && (
         <article className="card morphology-score-card">
