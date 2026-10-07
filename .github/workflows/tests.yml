@@ -37,7 +37,9 @@ jobs:
           node-version: "22"
 
       - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --global npm@11.9.0 --no-audit --no-fund
+          npm install --no-audit --no-fund
 
       - name: Run frontend tests and production build
         run: npm run check
