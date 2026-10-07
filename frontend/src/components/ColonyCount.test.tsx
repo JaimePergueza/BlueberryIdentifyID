@@ -6,7 +6,7 @@ describe("ColonyCount", () => {
   it("preserves zero as a preliminary count", () => {
     render(<ColonyCount assessment={{ status: "preliminary", estimated_count: 0 }} />);
     expect(screen.getByRole("heading", { name: "Conteo visual preliminar" })).toBeInTheDocument();
-    expect(screen.getByText(/regiones candidatas/)).toHaveTextContent("0");
+    expect(screen.getByText("regiones candidatas").parentElement).toHaveTextContent("0 regiones candidatas");
   });
 
   it("shows abstention instead of a count for confluent growth", () => {
